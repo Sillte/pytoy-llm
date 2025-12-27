@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytoy-llm"
+version = "0.1.0"
+description = "Thin, stateless LLM CLI wrapper for editor integrations (Vim/Neovim)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+
+dependencies = [
+  "litellm>=1.40.0",
+  "pydantic>=2.5",
+  "typer>=0.12",
+  "orjson>=3.9",
+]
+
+[dependency-groups]
+
+dev = [
+  "pytest",
+  "ruff",
+  "ty",
+]
+
+[project.optional-dependencies]
+
+# 将来 Python ライブラリ境界で Instructor を使うための布石
+instructor = [
+  "instructor>=1.5",
+]
+
+[project.scripts]
+pytoy-llm = "pytoy_llm.cli:app"
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
