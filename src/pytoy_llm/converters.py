@@ -1,5 +1,5 @@
 from pytoy_llm.models import InputMessage
-from pytoy_llm.models import SyncOutputMode, CustomLLMOutputModel, SyncOutput, SyncOutputType
+from pytoy_llm.models import CustomLLMOutputModel, SyncOutput, SyncOutputFormat
 from pydantic import ValidationError, BaseModel
 from typing import Sequence, cast, Mapping
 from litellm import ModelResponse, Choices
@@ -37,52 +37,24 @@ class InputConverter:
 
 
 class OutputConverter:
-    def _from_str_to_type(self, output_mode: SyncOutputMode) -> SyncOutputType:
-        if isinstance(output_mode, str):
-            if output_mode == "all":
-                output_type = ModelResponse
-            elif output_mode == "str":
-                output_type = str
-            else:
-                msg = "Unknown output_mode: {output_mode}"
-                raise ValueError(msg)
-        else:
-            output_type = output_mode
-        return output_type
-
-    def select_response_format_argment(self, output_mode: SyncOutputMode) -> type[BaseModel] | None:
-        """Return the appropriate `response_format` for `completion`.
-        """
-        output_type = self._from_str_to_type(output_mode)
-        is_user_naive_basemodel = bool(
-            issubclass(output_type, BaseModel)
-            and (not issubclass(output_type, ModelResponse))
-            and (not issubclass(output_type, CustomLLMOutputModel))
-        )  
-        if is_user_naive_basemodel:
-            assert issubclass(output_type, BaseModel)
-            return output_type
-        return None
-
-    def to_output(self, model_response: ModelResponse, output_mode: SyncOutputMode) -> SyncOutput:
-        output_type = self._from_str_to_type(output_mode) 
+    def to_output(
+        self, model_response: ModelResponse, output_format: SyncOutputFormat
+    ) -> SyncOutput:
         choices = cast(Choices, model_response.choices)
         if not choices:
             raise ValueError("No choices found in ModelResponse.")
 
         choice = choices[0]
         raw_content = choice.message.content or ""
+        output_type = output_format.output_type
 
-        if output_type is str:
+        if output_format.output_type is str:
             return raw_content
-
-        elif output_type == ModelResponse:
+        elif issubclass(output_type, ModelResponse):
             return model_response
-
         elif issubclass(output_type, CustomLLMOutputModel):
             return output_type.from_litellm_model_response(model_response)
         elif issubclass(output_type, BaseModel):
             return output_type.model_validate_json(raw_content)
-
         msg = f"`{output_type=}` cannot be handled."
         raise ValueError(msg)

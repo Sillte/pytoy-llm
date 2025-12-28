@@ -1,15 +1,19 @@
+**This library is prototypical and not sufficiently tested.**
+
+
 # pytoy-llm
 
 A thin, stateless LLM CLI wrapper designed for editor integrations  
-(Vim / Neovim).  
-Essentially, this library is LLM used for  [`vim-pytoy`](https://github.com/Sillte/vim-pytoy).
+(Vim / Neovim).
+
+This library is primarily used by [`vim-pytoy`](https://github.com/Sillte/vim-pytoy).
  
 `pytoy-llm` provides a **minimal, provider-agnostic boundary** around LLM
 completion APIs using [`litellm`](https://github.com/BerriAI/litellm),
 with strong emphasis on:
 
 - Stateless execution
-- Typed contracts (via Pydantic) (Not yet.)
+- Typed contracts (via Pydantic, partially implemented)
 
 ---
 
@@ -34,3 +38,48 @@ This design keeps the tool:
 - Predictable
 - Easy to audit
 - Easy to replace or extend
+
+### Usages
+
+#### Configuration setting
+
+First, execute the following script to generate a connection file.
+```python
+from pytoy_llm import initialize_configuration
+path = initialize_configuration("first_connect")
+print("ConnectionFile:", path) 
+```
+You will see the path to a configuration file like the following.
+Please fill your API info and model you want to use there.  
+```
+{
+    "model": "",
+    "base_url": "",
+    "api_key": ""
+}
+```
+
+Example: 
+```
+{
+    "model": "gemini/gemini-2.5-flash",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta",
+    "api_key": "<YOUR_SECRET_KEY>"
+}
+```
+
+#### `litellm.completion`.
+
+The simplest usage:
+
+- Input: `str`
+- Output: `str`
+
+```
+from pytoy_llm import completion
+output = completion("Hello, there.", output_format="str", connection="first_connect")
+```
+
+More advanced output formats (e.g. Pydantic models) are supported and documented...
+
+(To be continue...)

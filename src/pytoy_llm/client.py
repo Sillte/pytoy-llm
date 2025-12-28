@@ -1,5 +1,5 @@
 from litellm import completion, ModelResponse
-from pytoy_llm.models import Connection, InputMessage, SyncOutputMode
+from pytoy_llm.models import Connection, InputMessage, SyncOutputFormat, SyncOutputFormatStr
 from pytoy_llm.converters import InputConverter, OutputConverter
 from pytoy_llm.configurations import ConfigurationClient
 from typing import Sequence, Mapping
@@ -20,10 +20,17 @@ class PytoyLLMClient:
     def connection(self) -> Connection:
         return self._connection
 
-    def completion(self, content: str | Sequence[InputMessage | str | Mapping], output_mode: SyncOutputMode = str):
+    def completion(
+        self,
+        content: str | Sequence[InputMessage | str | Mapping],
+        output_format: SyncOutputFormat | SyncOutputFormatStr | type = str,
+    ):
+        if not isinstance(output_format, SyncOutputFormat):
+            output_format = SyncOutputFormat.from_any(output_format)
+
         messages = InputConverter().to_llm_messages(content)
         output_converter = OutputConverter()
-        response_format = output_converter.select_response_format_argment(output_mode)
+        response_format = output_format.litellm_response_format
 
         response = completion(
             model=self.connection.model,
@@ -33,10 +40,8 @@ class PytoyLLMClient:
             response_format=response_format,
         )
         assert isinstance(response, ModelResponse)
-        return output_converter.to_output(response, output_mode)
-
+        return output_converter.to_output(response, output_format)
 
 
 if __name__ == "__main__":
     pass
-

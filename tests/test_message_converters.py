@@ -1,7 +1,7 @@
 import pytest
 from litellm import ModelResponse
 from pydantic import BaseModel
-from pytoy_llm.models import LLMOutputModel
+from pytoy_llm.models import LLMOutputModel, SyncOutputFormat
 from pytoy_llm.converters import InputConverter, OutputConverter
 
 
@@ -61,14 +61,16 @@ def test_input_converter_sequence():
 def test_output_converter_str(mock_response):
     conv = OutputConverter()
     # モード "str" で文字列が返るか
-    res = conv.to_output(mock_response, "str")
+    output_format = SyncOutputFormat.from_any("str")
+    res = conv.to_output(mock_response, output_format)
     assert res == '{"answer": "fine"}'
 
 
 def test_output_converter_all(mock_response):
     conv = OutputConverter()
     # モード "all" で ModelResponse がそのまま返るか
-    res = conv.to_output(mock_response, "all")
+    output_format = SyncOutputFormat.from_any("all")
+    res = conv.to_output(mock_response, output_format)
     assert isinstance(res, ModelResponse)
     assert res.model == "gemini/gemini-2.0-flash"
 
@@ -76,7 +78,8 @@ def test_output_converter_all(mock_response):
 def test_output_converter_custom_model(mock_response):
     conv = OutputConverter()
     # LLMOutputModel (CustomLLMOutputModel継承) への変換
-    res = conv.to_output(mock_response, LLMOutputModel)
+    output_format = SyncOutputFormat.from_any(LLMOutputModel)
+    res = conv.to_output(mock_response, output_format)
     assert isinstance(res, LLMOutputModel)
     assert res.content == '{"answer": "fine"}'
     assert res.usage.total_tokens == 15
@@ -85,6 +88,7 @@ def test_output_converter_custom_model(mock_response):
 def test_output_converter_structured_json(mock_response):
     conv = OutputConverter()
     # 任意のBaseModelへのパース (Structured Output)
-    res = conv.to_output(mock_response, DummyStructuredModel)
+    output_format = SyncOutputFormat.from_any(DummyStructuredModel)
+    res = conv.to_output(mock_response, output_format)
     assert isinstance(res, DummyStructuredModel)
     assert res.answer == "fine"
