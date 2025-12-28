@@ -51,7 +51,7 @@ print("ConnectionFile:", path)
 ```
 You will see the path to a configuration file like the following.
 Please fill your API info and model you want to use there.  
-```
+```json
 {
     "model": "",
     "base_url": "",
@@ -60,11 +60,11 @@ Please fill your API info and model you want to use there.
 ```
 
 Example: 
-```
+```json
 {
     "model": "gemini/gemini-2.5-flash",
     "base_url": "https://generativelanguage.googleapis.com/v1beta",
-    "api_key": "<YOUR_SECRET_KEY>"
+    "api_key": "YOUR_SECRET_KEY"
 }
 ```
 
