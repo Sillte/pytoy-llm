@@ -12,6 +12,13 @@ def initialize_configuration(name: str = DEFAULT_NAME) -> Path:
     return ConfigurationClient().initialize_connection_file(name)
 
 
+def get_configuration_path(name: str = DEFAULT_NAME) -> Path:
+    path = ConfigurationClient().get_connection_path(name)
+    if not path.exists():
+        initialize_configuration(name)
+    return path
+
+
 def completion(
     content: str | list,
     output_format: SyncOutputFormat | SyncOutputFormatStr | type[BaseModel] = "str",
