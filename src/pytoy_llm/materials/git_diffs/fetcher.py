@@ -10,7 +10,7 @@ from pytoy_llm.materials.git_diffs.models import (
     FileDiff,
     AtomicChange,
     FileOperation,
-    DiffContainer,
+    DiffBundle,
 )
 import re
 
@@ -154,7 +154,7 @@ class GitDiffFetcher:
 
         self.operation_creator = FileOperationCreator()
 
-    def get_diff_commits(self, from_commit: str, to_commit: str) -> DiffContainer:
+    def get_diff_commits(self, from_commit: str, to_commit: str) -> DiffBundle:
         target_rev = self.repo.commit(to_commit)
         diffs = target_rev.diff(from_commit, create_patch=True)
         ops = self.operation_creator(diffs)
@@ -166,9 +166,9 @@ class GitDiffFetcher:
             )
             for op in ops
         ]
-        return DiffContainer(root_location=self.root_location, file_diffs=file_diffs)
+        return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
 
-    def get_diff_working_tree(self, base_commit: str | None) -> DiffContainer:
+    def get_diff_working_tree(self, base_commit: str | None) -> DiffBundle:
         diffs = self.repo.index.diff(base_commit, create_patch=True)
         ops = self.operation_creator(diffs)
         file_diffs = [
@@ -179,10 +179,10 @@ class GitDiffFetcher:
             )
             for op in ops
         ]
-        return DiffContainer(root_location=self.root_location, file_diffs=file_diffs)
+        return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
 
     @property
-    def diff_working_tree(self) -> DiffContainer:
+    def diff_working_tree(self) -> DiffBundle:
         return self.get_diff_working_tree(None)
 
 
