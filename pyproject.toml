@@ -15,6 +15,7 @@ dependencies = [
   "pydantic>=2.5",
   "typer>=0.12",
   "orjson>=3.9",
+  "GitPython",
 ]
 
 [dependency-groups]
