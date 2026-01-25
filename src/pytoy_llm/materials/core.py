@@ -1,6 +1,6 @@
 import json 
-from typing import Annotated, Sequence, Any, Mapping, Type, Literal
-from pydantic import BaseModel, Field
+from typing import Annotated, Sequence, Any, Mapping, Type, Literal, Union
+from pydantic import BaseModel, Field, TypeAdapter
 
 # --- 基本型の定義 ---
 type StructuredText = Annotated[
@@ -48,9 +48,31 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
         ))] = None
 
     type: Literal["model"] = "model"
+    
+    def _to_dumped_data_list_str(self) -> str:
+        #data_dump = [item.model_dump(mode="json") for item in self.data]
+        #json.dumps(data_dump, indent=4, ensure_ascii=False)
+        if self.data:
+            # 1. データに含まれる全ての型を抽出して Union 型を作る
+            distinct_types = set(type(item) for item in self.data)
+            distinct_types = tuple(sorted(distinct_types, key=lambda t: (t.__module__, t.__qualname__)))
+            if len(distinct_types) > 1:
+                target_type = list[Union[*distinct_types]] # type: ignore
+            elif len(distinct_types) == 1:
+                target_type = list[distinct_types[0]]
+            else:
+                raise RuntimeError("ImplementionError.")
+            # 2. その型定義でアダプターを作成
+            adapter = TypeAdapter(target_type)
+            return adapter.dump_json(
+                self.data, indent=4, ensure_ascii=False
+            ).decode()
+        else:
+            return "[]"
 
     def compose_str(self) -> str:
-        data_dump = [item.model_dump() for item in self.data]
+        json_data_str = self._to_dumped_data_list_str()
+
         json_schemas = (
             [self.schema_model.model_json_schema()]
             if self.schema_model
@@ -63,7 +85,7 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
         return (
             f"### Description\n\n{self.description}\n\n"
             f"### Json Schemas used in this SECTION\n\n{schema_fragments}\n\n"
-            f"### Json Data\n\n{json.dumps(data_dump, indent=4, ensure_ascii=False)}\n\n"
+            f"### Json Data\n\n```json{json_data_str}```\n\n"
         )
     
 

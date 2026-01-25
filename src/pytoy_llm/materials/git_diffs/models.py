@@ -106,14 +106,14 @@ class DiffBundle(BaseModel, frozen=True):
         """LLM-friendly structured text for the diff bundle."""
         import time
         timestamp = time.time()
-        bodies = "\n".join([fd.structured_text for fd in self.file_diffs])
+        body = "\n\n".join([fd.structured_text for fd in self.file_diffs])
         
         structured_text = (
             f"===DiffBundle===\n"
             f"- Root location: {self.root_location}\n"
             f"- Timestamp: {timestamp}\n"
             f"===Files===\n"
-            f"{'\n\n'.join(bodies)}"
+            f"{body}"
         )
         description = "Structured representation of file diffs in this bundle."
         return TextSectionData(
