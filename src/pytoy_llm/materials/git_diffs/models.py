@@ -37,20 +37,20 @@ class AtomicChange(BaseModel, frozen=True):
 # -------------------------
 class FileAdd(BaseModel, frozen=True):
     """Represents a file creation."""
-    path: Annotated[Path, Field(description="Path to the new file")]
+    path: Annotated[Path, Field(description="Relative path to the new file from the git root.")]
     lines: Annotated[Sequence[str], Field(description="Content lines of the new file")]
     op_type: Literal["Add"] = "Add"
     
 
 class FileDelete(BaseModel, frozen=True):
     """Represents a file deletion."""
-    path: Annotated[Path, Field(description="Path to the deleted file")]
+    path: Annotated[Path, Field(description="Relative path to the deleted file from the git root.")]
     old_lines: Annotated[Sequence[str], Field(description="Content lines of the deleted file")]
     op_type: Literal["Delete"] = "Delete"
 
 class FileModify(BaseModel, frozen=True):
     """Represents modifications to an existing file."""
-    path: Annotated[Path, Field(description="Path to the modified file")]
+    path: Annotated[Path, Field(description="Relative path to the modified file from the git root.")]
     atomic_changes: Annotated[Sequence[AtomicChange], Field(description="Sequence of atomic changes applied to the file")]
     op_type: Literal["Modify"] = "Modify"
 

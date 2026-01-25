@@ -7,6 +7,7 @@ from pytoy_llm.materials.git_diffs.models import (
     FileDelete,
     FileModify,
     FileDiff,
+    FileOperation,
     AtomicChange,
     FileOperation,
     DiffBundle,
@@ -181,14 +182,22 @@ class GitDiffCollector:
 
     
     def _create_bundle_from_ops(self, diffs: Any, timestamp_provider: Callable[[Path], float]) -> DiffBundle:
+        def _relative_location(operation: FileOperation) -> tuple[str, ...] | None:
+            try:
+                return (self.workspace / operation.path).relative_to(self.root_folder).parts
+            except ValueError:
+                # path is outside the root_folder
+                # optionally log warning here if needed
+                pass
+            return None
         ops = self.operation_creator(diffs)
         file_diffs = [
             FileDiff(
                 operation=op,
                 timestamp=timestamp_provider(op.path),
-                location=op.path.relative_to(self.workspace).parts,
+                location=location,
             )
-            for op in ops
+            for op in ops if ((location:=_relative_location(op)) is not None)
         ]
         return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
 
