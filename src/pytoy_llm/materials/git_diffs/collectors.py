@@ -145,7 +145,7 @@ class GitDiffCollector:
             repo_path = Path(".")
         repo_path = Path(repo_path)
         self.repo_path = repo_path if repo_path.is_dir() else repo_path.parent
-        self.repo = Repo(self.repo_path)
+        self.repo = Repo(self.repo_path, search_parent_directories=True)
         self.workspace = Path(self.repo.git_dir).parent
         self.root_folder = Path(root_folder) if root_folder else self.workspace
 
