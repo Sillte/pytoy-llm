@@ -129,3 +129,7 @@ class TextFileBundle(BaseModel, frozen=True):
         rel = cwd.relative_to(workspace)
         root_location = rel.parts
         return cls(root_location=root_location, text_files=text_files)
+    
+
+class TextFileBundleQuery(BaseModel, frozen=True):
+    """Currently, no-queries, however, we can set these parameters later."""

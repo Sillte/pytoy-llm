@@ -4,7 +4,7 @@ from typing import Sequence, Self
 from datetime import datetime
 import time
 from pytoy_llm.materials.utils import FileGatherer
-from pytoy_llm.materials.text_files.models import TextFile, TextFileBundle
+from pytoy_llm.materials.text_files.models import TextFile, TextFileBundle, TextFileBundleQuery
 
 
 class TextFilesCollector:
@@ -24,6 +24,11 @@ class TextFilesCollector:
 
     @property
     def bundle(self) -> TextFileBundle:
+        query = TextFileBundleQuery()
+        return self.get_bundle(query)
+    
+    def get_bundle(self, query: TextFileBundleQuery) -> TextFileBundle:
+        _ = query # Todo: parameters of`FileGatherer` can be set by `TextFileBundleQueyr` in the future.
         paths = FileGatherer().gather(self._cwd)
         paths = [path for path in paths if path.suffix == self._ext]
         text_files = [TextFile.from_path(path, self._workspace) for path in paths]

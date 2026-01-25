@@ -4,6 +4,11 @@ from pydantic import BaseModel
 from textwrap import dedent
 from typing import Sequence, Literal
 
+from pytoy_llm.materials.composers.models import LLMTask, SectionUsage
+from pytoy_llm.materials.core import TextSectionData
+from pytoy_llm.materials.basemodels import BaseModelBundle
+from pytoy_llm.materials.composers.task_prompt_composer import TaskPromptComposer
+
 
 def construct_basemodel[T:BaseModel](user_prompt: str,
                         instances: Sequence[BaseModel],
@@ -14,105 +19,103 @@ def construct_basemodel[T:BaseModel](user_prompt: str,
         system_prompt = make_system_prompt(output_type, instances, "python_code")
     else:
         system_prompt = make_system_prompt(output_type, instances, "instance")
-    user_prompt = make_user_prompt(user_prompt)
-
-    messages = [InputMessage(role="system", content=system_prompt), 
-                InputMessage(role="user", content=user_prompt), 
-    ]
+    user_message= InputMessage(role="user", content=user_prompt)
+    messages = [InputMessage(role="system", content=system_prompt), user_message] 
     return completion(messages, output_format=output_format)
                         
-
-
 def make_system_prompt(
     output_cls: type[BaseModel],
     instances: Sequence[BaseModel],
     output_mode: Literal["python_code", "instance"] = "python_code",
 ) -> str:
-    """
-    Generate a system prompt for LLM.
-    
-    output_mode:
-        - "python_code": produce Python code constructing the target object
-        - "instance": produce the actual BaseModel instance
-    """
+
     output_schema = output_cls.model_json_schema()
     target_class_name = output_schema["title"]
 
-    # collect all unique classes
-    schema_origin_cls_list = list(set(type(elem) for elem in instances) | {output_cls})
-
-    # JSON schema string
-    def _to_one_json_schema(cls: type[BaseModel], tag_name="json-schema") -> str:
-        return f"<{tag_name}> {cls.model_json_schema()}/<{tag_name}>"
-    json_schema_str = "\n".join(_to_one_json_schema(cls) for cls in schema_origin_cls_list)
-
-    # Instances string
-    def _to_one_instance(inst: BaseModel, tag_name="json") -> str:
-        return f"<{tag_name}> {inst.model_dump_json()}/<{tag_name}>"
-    instances_str = "\n".join(_to_one_instance(item) for item in instances)
+    bundle = BaseModelBundle(data=instances)
+    
+    usage = SectionUsage(
+        bundle_kind=bundle.bundle_kind,
+        usage_rule=[
+            "Use these examples as reference.",
+            "Follow the structure exactly.",
+            "The output MUST be regarded natual as one of examples of the reference.",
+            "Respect field descriptions as guidance."
+        ]
+    )
 
     # Decide output instruction
     if output_mode == "python_code":
-        output_instr = dedent(f"""
+        output_spec = dedent(f"""
+        The output must be a statement of python code. 
         Produce valid Python code that constructs a `{target_class_name}` instance.
         Use `None` or `null` for fields if necessary when you cannot infer them from the user's input.
         Do not include explanations or comments.
-        Example:
+
+        Example of outputs:
+        ------------------------------
         ```python
-        ParameterClass(param_int=5, 
+        BaseModelClass(param_int=5, 
                        param_str="hello", 
                        param_cls=ChildClass(val=2))
         ```
         """)
     else:  # instance
-        output_instr = dedent(f"""
-        Produce a valid `{target_class_name}` instance directly.
+        output_spec = dedent(f"""
+        Produce a valid `{target_class_name}` instance directly via `json`.
         Use `None` for fields if necessary when you cannot infer them from the user's input.
         Do not include explanations or comments.
         """).strip()
 
-    system_prompt = dedent(f"""
-    =====================
-    LLM Role / Rules
-    =====================
-
-    You are a construction assistant.
-    Your role is to produce a valid instance of `{target_class_name}` strictly following the examples provided.
-
-    Rules:
-    - Do NOT invent new relationships not observed in the instances.
-    - Do NOT include other information than ones to construct the target object.
-    - Do not add extra explanations or commentary.
-    - Respect field descriptions as guidance.
-
-    =====================
-    References (Context Information)
-    =====================
-
-    ## Json Schema
-    {json_schema_str}
-
-    ## Instances
-    {instances_str}
-
-    =====================
-    Output Format
-    =====================
-
-    {output_instr}
-    """).strip()
-
-    return system_prompt
+    task = LLMTask(
+        name="Construct BaseModel Instances",
+        intent=(
+        "Construct instances strictly following the examples provided.\n"
+        "Do not invent new relationships not observed in the instances.\n"
+        "Follow the field descriptions as guidance.\n"
+        ),
+        rules=[
+            "Do NOT invent new relationships not observed in the instances.",
+            "Do NOT add extra explanations or commentary."
+        ],
+        output_description=f"Instance of {target_class_name}",
+        output_spec=output_spec,
+        role=f"You are a construction assistant. You have responsibility and pride for generating useful `{target_class_name}`"
+    )
+    composer = TaskPromptComposer(task, [usage], [bundle.model_section_data])
+    return composer.compose_prompt()
 
 
-def make_user_prompt(user_prompt: str) -> str:
-    """
-    Wrap the user request into a separate prompt message.
-    """
-    return dedent(f"""
-    =====================
-    User Request
-    =====================
-    {user_prompt}
-    """).strip()
 
+if __name__ == "__main__":
+    from pydantic import BaseModel
+    from typing import Sequence
+
+    class SampleModel(BaseModel):
+        name: str
+        value: int
+
+    # --- 既存例（参考用） ---
+    examples: Sequence[SampleModel] = [
+        SampleModel(name="example1", value=10),
+        SampleModel(name="example2", value=20),
+        SampleModel(name="example3", value=50),
+    ]
+
+    # --- ユーザーの意図は曖昧に与える ---
+    user_input = (
+        "Create a SampleModel instance with a common name and around average value. "
+        "Refer to the examples for guidance."
+    )
+
+    # --- LLMに投げる ---
+    result_instance = construct_basemodel(
+        user_prompt=user_input,
+        instances=examples,
+        output_type=SampleModel,
+        output_format=SampleModel,  # 直接BaseModelインスタンス
+    )
+
+    print("result_instance", result_instance)
+
+    print("Generated SampleModel:", result_instance)

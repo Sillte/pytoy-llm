@@ -55,7 +55,7 @@ class FileModify(BaseModel, frozen=True):
     op_type: Literal["Modify"] = "Modify"
 
 
-FileOperation = FileAdd | FileDelete | FileModify
+type FileOperation = FileAdd | FileDelete | FileModify
 
 # -------------------------
 # FileDiff
@@ -131,3 +131,8 @@ class DiffBundle(BaseModel, frozen=True):
             description=description,
             data=[self] 
         )
+
+
+class GitDiffBundleQuery(BaseModel, frozen=True):
+    from_rev: str | Literal["index"] | Literal["head"]= "head"
+    to_rev: str |  Literal["working-tree"] | Literal["index"] | None = "working-tree"

@@ -1,9 +1,8 @@
 from pathlib import Path
 from pytoy_llm.materials.git_diffs.models import LineRange
-from typing import Sequence, Callable
+from typing import Sequence, Callable, Any
 from git import Repo, Diff, DiffIndex
 from pytoy_llm.materials.git_diffs.models import (
-    LineRange, 
     FileAdd,
     FileDelete,
     FileModify,
@@ -11,6 +10,7 @@ from pytoy_llm.materials.git_diffs.models import (
     AtomicChange,
     FileOperation,
     DiffBundle,
+    GitDiffBundleQuery
 )
 import re
 
@@ -39,7 +39,7 @@ class _HunkState:
 def _to_str(arg: str | bytes) -> str:
     if isinstance(arg, str):
         return arg
-    return arg.decode("utf-8", errors="ignore")
+    return arg.decode("utf-8", errors="ignore")  # type: ignore
 
 
 class FileAddCreator:
@@ -134,16 +134,17 @@ class FileOperationCreator:
             else:
                 pass
         return file_operations
+    
 
-
-class GitDiffFetcher:
+class GitDiffCollector:
     def __init__(
         self, repo_path: str | Path | None = None, root_folder: str | Path | None = None
     ) -> None:
-        # Note: `repo_path
+        # Note: `repo_path should be a directory.
         if repo_path is None:
             repo_path = Path(".")
-        self.repo_path = Path(repo_path)
+        repo_path = Path(repo_path)
+        self.repo_path = repo_path if repo_path.is_dir() else repo_path.parent
         self.repo = Repo(self.repo_path)
         self.workspace = Path(self.repo.git_dir).parent
         self.root_folder = Path(root_folder) if root_folder else self.workspace
@@ -153,28 +154,38 @@ class GitDiffFetcher:
         self.root_location: Sequence[str] = self.root_folder.relative_to(self.workspace).parts
 
         self.operation_creator = FileOperationCreator()
+        
+    def get_bundle(self, query: GitDiffBundleQuery) -> DiffBundle:
+        from_rev = query.from_rev
+        to_rev = query.to_rev
+        
+        if from_rev == "index":
+            base = self.repo.index
+        else:
+            from_rev = from_rev or "HEAD"
+            base = self.repo.commit(from_rev)
+            
+        if to_rev == "index":
+            diffs = base.diff(create_patch=True)
+            timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1 # noqa: E731
+        elif to_rev == "working-tree":
+            diffs = base.diff(None, create_patch=True)
+            timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1 # noqa: E731
+        else:
+            to_rev = to_rev or "HEAD"
+            diffs = base.diff(to_rev, create_patch=True)
+            timestamp = self.repo.commit(to_rev).committed_date
+            timestamp_provider = lambda _: float(timestamp) # noqa: E731
+        return self._create_bundle_from_ops(diffs, timestamp_provider)
+    
 
-    def get_diff_commits(self, from_commit: str, to_commit: str) -> DiffBundle:
-        target_rev = self.repo.commit(to_commit)
-        diffs = target_rev.diff(from_commit, create_patch=True)
+    
+    def _create_bundle_from_ops(self, diffs: Any, timestamp_provider: Callable[[Path], float]) -> DiffBundle:
         ops = self.operation_creator(diffs)
         file_diffs = [
             FileDiff(
                 operation=op,
-                timestamp=target_rev.committed_date,
-                location=op.path.relative_to(self.workspace).parts,
-            )
-            for op in ops
-        ]
-        return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
-
-    def get_diff_working_tree(self, base_commit: str | None) -> DiffBundle:
-        diffs = self.repo.index.diff(base_commit, create_patch=True)
-        ops = self.operation_creator(diffs)
-        file_diffs = [
-            FileDiff(
-                operation=op,
-                timestamp=op.path.stat().st_mtime,
+                timestamp=timestamp_provider(op.path),
                 location=op.path.relative_to(self.workspace).parts,
             )
             for op in ops
@@ -182,8 +193,9 @@ class GitDiffFetcher:
         return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
 
     @property
-    def diff_working_tree(self) -> DiffBundle:
-        return self.get_diff_working_tree(None)
+    def bundle(self) -> DiffBundle:
+        return self.get_bundle(GitDiffBundleQuery(from_rev="head", to_rev="working-tree"))
+
 
 
 if __name__ == "__main__":
