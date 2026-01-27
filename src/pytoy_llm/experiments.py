@@ -16,8 +16,8 @@ def construct_basemodel[T:BaseModel](user_prompt: str,
                         output_format: type[str] | type[T], 
                      *, explanation: str | None = None) -> str | T:
     """
-    explanation: IF addtional explanation is necessary for BaseModel.
-    Please input them.
+    explanation: If addtional explanation is necessary for construction of BaseModel.
+    Please provide them.
     """
 
     if output_format is str:

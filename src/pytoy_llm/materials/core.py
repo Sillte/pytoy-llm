@@ -1,6 +1,8 @@
 import json 
 from typing import Annotated, Sequence, Any, Mapping, Type, Literal, Union
 from pydantic import BaseModel, Field, TypeAdapter
+import warnings
+
 
 # --- 基本型の定義 ---
 type StructuredText = Annotated[
@@ -31,6 +33,9 @@ class TextSectionData(BaseModel, frozen=True):
     type: Literal["text"] = "text"
     
     def compose_str(self) -> str:
+        warn_forbidden_headers(self.description) 
+        warn_forbidden_headers(self.structured_text) 
+
         return (
         f"### Description\n\n{self.description}\n\n"
         f"### Structured Text\n\n{self.structured_text}\n"
@@ -71,6 +76,7 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
             return "[]"
 
     def compose_str(self) -> str:
+        warn_forbidden_headers(self.description) 
         json_data_str = self._to_dumped_data_list_str()
 
         json_schemas = (
@@ -90,3 +96,28 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
     
 
 type SectionData = TextSectionData | ModelSectionData
+
+
+
+def warn_forbidden_headers(text: str,
+                           min_allowed_header_level: int = 3,
+                           skip_first: bool = True) -> None:
+    """
+    Check each line. Warn if a header is too high (e.g., # or ##) 
+    compared to the minimum allowed header level.
+    """
+    if skip_first:  
+        start = 1
+    else:
+        start = 0
+    for i, line in enumerate(text.splitlines(), start=start):
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            header_level = len(stripped) - len(stripped.lstrip('#'))
+            if header_level < min_allowed_header_level:
+                warnings.warn(
+                    f"Line {i}: header level {header_level} "
+                    f"is below minimum allowed ({min_allowed_header_level}). "
+                    "Consider deeper headers for injected structure.",
+                    UserWarning
+                )

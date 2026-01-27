@@ -1,7 +1,7 @@
 from pytoy_llm.materials.composers.models import LLMTask, SectionUsage, SectionDataComposer
 from typing import Annotated, Sequence
 from pydantic import BaseModel, Field
-from pytoy_llm.materials.core import TextSectionData, ModelSectionData, SectionData
+from pytoy_llm.materials.core import TextSectionData, ModelSectionData, SectionData, warn_forbidden_headers
 from pytoy_llm.models import InputMessage
 
 class TaskPromptComposer:
@@ -22,9 +22,10 @@ class TaskPromptComposer:
     def compose_prompt(self) -> str:
         # Task header
         task_header = f"# Task: {self.task.name}\n\n"
-
+        warn_forbidden_headers(self.task.name, min_allowed_header_level=5)
         # Intent
         task_intent = f"## Task Intent\n\n{self.task.intent}\n\n"
+        warn_forbidden_headers(self.task.intent, min_allowed_header_level=2)
 
         # Rules
         task_rules = ""
@@ -33,6 +34,7 @@ class TaskPromptComposer:
 
         # Role
         role_str = f"## Role\n{self.task.role}\n\n" if self.task.role else ""
+        warn_forbidden_headers(role_str, min_allowed_header_level=2)
 
         # SectionUsage + SectionData
         sections_str = SectionDataComposer.compose_sections_with_usage(
@@ -42,12 +44,16 @@ class TaskPromptComposer:
 
         # Output specification
         output_description = f"## Expected Output\n\n{self.task.output_description}\n\n"
+        warn_forbidden_headers(self.task.output_description, min_allowed_header_level=2)
 
         if self.task.output_spec:
             output_spec_str = f"## Output Specification\n\n{self.task.output_spec}\n\n"
+            warn_forbidden_headers(str(self.task.output_spec), min_allowed_header_level=2)
         else:
             output_spec_str = ""
 
+        if self.task.reasoning_guidance:
+            warn_forbidden_headers(self.task.reasoning_guidance, min_allowed_header_level=2)
         # Reasoning guidance
         reasoning = f"## Reasoning Guidance\n\n{self.task.reasoning_guidance}\n\n" if self.task.reasoning_guidance else ""
 
