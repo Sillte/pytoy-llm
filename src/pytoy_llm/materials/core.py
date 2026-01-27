@@ -34,7 +34,10 @@ class TextSectionData(BaseModel, frozen=True):
     
     def compose_str(self) -> str:
         warn_forbidden_headers(self.description) 
-        warn_forbidden_headers(self.structured_text) 
+
+        # The below is intentional.
+        # Since `structure_text` is free format inside the tag.
+        # warn_forbidden_headers(self.structured_text)  
 
         return (
         f"### Description\n\n{self.description}\n\n"
