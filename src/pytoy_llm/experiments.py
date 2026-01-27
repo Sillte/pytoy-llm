@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from textwrap import dedent
 from typing import Sequence, Literal
 
-from pytoy_llm.materials.composers.models import LLMTask, SectionUsage
+from pytoy_llm.materials.composers.models import LLMTask, SectionUsage, SectionData, TextSectionData
 from pytoy_llm.materials.core import TextSectionData
 from pytoy_llm.materials.basemodels import BaseModelBundle
 from pytoy_llm.materials.composers.task_prompt_composer import TaskPromptComposer
@@ -13,12 +13,17 @@ from pytoy_llm.materials.composers.task_prompt_composer import TaskPromptCompose
 def construct_basemodel[T:BaseModel](user_prompt: str,
                         instances: Sequence[BaseModel],
                         output_type: type[T],
-                        output_format: type[str] | type[T]) -> str | T:
+                        output_format: type[str] | type[T], 
+                     *, explanation: str | None = None) -> str | T:
+    """
+    explanation: IF addtional explanation is necessary for BaseModel.
+    Please input them.
+    """
 
     if output_format is str:
-        system_prompt = make_system_prompt(output_type, instances, "python_code")
+        system_prompt = make_system_prompt(output_type, instances, "python_code", explanation=explanation)
     else:
-        system_prompt = make_system_prompt(output_type, instances, "instance")
+        system_prompt = make_system_prompt(output_type, instances, "instance", explanation=explanation)
     user_message= InputMessage(role="user", content=user_prompt)
     messages = [InputMessage(role="system", content=system_prompt), user_message] 
     return completion(messages, output_format=output_format)
@@ -27,12 +32,16 @@ def make_system_prompt(
     output_cls: type[BaseModel],
     instances: Sequence[BaseModel],
     output_mode: Literal["python_code", "instance"] = "python_code",
+    *,
+    explanation : str | None = None
 ) -> str:
 
     output_schema = output_cls.model_json_schema()
     target_class_name = output_schema["title"]
 
     bundle = BaseModelBundle(data=instances)
+    section_data_list: list[SectionData] = [bundle.model_section_data]
+    usages: list[SectionUsage]  = []
     
     usage = SectionUsage(
         bundle_kind=bundle.bundle_kind,
@@ -43,6 +52,7 @@ def make_system_prompt(
             "Respect field descriptions as guidance."
         ]
     )
+    usages.append(usage)
 
     # Decide output instruction
     if output_mode == "python_code":
@@ -82,7 +92,18 @@ def make_system_prompt(
         output_spec=output_spec,
         role=f"You are a construction assistant. You have responsibility and pride for generating useful `{target_class_name}`"
     )
-    composer = TaskPromptComposer(task, [usage], [bundle.model_section_data])
+    if explanation:
+        bundle_kind = "AdditionalExplanation"
+        section_data = TextSectionData(bundle_kind=bundle_kind,
+                        description=explanation,
+                        structured_text=explanation)
+        usage = SectionUsage(bundle_kind=bundle_kind, 
+                             usage_rule=["This section provides problem-specific hints not covered by the examples."])
+        usages.append(usage)
+        section_data_list.append(section_data)
+        
+
+    composer = TaskPromptComposer(task, usages, section_data_list)
     return composer.compose_prompt()
 
 
@@ -102,18 +123,22 @@ if __name__ == "__main__":
         SampleModel(name="example3", value=50),
     ]
 
+
     # --- ユーザーの意図は曖昧に与える ---
     user_input = (
-        "Create a SampleModel instance with a common name and around average value. "
+        "Create a SampleModel instance with a common name and a high value. "
         "Refer to the examples for guidance."
     )
+
+    explanation = "The maximum value of `SampleModel.value` is about 10000."
 
     # --- LLMに投げる ---
     result_instance = construct_basemodel(
         user_prompt=user_input,
         instances=examples,
         output_type=SampleModel,
-        output_format=SampleModel,  # 直接BaseModelインスタンス
+        output_format=SampleModel,  # 直接BaseModelインスタンス,
+        explanation=explanation
     )
 
     print("result_instance", result_instance)
