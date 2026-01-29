@@ -30,6 +30,13 @@ def test_task_prompt_composer_basic():
                 "Use these examples as reference.",
                 "Follow the style shown in examples."
             ]
+        ),
+        SectionUsage(
+            bundle_kind="ModelData",
+            usage_rule=[
+                "Use these examples as models.",
+                "Utilize models."
+            ]
         )
     ]
 
@@ -55,7 +62,8 @@ def test_task_prompt_composer_basic():
     # --- 簡単なチェック ---
     assert "Sample Task" in prompt_str
     assert "Rewrite the following text" in prompt_str
-    assert "### Usage for SECTION (bundle_kind = `TextExamples`)" in prompt_str
+    print(prompt_str)
+    assert "## Section (bundle_kind=`TextExamples`)" in prompt_str
     assert "Example sentences to guide rewriting" in prompt_str
     assert "Sample model instances" in prompt_str
 
@@ -65,5 +73,6 @@ def test_task_prompt_composer_basic():
     messages = composer.compose_messages(user_prompt="UserPrompt")
     assert len(messages) == 2
 
-
+if __name__ == "__main__":
+    test_task_prompt_composer_basic()
 

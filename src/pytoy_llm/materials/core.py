@@ -35,13 +35,13 @@ class TextSectionData(BaseModel, frozen=True):
     def compose_str(self) -> str:
         warn_forbidden_headers(self.description) 
 
-        # The below is intentional.
+        # The below comment out for `warn_forbiddenn_headers` is intentional.
         # Since `structure_text` is free format inside the tag.
         # warn_forbidden_headers(self.structured_text)  
 
         return (
-        f"### Description\n\n{self.description}\n\n"
-        f"### Structured Text\n\n{self.structured_text}\n"
+        f"#### Description\n\n{self.description}\n\n"
+        f"#### Structured Text\n\n{self.structured_text}\n"
         )
 
 
@@ -92,9 +92,9 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
             for schema in json_schemas
         )
         return (
-            f"### Description\n\n{self.description}\n\n"
-            f"### Json Schemas used in this SECTION\n\n{schema_fragments}\n\n"
-            f"### Json Data\n\n```json{json_data_str}```\n\n"
+            f"#### Description\n\n{self.description}\n\n"
+            f"#### Json Schemas\n\n{schema_fragments}\n\n"
+            f"#### Json Data\n\n```json\n{json_data_str}\n```\n\n"
         )
     
 
@@ -103,7 +103,7 @@ type SectionData = TextSectionData | ModelSectionData
 
 
 def warn_forbidden_headers(text: str,
-                           min_allowed_header_level: int = 3,
+                           min_allowed_header_level: int = 4,
                            skip_first: bool = True) -> None:
     """
     Check each line. Warn if a header is too high (e.g., # or ##) 

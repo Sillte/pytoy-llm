@@ -53,6 +53,6 @@ def test_compose_str_contains_sections():
     text = section.compose_str()
 
     assert "### Description" in text
-    assert "### Json Schemas used in this SECTION" in text
+    assert "### Json Schemas" in text
     assert "### Json Data" in text
     assert '"a": 1' in text

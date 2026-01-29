@@ -98,17 +98,33 @@ class SectionDataComposer:
         
     @classmethod
     def compose_sections_with_usage(cls, usages: Sequence["SectionUsage"], data_list: Sequence["SectionData"]) -> str:
-        # 照合チェック: usage の bundle_kind が sections に存在するか
-        section_bundle_kinds = {data.bundle_kind for data in data_list}
+        section_bundle_kinds = {data.bundle_kind: data for data in data_list}
+        kind_to_pair: dict[str, tuple[SectionUsage, SectionData]] = {}
         for usage in usages:
             if usage.bundle_kind not in section_bundle_kinds:
                 raise ValueError(
                     f"SectionUsage.bundle_kind='{usage.bundle_kind}' "
                     f"does not match any SectionData.bundle_kind"
                 )
-        usage_section = SectionUsage.compose_from_usages(usages) 
-        sections = [cls(data).compose() for data in data_list]
-        return "\n\n".join([usage_section, *sections])
+            kind_to_pair[usage.bundle_kind] = (usage, section_bundle_kinds[usage.bundle_kind])
+
+        lines = ["--------------------SECTIONS---------------------",]
+        
+        for bundle_kind, (usage, data) in kind_to_pair.items():
+            lines.append(f"## Section (bundle_kind=`{bundle_kind}`)")
+            lines.append(f"### Section Instruction (bundle_kind=`{bundle_kind}`)")
+            lines.append("1. Read the `Section Usage` rules carefully.")
+            lines.append("2. Read the `Section Data` content rules carefully.")
+            lines.append("3. Refer to `Usage` to determine how to utilize `Data`.")
+            lines.append(f"### Section Usage (bundle_kind=`{bundle_kind}`)")
+            lines.append(f"#### Section Rules for (bundle_kind=`{bundle_kind}`)")
+            rules_text = "\n".join(f"* {rule}" for rule in usage.usage_rule)
+            lines.append(rules_text)
+            lines.append(f"### Section Data (bundle_kind=`{bundle_kind}`)")
+            lines.append(data.compose_str())
+            lines.append("\n\n")
+        lines.append("-----------------------------------------")
+        return "\n".join(lines)
             
     def compose(self) -> str:
         header = f"----------[SECTION (bundle_kind=`{self.section.bundle_kind}`)]----------\n"
