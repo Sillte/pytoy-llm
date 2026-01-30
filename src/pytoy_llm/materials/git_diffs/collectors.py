@@ -9,7 +9,6 @@ from pytoy_llm.materials.git_diffs.models import (
     FileDiff,
     FileOperation,
     AtomicChange,
-    FileOperation,
     DiffBundle,
     GitDiffBundleQuery
 )

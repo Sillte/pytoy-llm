@@ -49,7 +49,7 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
     """Section representing a sequence of BaseModel instances with optional schema."""
     bundle_kind: BundleKind
     description: SectionDescription
-    data: Sequence[T] = Field(..., description="Sequence of BaseModel instances represented by this section.")
+    instances: Sequence[T] = Field(..., description="Sequence of BaseModel instances represented by this section.")
     schema_model: Annotated[type[T] | None, Field(description=(
             "Optional schema model describing the structure of the data. "
             "If None, the schema is inferred from the elements in `data`."
@@ -58,11 +58,12 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
     type: Literal["model"] = "model"
     
     def _to_dumped_data_list_str(self) -> str:
+        # Currently, for readability, thi function is not used. 
         #data_dump = [item.model_dump(mode="json") for item in self.data]
         #json.dumps(data_dump, indent=4, ensure_ascii=False)
-        if self.data:
+        if self.instances:
             # 1. データに含まれる全ての型を抽出して Union 型を作る
-            distinct_types = set(type(item) for item in self.data)
+            distinct_types = set(type(item) for item in self.instances)
             distinct_types = tuple(sorted(distinct_types, key=lambda t: (t.__module__, t.__qualname__)))
             if len(distinct_types) > 1:
                 target_type = list[Union[*distinct_types]] # type: ignore
@@ -73,19 +74,33 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
             # 2. その型定義でアダプターを作成
             adapter = TypeAdapter(target_type)
             return adapter.dump_json(
-                self.data, indent=4, ensure_ascii=False
+                self.instances, indent=4, ensure_ascii=False
             ).decode()
         else:
             return "[]"
 
     def compose_str(self) -> str:
         warn_forbidden_headers(self.description) 
-        json_data_str = self._to_dumped_data_list_str()
+        #json_instance_str = self._to_dumped_data_list_str()
+        if not self.instances:
+            return ("#### Desciption\n\n"
+                    f"{self.description}"
+                    "No json exist.\n")
+
+        data_parts = []
+        for item in self.instances:
+            part = ("```json\n" 
+                    f"{item.model_dump_json(ensure_ascii=False)}"
+                    "```"
+            )
+            data_parts.append(part)
+        json_instance_str = "\n".join(data_parts)
+        
 
         json_schemas = (
             [self.schema_model.model_json_schema()]
             if self.schema_model
-            else [cls.model_json_schema() for cls in set(type(item) for item in self.data)]
+            else [cls.model_json_schema() for cls in set(type(item) for item in self.instances)]
         )
         schema_fragments = "\n\n".join(
             "\n```json\n" + json.dumps(schema, indent=2, ensure_ascii=False) + "\n```"
@@ -94,7 +109,7 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
         return (
             f"#### Description\n\n{self.description}\n\n"
             f"#### Json Schemas\n\n{schema_fragments}\n\n"
-            f"#### Json Data\n\n```json\n{json_data_str}\n```\n\n"
+            f"#### Json Instance\n\n{json_instance_str}\n\n"
         )
     
 

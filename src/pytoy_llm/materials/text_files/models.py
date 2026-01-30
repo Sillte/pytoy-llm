@@ -1,19 +1,25 @@
 from __future__ import annotations
 from pathlib import Path
 from pydantic import BaseModel, Field, BeforeValidator
-from typing import Annotated, Self, Literal, Mapping, get_type_hints
+from typing import Annotated, Self, Literal, Mapping, get_type_hints, Any
 from collections.abc import Sequence
 from datetime import datetime
-import time
 import uuid
 from pytoy_llm.materials.core import StructuredText
 from pytoy_llm.materials.core import ModelSectionData, TextSectionData
 
 
+def check_relative_path(v: Any) -> Path:
+    p = Path(v)
+    if p.is_absolute():
+        # raise するのが正しい。PydanticがこれをキャッチしてValidationErrorに変換する
+        raise ValueError("Path must be relative")
+    return p
+
 TextFilePath = Annotated[
     Path,
     Field(description="Relative path"),
-    BeforeValidator(lambda v: Path(v) if not Path(v).is_absolute() else ValueError("Path must be relative"))
+    BeforeValidator(check_relative_path)
 ]
 
 TextFileID = Annotated[
@@ -83,7 +89,7 @@ class TextFileCollection(BaseModel):
     
 
     @property
-    def structured_text(self) -> str:
+    def structured_text(self) -> StructuredText:
         """Returns a structured representation of all instances suitable for LLM consumption.
 
         Includes:
@@ -179,7 +185,7 @@ class TextFileBundle(BaseModel, frozen=True):
         # `chunk` or `iter` iteration is necessary regarding `data`.
         return ModelSectionData(bundle_kind=self.bundle_kind,
                                 description=self.description,
-                                data=self.collection.instances)
+                                instances=self.collection.instances)
         
     
 

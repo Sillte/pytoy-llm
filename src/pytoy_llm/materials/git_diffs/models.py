@@ -1,7 +1,22 @@
-from pydantic import BaseModel, Field
-from typing import Sequence, Annotated, Literal, assert_never
+from pydantic import BaseModel, Field, BeforeValidator
+from typing import Sequence, Annotated, Literal, assert_never, Any
 from pathlib import Path
 from pytoy_llm.materials.core import ModelSectionData, TextSectionData, StructuredText
+from datetime import datetime
+from uuid import uuid4
+
+def check_relative_path(v: Any) -> Path:
+    p = Path(v)
+    if p.is_absolute():
+        raise ValueError("Path must be relative")
+    return p
+
+
+FilePath = Annotated[
+    Path,
+    Field(description="Relative path"),
+    BeforeValidator(check_relative_path)
+]
 
 
 class LineRange(BaseModel, frozen=True):
@@ -37,20 +52,20 @@ class AtomicChange(BaseModel, frozen=True):
 # -------------------------
 class FileAdd(BaseModel, frozen=True):
     """Represents a file creation."""
-    path: Annotated[Path, Field(description="Relative path to the new file from the git root.")]
+    path: Annotated[FilePath, Field(description="Relative path to the new file from the git root.")]
     lines: Annotated[Sequence[str], Field(description="Content lines of the new file")]
     op_type: Literal["Add"] = "Add"
     
 
 class FileDelete(BaseModel, frozen=True):
     """Represents a file deletion."""
-    path: Annotated[Path, Field(description="Relative path to the deleted file from the git root.")]
+    path: Annotated[FilePath, Field(description="Relative path to the deleted file from the git root.")]
     old_lines: Annotated[Sequence[str], Field(description="Content lines of the deleted file")]
     op_type: Literal["Delete"] = "Delete"
 
 class FileModify(BaseModel, frozen=True):
     """Represents modifications to an existing file."""
-    path: Annotated[Path, Field(description="Relative path to the modified file from the git root.")]
+    path: Annotated[FilePath, Field(description="Relative path to the modified file from the git root.")]
     atomic_changes: Annotated[Sequence[AtomicChange], Field(description="Sequence of atomic changes applied to the file")]
     op_type: Literal["Modify"] = "Modify"
 
@@ -62,12 +77,13 @@ type FileOperation = FileAdd | FileDelete | FileModify
 # -------------------------
 class FileDiff(BaseModel, frozen=True):
     """Represents a single file change in a diff."""
+    id: str = Field(default_factory=lambda: str(uuid4()), description="Unique ID for the file associated with this diff")
     operation: Annotated[FileOperation, Field(description="The type of file operation (add, delete, modify)")]
     timestamp: Annotated[float, Field(description="Time when the change occurred (commit time or file mtime)")]
     location: Annotated[Sequence[str], Field(description="Relative path from the workspace root as sequence of directories")]
 
     @property
-    def path(self) -> Path:
+    def path(self) -> FilePath:
         """Convenience accessor for the path of the file affected by this diff."""
         return self.operation.path
     
@@ -110,8 +126,8 @@ class DiffBundle(BaseModel, frozen=True):
         
         structured_text = (
             f"===DiffBundle===\n"
-            f"- Root location: {self.root_location}\n"
-            f"- Timestamp: {timestamp}\n"
+            f"- Timestamp: {timestamp} / {datetime.fromtimestamp(timestamp).isoformat()}\n"
+            f"- Root location: {self.root_location} \n"
             f"===Files===\n"
             f"{body}"
         )
@@ -125,11 +141,13 @@ class DiffBundle(BaseModel, frozen=True):
     @property
     def model_section_data(self) -> ModelSectionData:
         """Raw BaseModel representation of the diff bundle."""
-        description = "JSON-like representation of file diffs for model consumption."
+        description = ("JSON-like representation of file diffs for model consumption.\n"
+                       "Current Timestamp: {timestamp} / {datetime.fromtimestamp(timestamp).isoformat()}\n"
+                       f"Root location of the instances: {self.root_location}\n")
         return ModelSectionData(
             bundle_kind=self.bundle_kind,
             description=description,
-            data=[self] 
+            instances=self.file_diffs
         )
 
 

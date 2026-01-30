@@ -27,7 +27,7 @@ class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
         # `chunk` or `iter` iteration is necessary regarding `data`.
         return ModelSectionData(bundle_kind=self.bundle_kind,
                                 description=self.description,
-                                data=self.data)
+                                instances=self.data)
         
     @property
     def description(self) -> str:

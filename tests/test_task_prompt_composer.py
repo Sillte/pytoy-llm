@@ -50,7 +50,7 @@ def test_task_prompt_composer_basic():
     model_section = ModelSectionData[SampleModel](
         bundle_kind="ModelData",
         description="Sample model instances",
-        data=[SampleModel(name="a", value=1), SampleModel(name="b", value=2)]
+        instances=[SampleModel(name="a", value=1), SampleModel(name="b", value=2)]
     )
 
     section_data_list = [text_section, model_section]
