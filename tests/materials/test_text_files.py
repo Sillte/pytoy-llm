@@ -1,21 +1,43 @@
-import pytest
 from pathlib import Path
-from pytoy_llm.materials.text_files import TextFile, TextFilesCollector
-import time
 
-def test_textfile_from_path(tmp_path):
-    file_path = tmp_path / "example.txt"
-    file_path.write_text("Hello\nWorld", encoding="utf8")
+from pytoy_llm.materials.text_files.models import TextFileLocator, TextFileContent, TextFileCollection
 
-    tf = TextFile.from_path(file_path, workspace=tmp_path)
-    assert tf.path == file_path
-    assert tf.location == ("example.txt",)
-    assert abs(tf.timestamp - file_path.stat().st_mtime) < 1e-3
-    assert tf.text == "Hello\nWorld"
+def test_structured_text():
+    locator1 = TextFileLocator(
+        id="file1",
+        path=Path("docs/file1.txt"),
+        timestamp=1675200000.0
+    )
 
-    structure = tf.structured_text
-    assert "<file>" in structure
-    assert "Hello" in structure
-    assert "World" in structure
+    locator2 = TextFileLocator(
+        id="file2",
+        path=Path("docs/file2.txt"),
+        timestamp=1675300000.0
+    )
 
+    locators = {
+        locator1.id: locator1,
+        locator2.id: locator2,
+    }
 
+    # --- テスト用 contents ---
+    content1 = TextFileContent(
+        id="file1",
+        entry="All",
+        body="これはファイル1の全文テキストです。"
+    )
+
+    content2 = TextFileContent(
+        id="file2",
+        entry="Summary",
+        body="これはファイル2のサマリです。"
+    )
+
+    contents = {
+        content1.id: content1,
+        content2.id: content2,
+    }
+
+    collection = TextFileCollection(locators=locators, contents=contents)
+    print(collection.structured_text)
+    assert "テキストです。" in collection.structured_text

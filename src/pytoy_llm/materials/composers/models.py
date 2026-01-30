@@ -61,25 +61,6 @@ class SectionUsage(BaseModel, frozen=True):
         Field(description="List of rules describing how this Section should be used. Each entry becomes a bullet point in the prompt.")
     ]
 
-    @classmethod
-    def compose_usage_rule(cls) -> str:
-        return ("## Usage of SECTIONS with `bundle_kind`\n\n"
-                "This prompt includes the following SECTIONS with `bundle_kind`. \n"
-                "Please utilize them as following instructions.\n"
-                )
-        
-    @classmethod
-    def compose_from_usages(cls, usages: Sequence["SectionUsage"]) -> str:
-        if not usages:
-            return "\n\n"
-        parts = []
-        parts.append(cls.compose_usage_rule())
-        for usage in usages:
-            parts.append(usage.compose_fragment())
-            parts.append("\n")
-        return "\n".join(parts)
-
-
     def compose_fragment(self) -> str:
         """
         Generate a human-readable representation of the usage rules

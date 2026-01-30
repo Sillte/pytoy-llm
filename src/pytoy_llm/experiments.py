@@ -121,12 +121,13 @@ if __name__ == "__main__":
         SampleModel(name="example1", value=10),
         SampleModel(name="example2", value=20),
         SampleModel(name="example3", value=50),
+        SampleModel(name="example4", value=100),
     ]
 
 
     # --- ユーザーの意図は曖昧に与える ---
     user_input = (
-        "Create a SampleModel instance with a common name and a high value. "
+        "Create a SampleModel instance with a popular name and a high value. "
         "Refer to the examples for guidance."
     )
 
