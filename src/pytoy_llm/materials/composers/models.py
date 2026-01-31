@@ -2,7 +2,7 @@ from typing import Annotated, Sequence
 from pydantic import BaseModel, Field
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData, SectionData
 
-class LLMInvocationSpec(BaseModel):
+class SystemPromptTemplate[T: BaseModel](BaseModel):
     name: Annotated[
         str,
         Field(description="Human-readable task name")
@@ -24,7 +24,7 @@ class LLMInvocationSpec(BaseModel):
     ]
 
     output_spec: Annotated[
-        type | str,
+        type[T] | type[str],
         Field(description="Specification of the expected output (type or format hint)")
     ]
 
@@ -43,7 +43,7 @@ class LLMInvocationSpec(BaseModel):
         str | None,
         Field(description="Role or persona the LLM should assume for this task")
     ] = None
-
+    
 
 
 class SectionUsage(BaseModel, frozen=True):
@@ -95,7 +95,7 @@ class SectionDataComposer:
             lines.append(f"### Section Instruction (bundle_kind=`{bundle_kind}`)")
             lines.append("1. Read the `Section Usage` rules carefully.")
             lines.append("2. Read the `Section Data` content rules carefully.")
-            lines.append("3. Refer to `Usage` to determine how to utilize `Data`.")
+            lines.append("3. Refer to `Section Usage` to determine how to utilize `Section Data`.")
             lines.append(f"### Section Usage (bundle_kind=`{bundle_kind}`)")
             lines.append(f"#### Section Rules for (bundle_kind=`{bundle_kind}`)")
             rules_text = "\n".join(f"* {rule}" for rule in usage.usage_rule)

@@ -4,10 +4,11 @@ from pydantic import BaseModel
 from textwrap import dedent
 from typing import Sequence, Literal
 
-from pytoy_llm.materials.composers.models import LLMInvocationSpec, SectionUsage, SectionData, TextSectionData
+from pytoy_llm.materials.composers.models import SectionUsage, SectionData, TextSectionData, SystemPromptTemplate
 from pytoy_llm.materials.core import TextSectionData
 from pytoy_llm.materials.basemodels import BaseModelBundle
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
+from pytoy_llm.task.models import LLMInvocationSpec
 
 
 def construct_basemodel[T:BaseModel](user_prompt: str,
@@ -26,6 +27,7 @@ def construct_basemodel[T:BaseModel](user_prompt: str,
         system_prompt = make_system_prompt(output_type, instances, "instance", explanation=explanation)
     user_message= InputMessage(role="user", content=user_prompt)
     messages = [InputMessage(role="system", content=system_prompt), user_message] 
+    print(messages)
     return completion(messages, output_format=output_format)  # type:ignore
                         
 def make_system_prompt(
@@ -56,7 +58,7 @@ def make_system_prompt(
 
     # Decide output instruction
     if output_mode == "python_code":
-        output_spec = dedent(f"""
+        output_description = dedent(f"""
         The output must be a statement of python code. 
         Produce valid Python code that constructs a `{target_class_name}` instance.
         Use `None` or `null` for fields if necessary when you cannot infer them from the user's input.
@@ -70,14 +72,17 @@ def make_system_prompt(
                        param_cls=ChildClass(val=2))
         ```
         """)
+        output_spec = str
     else:  # instance
-        output_spec = dedent(f"""
+        output_description = dedent(f"""
         Produce a valid `{target_class_name}` instance directly via `json`.
         Use `None` for fields if necessary when you cannot infer them from the user's input.
         Do not include explanations or comments.
         """).strip()
 
-    task = LLMInvocationSpec(
+        output_spec = output_cls
+
+    prompt_template = SystemPromptTemplate(
         name="Construct BaseModel Instances",
         intent=(
         "Construct instances strictly following the examples provided.\n"
@@ -88,7 +93,7 @@ def make_system_prompt(
             "Do NOT invent new relationships not observed in the instances.",
             "Do NOT add extra explanations or commentary."
         ],
-        output_description=f"Instance of {target_class_name}",
+        output_description=output_description,
         output_spec=output_spec,
         role=f"You are a construction assistant. You have responsibility and pride for generating useful `{target_class_name}`"
     )
@@ -103,7 +108,7 @@ def make_system_prompt(
         section_data_list.append(section_data)
         
 
-    composer = InvocationPromptComposer(task, usages, section_data_list)
+    composer = InvocationPromptComposer(prompt_template, usages, section_data_list)
     return composer.compose_prompt()
 
 

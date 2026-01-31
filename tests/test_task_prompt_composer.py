@@ -1,9 +1,10 @@
 import pytest
 from pydantic import BaseModel
 from typing import Sequence
-from pytoy_llm.materials.composers.models import LLMInvocationSpec, SectionUsage, SectionDataComposer
+from pytoy_llm.materials.composers.models import SectionUsage, SectionDataComposer
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData
+from pytoy_llm.task.models import LLMInvocationSpec
 
 class SampleModel(BaseModel):
     name: str

@@ -74,7 +74,7 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
             # 2. その型定義でアダプターを作成
             adapter = TypeAdapter(target_type)
             return adapter.dump_json(
-                self.instances, indent=4, ensure_ascii=False
+                self.instances, indent=4, ensure_ascii=False  #type: ignore
             ).decode()
         else:
             return "[]"
