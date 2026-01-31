@@ -4,10 +4,10 @@ from pydantic import BaseModel
 from textwrap import dedent
 from typing import Sequence, Literal
 
-from pytoy_llm.materials.composers.models import LLMTask, SectionUsage, SectionData, TextSectionData
+from pytoy_llm.materials.composers.models import LLMInvocationSpec, SectionUsage, SectionData, TextSectionData
 from pytoy_llm.materials.core import TextSectionData
 from pytoy_llm.materials.basemodels import BaseModelBundle
-from pytoy_llm.materials.composers.task_prompt_composer import TaskPromptComposer
+from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 
 
 def construct_basemodel[T:BaseModel](user_prompt: str,
@@ -26,7 +26,7 @@ def construct_basemodel[T:BaseModel](user_prompt: str,
         system_prompt = make_system_prompt(output_type, instances, "instance", explanation=explanation)
     user_message= InputMessage(role="user", content=user_prompt)
     messages = [InputMessage(role="system", content=system_prompt), user_message] 
-    return completion(messages, output_format=output_format)
+    return completion(messages, output_format=output_format)  # type:ignore
                         
 def make_system_prompt(
     output_cls: type[BaseModel],
@@ -77,7 +77,7 @@ def make_system_prompt(
         Do not include explanations or comments.
         """).strip()
 
-    task = LLMTask(
+    task = LLMInvocationSpec(
         name="Construct BaseModel Instances",
         intent=(
         "Construct instances strictly following the examples provided.\n"
@@ -103,7 +103,7 @@ def make_system_prompt(
         section_data_list.append(section_data)
         
 
-    composer = TaskPromptComposer(task, usages, section_data_list)
+    composer = InvocationPromptComposer(task, usages, section_data_list)
     return composer.compose_prompt()
 
 

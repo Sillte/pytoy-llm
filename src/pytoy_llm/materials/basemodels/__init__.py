@@ -65,22 +65,22 @@ classDiagram
     BaseModelBundle --> SectionData : provides ModelSectionData
     BaseModelBundle --> SectionData : provides TextSectionData
 
-    %% --- Task ---
-    class LLMTask
+    %% --- InvocationSpec ---
+    class LLMInvocationSpec
 
     %% --- Composers ---
     class SectionDataComposer
     SectionDataComposer --> SectionData : compose()
     SectionDataComposer --> SectionUsage : compose_sections_with_usage()
 
-    class TaskPromptComposer
-    TaskPromptComposer --> LLMTask : uses
-    TaskPromptComposer --> SectionUsage : uses
-    TaskPromptComposer --> SectionData : uses directly (via compose_sections_with_usage)
+    class InvocationPromptComposer
+    InvocationPromptComposer --> LLMInvocationSpec : uses
+    InvocationPromptComposer --> SectionUsage : uses
+    InvocationPromptComposer --> SectionData : uses directly (via compose_sections_with_usage)
 
     %% --- Messages ---
     class InputMessage
 
     %% --- Relationships summary ---
-    TaskPromptComposer --> InputMessage : compose_messages()
+    InvocationPromptComposer --> InputMessage : compose_messages()
 """

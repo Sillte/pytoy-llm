@@ -1,9 +1,8 @@
-import json
 from typing import Annotated, Sequence
 from pydantic import BaseModel, Field
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData, SectionData
 
-class LLMTask(BaseModel):
+class LLMInvocationSpec(BaseModel):
     name: Annotated[
         str,
         Field(description="Human-readable task name")

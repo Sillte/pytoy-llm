@@ -1,19 +1,17 @@
-# test_task_prompt_composer.py
 import pytest
 from pydantic import BaseModel
 from typing import Sequence
-from pytoy_llm.materials.composers.models import LLMTask, SectionUsage, SectionDataComposer
-from pytoy_llm.materials.composers.task_prompt_composer import TaskPromptComposer
+from pytoy_llm.materials.composers.models import LLMInvocationSpec, SectionUsage, SectionDataComposer
+from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData
 
 class SampleModel(BaseModel):
     name: str
     value: int
 
-def test_task_prompt_composer_basic():
-    # --- サンプル Task ---
-    task = LLMTask(
-        name="Sample Task",
+def test_invocation_prompt_composer_basic():
+    invocation_spec = LLMInvocationSpec(
+        name="Sample invocation",
         intent="Rewrite the following text to be more concise.",
         rules=["Do not change meaning", "Keep technical terms intact"],
         output_description="Rewritten text as string",
@@ -56,11 +54,11 @@ def test_task_prompt_composer_basic():
     section_data_list = [text_section, model_section]
 
     # --- Compose prompt ---
-    composer = TaskPromptComposer(task, section_usages, section_data_list)
+    composer = InvocationPromptComposer(invocation_spec, section_usages, section_data_list)
     prompt_str = composer.compose_prompt()
 
     # --- 簡単なチェック ---
-    assert "Sample Task" in prompt_str
+    assert "Sample invocation" in prompt_str
     assert "Rewrite the following text" in prompt_str
     print(prompt_str)
     assert "## Section (bundle_kind=`TextExamples`)" in prompt_str
@@ -74,5 +72,5 @@ def test_task_prompt_composer_basic():
     assert len(messages) == 2
 
 if __name__ == "__main__":
-    test_task_prompt_composer_basic()
+    test_invocation_prompt_composer_basic()
 
