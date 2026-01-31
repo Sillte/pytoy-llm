@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 from typing import Sequence
-from pytoy_llm.materials.composers.models import SectionUsage, SectionDataComposer
+from pytoy_llm.materials.composers.models import SectionUsage, SectionDataComposer, SystemPromptTemplate
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData
 from pytoy_llm.task.models import LLMInvocationSpec
@@ -11,7 +11,7 @@ class SampleModel(BaseModel):
     value: int
 
 def test_invocation_prompt_composer_basic():
-    invocation_spec = LLMInvocationSpec(
+    system_prompt = SystemPromptTemplate(
         name="Sample invocation",
         intent="Rewrite the following text to be more concise.",
         rules=["Do not change meaning", "Keep technical terms intact"],
@@ -55,7 +55,7 @@ def test_invocation_prompt_composer_basic():
     section_data_list = [text_section, model_section]
 
     # --- Compose prompt ---
-    composer = InvocationPromptComposer(invocation_spec, section_usages, section_data_list)
+    composer = InvocationPromptComposer(system_prompt, section_usages, section_data_list)
     prompt_str = composer.compose_prompt()
 
     # --- 簡単なチェック ---
