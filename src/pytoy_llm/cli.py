@@ -4,7 +4,7 @@ import sys
 import typer
 from pydantic import BaseModel
 
-from pytoy_llm.configurations import ConfigurationClient, DEFAULT_NAME
+from pytoy_llm.connection_configuration import ConnectionConfiguration, DEFAULT_NAME
 from pytoy_llm.impl import completion
 
 app = typer.Typer(
@@ -27,7 +27,7 @@ def config(
     """Making the connection file and display the path for configuration.
     It is expected that users to fill a configuration file for subsequent use.
     """
-    conf_client = ConfigurationClient()
+    conf_client = ConnectionConfiguration()
     path = conf_client.get_connection_path(connection)
     if path.exists():
         typer.echo(path)

@@ -2,7 +2,7 @@ import pytest
 import json
 from typing import Any
 from pydantic import ValidationError, BaseModel
-from pytoy_llm.configurations import ConfigurationClient
+from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import Connection
 
 
@@ -20,7 +20,7 @@ def generate_expected_data_from_examples(klass: type[BaseModel]) -> dict[str, An
 
 @pytest.fixture
 def client():
-    return ConfigurationClient()
+    return ConnectionConfiguration()
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def test_name():
     return "__pytest_connection__"
 
 
-def test_initialize_connection_file(client: ConfigurationClient, test_name: str):
+def test_initialize_connection_file(client: ConnectionConfiguration, test_name: str):
     path = client.initialize_connection_file(test_name)
     assert path.exists()
 

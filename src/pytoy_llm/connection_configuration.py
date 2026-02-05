@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
-from pytoy_llm.exceptions import IllegalConfigurationError
 from pytoy_llm.models import Connection
 
 
@@ -46,7 +45,14 @@ def _make_default_json(model: type[BaseModel]) -> str:
     return json.dumps(data, indent=4, ensure_ascii=False)
 
 
-class ConfigurationClient:
+class IllegalConfigurationError(Exception):
+    """Configuration is not valid.
+    The most typical case is the configuration file is generated,
+    but the file is not property configured.
+    """
+
+
+class ConnectionConfiguration:
     """Client for handing Configuration Information"""
 
     def __init__(

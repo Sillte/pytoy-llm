@@ -27,7 +27,6 @@ def construct_basemodel[T:BaseModel](user_prompt: str,
         system_prompt = make_system_prompt(output_type, instances, "instance", explanation=explanation)
     user_message= InputMessage(role="user", content=user_prompt)
     messages = [InputMessage(role="system", content=system_prompt), user_message] 
-    print(messages)
     return completion(messages, output_format=output_format)  # type:ignore
                         
 def make_system_prompt(
