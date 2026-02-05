@@ -18,6 +18,9 @@ class ModelResponseConverter:
         choices = cast(Choices, response.choices)
         choice = choices[0]
         raw_content = choice.message.content or ""
+        
+        if not isinstance(self.result_cls, type):
+            raise ValueError(f"`result_cls` must be a type, but got {type(self.result_cls)=}")
 
         if issubclass(self.result_cls, str):
             return raw_content
@@ -42,7 +45,8 @@ class PytoyLiteLLMClient:
     Hence, only text related functions are considered.
     """
 
-    def __init__(self, connection: str | Connection, llm_config: LLMConfig = LLMConfig()) -> None:
+    def __init__(self, connection: str | Connection, llm_config: LLMConfig | None = None) -> None:
+        llm_config = llm_config or LLMConfig()
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
         self._connection = connection
@@ -59,21 +63,15 @@ class PytoyLiteLLMClient:
         result_cls: SyncResultClass | None = None
     ):
         from litellm import completion, ModelResponse, Choices
-        if result_cls is None:
-            result_cls = llm_response_format
-        if isinstance(content, str) or isinstance(content, InputMessage):
-            messages = [InputMessage.from_any(content)]
-        elif isinstance(content, Sequence):
-            messages = [InputMessage.from_any(item) for item in content]
-        else:
-            raise ValueError(f"`{content=}` is invalid.")
-
+        messages = InputMessage.to_messages(content)
         response_format: None | type[BaseModel] = None
         if llm_response_format is str: 
             response_format = None
         else:
             response_format = llm_response_format  # type: ignore
         assert response_format is not str
+        if result_cls is None:
+            result_cls = llm_response_format 
 
         response: ModelResponse = completion(
             model=self.connection.model,
@@ -104,4 +102,3 @@ if __name__ == "__main__":
     mes  = InputMessage(role="user", content=f"渡しているBaseModelの一例をください。outputはjsonで。渡すBaseModelは ```{json.dumps(Target.model_json_schema())}```")
     result = client.completion([mes], llm_response_format=str, result_cls=LLMOutputModel)
     print("result.content", result)
-

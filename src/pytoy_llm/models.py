@@ -68,12 +68,23 @@ class InputMessage(BaseModel, frozen=True):
         elif isinstance(message, Mapping):
             return cls.model_validate(message)
         elif isinstance(message, InputMessage):
-            return message
+            return cls.model_validate(message)
         else:
             raise TypeError(f"Unsupported type for InputMessage: {message=}")
-    
+        
+    @classmethod
+    def to_messages(cls, messages: str | InputMessage | Sequence[str | Mapping | "InputMessage"]) -> Sequence["InputMessage"]:
+        if isinstance(messages, str):
+            return [cls.from_str(messages)]
+        elif isinstance(messages, InputMessage):
+            return [messages]
+        elif isinstance(messages, Mapping):
+            return [cls.model_validate(messages)]
+        else:
+            return [cls.from_any(message) for message in messages]
     
 
+# It is uncertain whether this class is useful or not.
 class StructuredMessage[T: BaseModel | str](BaseModel, frozen=True):
     role: Annotated[
         Literal["system", "user", "assistant"],

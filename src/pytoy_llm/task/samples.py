@@ -1,8 +1,8 @@
-from pytoy_llm.task import LLMInvocationSpec, LLMTaskMeta, LLMTaskSpec, InvocationSpec
+from pytoy_llm.task import LLMInvocationSpec, LLMTaskMeta, LLMTaskSpec, InvocationSpec, AgentInvocationSpec
 from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest
 from pytoy_llm.models import InputMessage
 from pydantic import Field, BaseModel
-from typing import Annotated, Sequence
+from typing import Annotated, Sequence, Literal
 
 
 if __name__ == "__main__":
@@ -44,37 +44,72 @@ if __name__ == "__main__":
     }
     def add_user_name(summaries: IncidentSummaries, ctx) -> IncidentSummaries:
         # Immitate to access to database and add the necessary info.
-        for item in summaries.items:
+        import copy
+        out_summaries = copy.deepcopy(summaries)
+        for item in out_summaries.items:
             item.user_name = id_to_username.get(item.user_id, "UnknownUser")
-        return summaries
-    user_name_invocation = InvocationSpec.from_any(add_user_name)
-    
+        return out_summaries
 
-    email_invocation = LLMInvocationSpec[str](
-        output_spec=str,
+    user_name_invocation = InvocationSpec.from_any(add_user_name)
+    class IncidentAction(BaseModel):
+        user_id: str
+        user_name: str
+        action: Literal["notify", "escalate", "ignore"]   # notify / escalate / ignore
+        reason: str
+    class IncidentActions(BaseModel):
+        actions: Annotated[
+            list[IncidentAction],
+            Field(description="Decided actions for incidents")
+        ]
+    decide_action_invocation = AgentInvocationSpec[IncidentActions](
+        output_spec=IncidentActions,
         create_messages=lambda summaries, ctx: [
             InputMessage(
                 role="system",
                 content=(
-                    "You are a system notification assistant.\n"
-                    "Write notification emails to users based on system incidents.\n"
-                    "Write one short email per user.\n"
-                    "Be polite, clear, and factual."
-                )
+                    "You are an incident response agent.\n"
+                    "Decide what action should be taken for each incident.\n"
+                    "Rules:\n"
+                    "- high severity → escalate\n"
+                    "- medium severity → notify\n"
+                    "- low severity → ignore\n"
+                    "Return structured results."
+                ),
+            ),
+            InputMessage(
+                role="user",
+                content="\n".join(
+                    f"user={item.user_id}, severity={item.severity}, action={item.action}, user_name={item.user_name}"
+                    for item in summaries.items
+                ),
+            ),
+        ],
+    )
+    
+
+    email_invocation = LLMInvocationSpec[str](
+        output_spec=str,
+        create_messages=lambda actions, ctx: [
+            InputMessage(
+                role="system",
+                content=(
+                    "You are a notification assistant.\n"
+                    "Write emails only for actions that are 'notify' or 'escalate'."
+                ),
             ),
             InputMessage(
                 role="user",
                 content="\n".join(
                     f"""
-    User Name: {item.user_name}
-    User ID: {item.user_id}
-    Action: {item.action}
-    Severity: {item.severity}
+    User ID: {a.user_id}
+    Action: {a.action}
+    Reason: {a.reason}
     """
-                    for item in summaries.items
-                )
-            )
-        ]
+                    for a in actions.actions
+                    if a.action in ("notify", "escalate")
+                ),
+            ),
+        ],
     )
     task_meta = LLMTaskMeta(
         name="IncidentNotificationTask",
@@ -90,14 +125,16 @@ if __name__ == "__main__":
         invocation_specs=[
             parse_log_invocation,   # LLM
             user_name_invocation,   # normal function
+            decide_action_invocation,  # Agent
             email_invocation,       # LLM
         ],
         output_spec=str
     )
     request = LLMTaskRequest(
         task_spec=task_spec,
-        task_input=log_input
+        task_input=log_input,
     )
-
     response = LLMTaskExecutor().execute(request)
     print(response.output)
+    
+    print("invocation_history", response.result.invocation_history)

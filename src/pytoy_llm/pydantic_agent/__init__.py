@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from typing import get_args, get_origin, Callable
+from typing import Callable, Mapping
 from pydantic_ai import Agent
 from pydantic import BaseModel
 from pydantic_ai.models.google import GoogleModel
@@ -43,7 +43,8 @@ def get_model(model_name: str, api_key: str, base_url: str, model_settings: Mode
 class PytoyAgent:
     def __init__(self, connection: str | Connection,
                        tools: Sequence[LLMTool | Callable] = (),
-                       llm_config: LLMConfig = LLMConfig()) -> None:
+                       llm_config: LLMConfig | None = None) -> None:
+        llm_config = llm_config or LLMConfig()
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
         self._connection = connection
@@ -70,9 +71,10 @@ class PytoyAgent:
 
 
     def run_sync[T: BaseModel | str](self,
-                               input_messages: Sequence[InputMessage],
+                               content: str | InputMessage | Sequence[InputMessage | str | Mapping],
                                llm_response_format: SyncOutputType,
                                result_cls: SyncResultClass | AgentRunResult[T] | None = None) -> str | T | AgentRunResult[T]:
+        input_messages = InputMessage.to_messages(content)
         if result_cls is None:
             result_cls = llm_response_format
 
@@ -80,13 +82,13 @@ class PytoyAgent:
         system_prompts = [item.content for item in input_messages if item.role == "system"]
         input_messages = [item for item in input_messages if item.role != "system"] 
 
-        first_user_index = None
+        last_user_index = None
         for index  in reversed(range(len(input_messages))):
             mes = input_messages[index]
             if mes.role == "user":
-                first_user_index = index
+                last_user_index = index
                 break
-        if first_user_index is None:
+        if last_user_index is None:
             user_prompt = None
         else:
             user_prompt = input_messages[index].content
@@ -110,6 +112,7 @@ class PytoyAgent:
             return LLMOutputModel.from_pydantic_run_result(result, input_messages)
         else:
             return result.output
+        
 
 
 
@@ -126,24 +129,6 @@ def experiment_func(name: str = DEFAULT_NAME):
     ret = agent.run_sync(input_messages=[mes], llm_response_format=AnswerOutput, result_cls=LLMOutputModel[AnswerOutput])
     print(ret)
 
-def experiment2(name: str = DEFAULT_NAME):
-    class Dummy: 
-        def function(self, location: str) -> str: 
-            """Return the weather information of the given location.
-            """
-            if location == "Tokyo":
-                return "Snowy"
-            else:
-                return "Unknown"
-
-    from pytoy_llm.models import InputMessage
-    
-    mes = InputMessage(role="user", content= "ゼロの使い魔と涼宮ハルヒの憂鬱の共通点は？")
-    config = LLMConfig(temperature=0.7)
-    agent = PytoyAgent(name, llm_config=config, tools=[Dummy().function])
-    ret = agent.run_sync(input_messages=[mes], llm_response_format=str, result_cls=LLMOutputModel)
-    print(ret)
-
 
 if __name__ == "__main__":
-    experiment2()
+    experiment_func()

@@ -1,6 +1,6 @@
 from pytoy_llm.models import LLMMessageHistory
-from pytoy_llm.task.models import LLMTaskSpec, LLMInvocationSpec, InvocationSpec  # NOQA
-from pytoy_llm.task.models import LLMInvocationSpec, InvocationSpec, LLMTaskMeta  # NOQA
+from pytoy_llm.task.models import LLMTaskSpec, LLMInvocationSpec, InvocationSpec, AgentInvocationSpec  # NOQA
+from pytoy_llm.task.models import LLMInvocationSpec, InvocationSpec, LLMTaskMeta, LLMTaskRunResult  # NOQA
 
 from pydantic import BaseModel, Field
 
@@ -8,23 +8,28 @@ import uuid
 from typing import Annotated, Any
 
 
-class LLMTaskRequest(BaseModel):
-    task_spec: Annotated[LLMTaskSpec, Field(description="Specification of LLMTask")]
+class LLMTaskRequest[T: BaseModel | str](BaseModel):
+    task_spec: Annotated[LLMTaskSpec[T], Field(description="Specification of LLMTask")]
     task_input: Annotated[Any, Field(description="Input for the task.")]
-    history : Annotated[LLMMessageHistory | None , Field(description="History")] = None
-    id: Annotated[str, Field(description="ID of TaskRequest")] = str(uuid.uuid1())
+    history : Annotated[LLMMessageHistory | None , Field(description="History of messages. `task_input` is not included.")] = None
+    id: Annotated[str, Field(description="ID of TaskRequest")] = Field(
+        default_factory=lambda: str(uuid.uuid4())
+    )
 
 
-class LLMTaskResponse[S: BaseModel](BaseModel):
-    output: S | str
+class LLMTaskResponse[T: BaseModel | str](BaseModel):
+    result: LLMTaskRunResult[T]
     id: Annotated[str, Field(description="ID of TaskRequest")]
-    # metadata: dict[str, Any] = {} # トークン数や実行ログなど
+
+    @property
+    def output(self) -> T | str:
+        return self.result.output
 
 
 class LLMTaskExecutor:
-    def execute(self, request: LLMTaskRequest) -> LLMTaskResponse:
+    def execute[T: BaseModel | str](self, request: LLMTaskRequest) -> LLMTaskResponse[T]:
         request_id = request.id
         task_input = request.task_input
         history = request.history
-        output = request.task_spec.run(task_input=task_input, history=history)
-        return LLMTaskResponse(output=output, id=request_id)
+        result = request.task_spec.run(task_input=task_input, history=history)
+        return LLMTaskResponse(result=result, id=request_id)
