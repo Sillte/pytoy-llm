@@ -6,8 +6,8 @@ from pytoy_llm.materials.composers.models import SectionDataComposer
 from pytoy_llm.models import InputMessage
 from pydantic import BaseModel
 
-from pytoy_llm.task.models.context import LLMTaskContext
-from pytoy_llm.task.models.invocations import LLMInvocationSpec
+from pytoy_llm.task.models.context import LLMTaskContext, LLMTaskContextProtocol
+from pytoy_llm.task.models import LLMInvocationSpec, InvocationSpecMeta
 
 class InvocationPromptComposer:
     """
@@ -96,8 +96,11 @@ class InvocationPromptComposer:
     
 
     def compose_invocation_spec(self) -> LLMInvocationSpec:
-        def create_messages(input: Any, context: LLMTaskContext) -> Sequence[InputMessage]:
+        def create_messages(input: Any, context: LLMTaskContextProtocol) -> Sequence[InputMessage]:
             input = str(input) if input else None 
             messages = self.compose_messages(input)
             return messages
-        return LLMInvocationSpec(create_messages=create_messages, output_spec=self.prompt_template.output_spec)
+        return LLMInvocationSpec(create_messages=create_messages,
+                                 output_spec=self.prompt_template.output_spec,
+                                 meta=InvocationSpecMeta(name=self.prompt_template.name,
+                                                          intent=self.prompt_template.intent))

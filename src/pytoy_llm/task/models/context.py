@@ -1,4 +1,4 @@
-from pytoy_llm.task.models.context_protocols import LLMFacadeProtocol
+from pytoy_llm.task.models.context_protocols import LLMFacadeProtocol, LLMTaskContextProtocol  # NOQA
 from pytoy_llm.task.models.repository import LLMTaskStateRepository
 from pytoy_llm.task.models.schemas import LLMTaskArgument, LLMTaskSpecMeta
 
