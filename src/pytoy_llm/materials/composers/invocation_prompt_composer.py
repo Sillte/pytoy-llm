@@ -6,7 +6,8 @@ from pytoy_llm.materials.composers.models import SectionDataComposer
 from pytoy_llm.models import InputMessage
 from pydantic import BaseModel
 
-from pytoy_llm.task.models import LLMInvocationSpec, LLMTaskContext
+from pytoy_llm.task.models.context import LLMTaskContext
+from pytoy_llm.task.models.invocations import LLMInvocationSpec
 
 class InvocationPromptComposer:
     """

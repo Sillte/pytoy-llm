@@ -4,7 +4,7 @@ from typing import Sequence
 from pytoy_llm.materials.composers.models import SectionUsage, SectionDataComposer, SystemPromptTemplate
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData
-from pytoy_llm.task.models import LLMInvocationSpec
+from pytoy_llm.task.models.invocations import LLMInvocationSpec
 
 class SampleModel(BaseModel):
     name: str

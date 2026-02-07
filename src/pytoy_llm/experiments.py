@@ -8,7 +8,7 @@ from pytoy_llm.materials.composers.models import SectionUsage, SectionData, Text
 from pytoy_llm.materials.core import TextSectionData
 from pytoy_llm.materials.basemodels import BaseModelBundle
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
-from pytoy_llm.task.models import LLMInvocationSpec
+from pytoy_llm.task.models.invocations import LLMInvocationSpec
 
 
 def construct_basemodel[T:BaseModel](user_prompt: str,

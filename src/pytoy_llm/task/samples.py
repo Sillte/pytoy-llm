@@ -1,8 +1,12 @@
-from pytoy_llm.task import LLMInvocationSpec, LLMTaskMeta, LLMTaskSpec, InvocationSpec, AgentInvocationSpec
+from pytoy_llm.task import LLMTaskSpec
 from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest
 from pytoy_llm.models import InputMessage
 from pydantic import Field, BaseModel
 from typing import Annotated, Sequence, Literal
+
+from pytoy_llm.task.models import AgentInvocationSpec, FunctionInvocationSpec, LLMInvocationSpec, SelectedInvocationSpec 
+from pytoy_llm.task.models import InvocationSpecMeta
+from pytoy_llm.task.models import LLMTaskSpecMeta
 
 
 if __name__ == "__main__":
@@ -17,8 +21,9 @@ if __name__ == "__main__":
 
     
     parse_log_invocation = LLMInvocationSpec[IncidentSummaries](
+        meta= InvocationSpecMeta(name="ParseLogInvocation", intent="Parse system logs to extract incident summaries."),
     output_spec=IncidentSummaries,
-    create_messages=lambda input, ctx: [
+    create_messages=lambda input: [
         InputMessage(
             role="system",
             content=(
@@ -50,7 +55,7 @@ if __name__ == "__main__":
             item.user_name = id_to_username.get(item.user_id, "UnknownUser")
         return out_summaries
 
-    user_name_invocation = InvocationSpec.from_any(add_user_name)
+    user_name_invocation = FunctionInvocationSpec.from_any(add_user_name)
     class IncidentAction(BaseModel):
         user_id: str
         user_name: str
@@ -62,6 +67,7 @@ if __name__ == "__main__":
             Field(description="Decided actions for incidents")
         ]
     decide_action_invocation = AgentInvocationSpec[IncidentActions](
+        meta= InvocationSpecMeta(name="DecideIncidentActions", intent="Decide actions for each incident based on severity."),
         output_spec=IncidentActions,
         create_messages=lambda summaries, ctx: [
             InputMessage(
@@ -88,6 +94,7 @@ if __name__ == "__main__":
     
 
     email_invocation = LLMInvocationSpec[str](
+        meta= InvocationSpecMeta(name="intent=GenerateNotificationEmails", intent="Generate notification emails for affected users."),
         output_spec=str,
         create_messages=lambda actions, ctx: [
             InputMessage(
@@ -101,7 +108,7 @@ if __name__ == "__main__":
                 role="user",
                 content="\n".join(
                     f"""
-    User ID: {a.user_id}
+    User ID: {a.user_id}, "UserName: {a.user_name}"
     Action: {a.action}
     Reason: {a.reason}
     """
@@ -111,7 +118,7 @@ if __name__ == "__main__":
             ),
         ],
     )
-    task_meta = LLMTaskMeta(
+    task_meta = LLMTaskSpecMeta(
         name="IncidentNotificationTask",
         intent="Analyze system logs and notify affected users via email",
         rules=[
@@ -137,4 +144,4 @@ if __name__ == "__main__":
     response = LLMTaskExecutor().execute(request)
     print(response.output)
     
-    print("invocation_history", response.result.invocation_history)
+    print("invocation_history", response.result.invocation_records)
