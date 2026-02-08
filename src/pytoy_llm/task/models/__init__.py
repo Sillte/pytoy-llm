@@ -65,12 +65,12 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
 
     @classmethod
     def from_single_spec(
-        cls, task_meta: str | LLMTaskSpecMeta, invocation_spec: LLMInvocationSpec[S], 
+        cls, meta: str | LLMTaskSpecMeta, invocation_spec: LLMInvocationSpec[S], 
     ) -> Self:
         """Utility function for construction the task with 1 LLMInvocation."""
-        if isinstance(task_meta, str):
-            task_meta = LLMTaskSpecMeta(name=task_meta, intent=invocation_spec.meta.intent)
+        if isinstance(meta, str):
+            meta = LLMTaskSpecMeta(name=meta, intent=invocation_spec.meta.intent)
         return cls(
-            task_meta=task_meta,
+            meta=meta,
             invocation_specs=[invocation_spec],
         )  # type: ignore
