@@ -30,7 +30,7 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
         Sequence[FunctionInvocationSpec | LLMInvocationSpec | AgentInvocationSpec | SelectedInvocationSpec],
         Field(description="Ordered list of steps or conditional branches"),
     ]
-    task_meta: Annotated[LLMTaskSpecMeta, Field(description="Meta data for the task.")]
+    meta: Annotated[LLMTaskSpecMeta, Field(description="Meta data for the task.")]
 
     @property
     def output_spec(self) -> S | None:
@@ -41,7 +41,7 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
     ) -> LLMTaskRecord[S]:
         task_agument = LLMTaskArgument(initial_history=history, initial_input=task_input)
         llm_facade = LLMFacade()
-        task_context = LLMTaskContext(task_meta=self.task_meta, task_argument=task_agument, llm_facade=llm_facade)
+        task_context = LLMTaskContext(task_meta=self.meta, task_argument=task_agument, llm_facade=llm_facade)
 
         invocation_records: InvocationRecords = InvocationRecords()
 
@@ -53,7 +53,7 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
             invocation_records = invocation_records.updated(records)
             input = invocation_records.output
         return LLMTaskRecord(
-            task_name=self.task_meta.name,
+            task_name=self.meta.name,
             output=invocation_records.output,
             invocation_records=invocation_records.entries,
             repository_snapshot=task_context.repository.snapshot,
@@ -61,7 +61,7 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
 
     @property
     def name(self) -> str:
-        return self.task_meta.name
+        return self.meta.name
 
     @classmethod
     def from_single_spec(

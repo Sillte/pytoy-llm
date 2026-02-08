@@ -136,7 +136,7 @@ if __name__ == "__main__":
         ]
     )
     task_spec = LLMTaskSpec[str](
-        task_meta=task_meta,
+        meta=task_meta,
         invocation_specs=[
             parse_log_invocation,   # LLM
             user_name_invocation,   # normal function
