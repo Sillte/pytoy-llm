@@ -30,12 +30,12 @@ class LLMTaskRequest[T: BaseModel | str](BaseModel):
 
 
 class LLMTaskResponse[T: BaseModel | str](BaseModel):
-    result: LLMTaskRecord[T]
+    record: LLMTaskRecord[T]
     id: Annotated[str, Field(description="ID of TaskRequest")]
 
     @property
     def output(self) -> T | str:
-        return self.result.output
+        return self.record.output
 
 
 class LLMTaskExecutor:
@@ -43,5 +43,5 @@ class LLMTaskExecutor:
         request_id = request.id
         task_input = request.task_input
         history = request.history
-        result = request.task_spec.run(task_input=task_input, history=history)
-        return LLMTaskResponse(result=result, id=request_id)
+        record = request.task_spec.run(task_input=task_input, history=history)
+        return LLMTaskResponse(record=record, id=request_id)

@@ -90,7 +90,7 @@ class InvocationEffect(BaseModel, frozen=True):
             return InvocationEffect(output=arg, repository_updates={})
 
 
-class LLMTaskRecord[T: BaseModel | str](BaseModel):
+class LLMTaskRecord[T: BaseModel | str](BaseModel, frozen=True):
     id: Annotated[str, Field(description="Unique identifier for this Task record")] = Field(
         default_factory=lambda: str(uuid.uuid1())
     )

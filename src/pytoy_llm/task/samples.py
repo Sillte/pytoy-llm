@@ -2,6 +2,7 @@ from pytoy_llm.task import LLMTaskSpec
 from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest
 from pytoy_llm.models import InputMessage
 from pydantic import Field, BaseModel
+from pydantic_ai import WebSearchTool
 from typing import Annotated, Sequence, Literal
 
 from pytoy_llm.task.models import AgentInvocationSpec, FunctionInvocationSpec, LLMInvocationSpec, SelectedInvocationSpec 
@@ -66,6 +67,12 @@ if __name__ == "__main__":
             list[IncidentAction],
             Field(description="Decided actions for incidents")
         ]
+        
+    def append_free_str(input: str) -> str:
+        """If and only if you think it is required to add `free` to the string. 
+        call this tool.
+        """
+        return input + "free"
     decide_action_invocation = AgentInvocationSpec[IncidentActions](
         meta= InvocationSpecMeta(name="DecideIncidentActions", intent="Decide actions for each incident based on severity."),
         output_spec=IncidentActions,
@@ -90,6 +97,7 @@ if __name__ == "__main__":
                 ),
             ),
         ],
+        tools=[append_free_str]
     )
     
 
@@ -135,7 +143,6 @@ if __name__ == "__main__":
             decide_action_invocation,  # Agent
             email_invocation,       # LLM
         ],
-        output_spec=str
     )
     request = LLMTaskRequest(
         task_spec=task_spec,
@@ -144,4 +151,4 @@ if __name__ == "__main__":
     response = LLMTaskExecutor().execute(request)
     print(response.output)
     
-    print("invocation_history", response.result.invocation_records)
+    print("invocation_records", response.record.invocation_records)

@@ -4,7 +4,7 @@ from pytoy_llm.models import LLMMessageHistory
 
 from pydantic import BaseModel, Field
 
-from typing import Annotated, Sequence, Self
+from typing import Annotated, Sequence, Self, Any
 
 from pytoy_llm.task.models.schemas import LLMTaskArgument
 from pytoy_llm.task.models.schemas import LLMTaskSpecMeta
@@ -30,11 +30,14 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
         Sequence[FunctionInvocationSpec | LLMInvocationSpec | AgentInvocationSpec | SelectedInvocationSpec],
         Field(description="Ordered list of steps or conditional branches"),
     ]
-    output_spec: Annotated[type[S], Field(description="Output specification of Task.", default=str)]
     task_meta: Annotated[LLMTaskSpecMeta, Field(description="Meta data for the task.")]
 
+    @property
+    def output_spec(self) -> S | None:
+        return self.invocation_specs[-1].output_spec if self.invocation_specs else None  # type: ignore
+
     def run(
-        self, task_input: S, history: LLMMessageHistory | None = None
+        self, task_input: Any, history: LLMMessageHistory | None = None
     ) -> LLMTaskRecord[S]:
         task_agument = LLMTaskArgument(initial_history=history, initial_input=task_input)
         llm_facade = LLMFacade()
@@ -70,5 +73,4 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
         return cls(
             task_meta=task_meta,
             invocation_specs=[invocation_spec],
-            output_spec=invocation_spec.output_spec,
         )  # type: ignore

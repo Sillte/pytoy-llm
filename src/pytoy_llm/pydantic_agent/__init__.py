@@ -7,6 +7,7 @@ from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+
 from pydantic_ai.models import Model as PydanticAIModel
 from pydantic_ai import RunContext
 from pytoy_llm.models import Connection, InputMessage, LLMOutputModel, SyncOutputType, SyncResultClass, LLMTool, LLMConfig
@@ -25,17 +26,16 @@ def get_model(model_name: str, api_key: str, base_url: str, model_settings: Mode
         provider = GoogleProvider(api_key=api_key)
         sub_name = "/".join(parts[1:])
         assert base_url.find("google") != -1, "for fool proof."
-        assert base_url.find("localhost") == -1, "for fool proof."
         return GoogleModel(sub_name, provider=provider, settings=model_settings)
 
-    elif parts[0] in {"openai", "ollama"}:
+    elif parts[0] in {"openai"}:
         # For Google, `openai` or in local LLM, you must pass the url. 
         assert base_url, "for fool proof."
         provider = OpenAIProvider(api_key=api_key, base_url=base_url)
         sub_name = "/".join(parts[1:])
         return OpenAIChatModel(sub_name, provider=provider, settings=model_settings)
-
     else:
+        assert base_url, "for fool proof."
         from pydantic_ai_litellm import LiteLLMModel
         return LiteLLMModel(model_name=model_name, api_key=api_key, api_base=base_url, settings=model_settings)
 

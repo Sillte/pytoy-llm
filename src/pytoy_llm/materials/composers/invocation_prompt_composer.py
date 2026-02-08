@@ -18,11 +18,11 @@ class InvocationPromptComposer:
     """
     def __init__(self,
                  prompt_template: SystemPromptTemplate,
-                 section_usages: Sequence[SectionUsage],
-                 section_data_list: Sequence[SectionData]):
+                 section_usages: Sequence[SectionUsage] | None = None,
+                 section_data_list: Sequence[SectionData] | None = None):
         self.prompt_template = prompt_template
-        self.section_usages = section_usages
-        self.section_data_list = section_data_list
+        self.section_usages = section_usages or []
+        self.section_data_list = section_data_list or []
 
     def compose_prompt(self) -> str:
         # Invocation header
