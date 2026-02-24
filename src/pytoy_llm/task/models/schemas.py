@@ -33,7 +33,7 @@ class LLMTaskSpecMeta(BaseModel):
 
 class InvocationSpecMeta(BaseModel):
     name: Annotated[str, Field(description="Name of the invocation step.")]
-    intent: Annotated[str, Field(description="Intent of this invocation step.")]
+    intent: Annotated[str, Field(description="Intent of this invocation step.")] = ""
 
 
 class InvocationMeta(BaseModel, frozen=True):
