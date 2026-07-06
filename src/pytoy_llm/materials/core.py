@@ -90,7 +90,7 @@ class ModelSectionData[T: BaseModel](BaseModel, frozen=True):
         data_parts = []
         for item in self.instances:
             part = ("```json\n" 
-                    f"{item.model_dump_json(ensure_ascii=False)}"
+                    f"{item.model_dump_json()}"
                     "```"
             )
             data_parts.append(part)
