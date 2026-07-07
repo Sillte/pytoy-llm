@@ -142,7 +142,7 @@ class DiffBundle(BaseModel, frozen=True):
     def model_section_data(self) -> ModelSectionData:
         """Raw BaseModel representation of the diff bundle."""
         description = ("JSON-like representation of file diffs for model consumption.\n"
-                       "Current Timestamp: {timestamp} / {datetime.fromtimestamp(timestamp).isoformat()}\n"
+                       f"Current Timestamp: {timestamp} / {datetime.fromtimestamp(timestamp).isoformat()}\n"
                        f"Root location of the instances: {self.root_location}\n")
         return ModelSectionData(
             bundle_kind=self.bundle_kind,
