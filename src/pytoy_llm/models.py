@@ -128,7 +128,7 @@ class LLMOutputMeta(BaseModel, frozen=True):
 
 
 class LLMOutputModel[T: BaseModel | str](BaseModel, frozen=True):
-    content: Annotated[T, Field(description="The main text content from LLM")]
+    content: Annotated[T | str, Field(description="The main text content from LLM")]
     meta: Annotated[LLMOutputMeta, Field(description="Meta data of the output of LLM")]
     messages: Annotated[Sequence[InputMessage],  Field(description="History of messages")]
 
@@ -152,7 +152,7 @@ class LLMOutputModel[T: BaseModel | str](BaseModel, frozen=True):
 
     @classmethod
     def from_pydantic_run_result(cls, run_result: "AgentRunResult", input_messages: Sequence[InputMessage]) -> Self:
-        content: str | T = run_result.output
+        content = run_result.output
         meta = LLMOutputMeta.from_pydantic_run_result(run_result) 
         messages = cls._from_pydantic_messages(run_result)
         return cls(content=content, meta=meta, messages=[*input_messages, *messages])

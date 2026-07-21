@@ -145,7 +145,7 @@ if __name__ == "__main__":
         ],
     )
     request = LLMTaskRequest(
-        task_spec=task_spec,
+        task_spec=task_spjec,
         task_input=log_input,
     )
     response = LLMTaskExecutor().execute(request)
