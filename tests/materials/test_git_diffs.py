@@ -1,9 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
-from git import Diff
 from pytoy_llm.materials.git_diffs.collectors import GitDiffCollector, FileAddCreator, FileDeleteCreator, FileModifyCreator
-from pytoy_llm.materials.git_diffs.models import FileAdd, FileDelete, FileModify, AtomicChange, LineRange, GitDiffBundleQuery
+from pytoy_llm.materials.git_diffs.models import FileAdd, FileDelete, FileModify, GitDiffBundleQuery
 
 # --- FileAddCreator テスト ---
 def test_file_add_creator():

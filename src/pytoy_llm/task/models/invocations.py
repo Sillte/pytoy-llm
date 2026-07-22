@@ -109,7 +109,7 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
             input_messages = self.create_messages(input, task_context)  #type: ignore
         output_or_effect = task_context.llm_facade.completion(
             input_messages,
-            output_format=self.output_spec,
+            output_type=self.output_spec,
             connection_name=self.connection_name,
             llm_config=self.llm_config,
         )
@@ -124,7 +124,7 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
     kind: Annotated[Literal["agent"], Field(description="Type of invocation")] = "agent"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     output_spec: Annotated[
-        type[str] | type[T], Field(description="Expected type of the output from LLM")
+        type[T], Field(description="Expected type of the output from LLM")
     ]
     create_messages: Annotated[
         Callable[[Any, LLMTaskContextProtocol], Sequence[InputMessage]] | Callable[[Any], Sequence[InputMessage]],
@@ -148,7 +148,7 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
             input_messages = self.create_messages(input, task_context)  #type: ignore
         output_or_effect = task_context.llm_facade.run_agent(
             input_messages,
-            output_format=self.output_spec,
+            output_type=self.output_spec,
             tools=self.tools,
             connection_name=self.connection_name,
             llm_config=self.llm_config,

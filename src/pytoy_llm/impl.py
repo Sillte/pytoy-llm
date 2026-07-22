@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Sequence, Callable
+from pydantic import BaseModel
 
 from pytoy_llm.litellm_client import PytoyLiteLLMClient, Connection
 from pytoy_llm.connection_configuration import ConnectionConfiguration, DEFAULT_NAME
-from pytoy_llm.models import SyncOutputType, LLMTool, InputMessage, LLMConfig
+from pytoy_llm.models import LLMTool, InputMessage, LLMConfig
 
 
 def initialize_configuration(name: str = DEFAULT_NAME) -> Path:
@@ -19,23 +20,23 @@ def get_configuration_path(name: str = DEFAULT_NAME) -> Path:
     return path
 
 
-def completion(
+def completion[T: BaseModel | str](
     content: str | list | Sequence[InputMessage],
-    output_format: SyncOutputType = str,
+    output_type: type[T] = str,
     llm_config: LLMConfig | None = None,
     connection: str | Connection = DEFAULT_NAME,
-):
+) -> T:
     """Execute the `litellm.completion`."""
     client = PytoyLiteLLMClient(connection, llm_config=llm_config)
-    return client.completion(content, llm_response_format=output_format)
+    return client.completion(content, output_type=output_type, result_type="output")
 
 
-def run_agent(content: str | list | Sequence[InputMessage],
-              output_format: SyncOutputType = str,
+def run_agent[T: BaseModel | str](content: str | list | Sequence[InputMessage],
+              output_type: type[T] = str,
               tools: Sequence[Callable | LLMTool] = tuple(),
               llm_config: LLMConfig | None = None,
-              connection: str | Connection= DEFAULT_NAME):
+              connection: str | Connection = DEFAULT_NAME) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""
     from pytoy_llm.pydantic_agent import PytoyAgent
-    agent = PytoyAgent(connection, tools=tools, llm_config=llm_config)
-    return agent.run_sync(content, llm_response_format=output_format)
+    agent = PytoyAgent(connection, llm_config=llm_config)
+    return agent.run_sync(content, output_type=output_type, result_type="output", tools=tools)

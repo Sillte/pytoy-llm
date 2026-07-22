@@ -13,7 +13,7 @@ class LLMFacadeProtocol[T: BaseModel | str](Protocol):
     def completion(
         self,
         input_messages: Sequence[InputMessage],
-        output_format: type[T],
+        output_type: type[T],
         llm_config: LLMConfig | None,
         connection_name: str | None = None,
     ) -> T:
@@ -24,7 +24,7 @@ class LLMFacadeProtocol[T: BaseModel | str](Protocol):
     def run_agent(
         self,
         input_messages: Sequence[InputMessage],
-        output_format: type[str] | type[T],
+        output_type: type[T],
         tools: Sequence[Callable | LLMTool] = (),
         llm_config: LLMConfig | None = None,
         connection_name: str | None = None,

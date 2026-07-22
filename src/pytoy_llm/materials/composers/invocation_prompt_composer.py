@@ -1,12 +1,12 @@
 import json
-from typing import Annotated, Sequence, Any
+from typing import Sequence, Any
 from pytoy_llm.materials.core import  SectionData, warn_forbidden_headers
 from pytoy_llm.materials.composers.models import SystemPromptTemplate, SectionUsage
 from pytoy_llm.materials.composers.models import SectionDataComposer
 from pytoy_llm.models import InputMessage
 from pydantic import BaseModel
 
-from pytoy_llm.task.models.context import LLMTaskContext, LLMTaskContextProtocol
+from pytoy_llm.task.models.context import LLMTaskContextProtocol
 from pytoy_llm.task.models import LLMInvocationSpec, InvocationSpecMeta
 
 class InvocationPromptComposer:

@@ -1,7 +1,5 @@
-import pytest
 from pydantic import BaseModel
-from typing import Sequence
-from pytoy_llm.materials.composers.models import SectionUsage, SectionDataComposer, SystemPromptTemplate
+from pytoy_llm.materials.composers.models import SectionUsage, SystemPromptTemplate
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.core import TextSectionData, ModelSectionData
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from pydantic import BaseModel, Field, BeforeValidator
-from typing import Annotated, Self, Literal, Mapping, get_type_hints, Any
+from typing import Annotated, Self, Literal, Mapping, Any
 from collections.abc import Sequence
 from datetime import datetime
 import uuid
@@ -103,7 +103,7 @@ class TextFileCollection(BaseModel):
         lines.append(f"  - id: {TextFileLocator.model_fields['id'].description}")
         lines.append(f"  - path: {TextFileLocator.model_fields['path'].description}")
         lines.append(f"  - timestamp: {TextFileLocator.model_fields['timestamp'].description}")
-        lines.append(f"  - readable_timestamp: human-readable timestamp")
+        lines.append("  - readable_timestamp: human-readable timestamp")
 
         # EntryType の説明
         entry_desc = TextFileContent.model_fields['entry'].description

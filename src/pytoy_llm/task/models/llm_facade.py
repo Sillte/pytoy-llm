@@ -6,7 +6,7 @@ from pytoy_llm.task.models.context_protocols import LLMFacadeProtocol
 from pydantic import BaseModel
 
 
-from typing import Callable, Sequence, cast
+from typing import Callable, Sequence
 
 
 class LLMFacade[T: BaseModel | str](LLMFacadeProtocol[T]):
@@ -17,30 +17,24 @@ class LLMFacade[T: BaseModel | str](LLMFacadeProtocol[T]):
     def completion(
         self,
         input_messages: Sequence[InputMessage],
-        output_format: type[str] | type[T],
+        output_type: type[T],
         llm_config: LLMConfig | None,
         connection_name: str | None = None,
-    ) -> str | T:
+    ) -> T:
         connection_name = connection_name or self.connection_name
         llm_config = llm_config or self.llm_config
-        raw_output = completion(
-            input_messages, output_format, connection=connection_name, llm_config=llm_config
-        )  # type: ignore
-        if isinstance(output_format, type) and issubclass(output_format, BaseModel):
-            return output_format.model_validate(raw_output)
-        elif output_format is str:
-            return raw_output  # type: ignore
-        else:
-            raise TypeError(f"Unsupported output_format type: {output_format}")
+        return completion(
+            input_messages, output_type, connection=connection_name, llm_config=llm_config
+        ) 
 
     def run_agent(
         self,
         input_messages: Sequence[InputMessage],
-        output_format: type[str] | type[T],
+        output_format: type[T],
         tools: Sequence[Callable | LLMTool] = (),
         llm_config: LLMConfig | None = None,
         connection_name: str | None = None,
-    ) -> str | T:
+    ) -> T:
         """Alias of `run_agent` for better readability."""
         connection_name = connection_name or self.connection_name
         llm_config = llm_config or self.llm_config
@@ -51,4 +45,4 @@ class LLMFacade[T: BaseModel | str](LLMFacadeProtocol[T]):
             connection=connection_name,
             llm_config=llm_config,
         )
-        return cast(str | T, result)
+        return result

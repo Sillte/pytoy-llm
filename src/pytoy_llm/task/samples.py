@@ -2,10 +2,9 @@ from pytoy_llm.task import LLMTaskSpec
 from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest
 from pytoy_llm.models import InputMessage
 from pydantic import Field, BaseModel
-from pydantic_ai import WebSearchTool
 from typing import Annotated, Sequence, Literal
 
-from pytoy_llm.task.models import AgentInvocationSpec, FunctionInvocationSpec, LLMInvocationSpec, SelectedInvocationSpec 
+from pytoy_llm.task.models import AgentInvocationSpec, FunctionInvocationSpec, LLMInvocationSpec 
 from pytoy_llm.task.models import InvocationSpecMeta
 from pytoy_llm.task.models import LLMTaskSpecMeta
 
@@ -145,7 +144,7 @@ if __name__ == "__main__":
         ],
     )
     request = LLMTaskRequest(
-        task_spec=task_spjec,
+        task_spec=task_spec,
         task_input=log_input,
     )
     response = LLMTaskExecutor().execute(request)

@@ -1,6 +1,5 @@
-from typing import Sequence, assert_never
-from pytoy_llm.materials.core import SectionData, TextSectionData, ModelSectionData
-import json
+from typing import Sequence
+from pytoy_llm.materials.core import SectionData
 
 
 class NaiveSectionComposer:

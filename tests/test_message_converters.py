@@ -1,3 +1,4 @@
+from typing import cast 
 import pytest
 from litellm import ModelResponse
 from pydantic import BaseModel
@@ -52,11 +53,11 @@ def test_input_converter_sequence():
 
 
 def test_model_response_converter_to_str(mock_response):
-    converter = ModelResponseConverter(str, str)
+    converter = ModelResponseConverter(str, "output")
     result = converter.convert(mock_response, input_messages=[])
     assert isinstance(result, str)
 
 def test_model_response_converter_to_basemodel(mock_response):
-    converter = ModelResponseConverter(DummyStructuredModel, DummyStructuredModel)
-    result = converter.convert(mock_response, input_messages=[])
+    converter = ModelResponseConverter(DummyStructuredModel, "output")
+    result = cast(DummyStructuredModel, converter.convert(mock_response, input_messages=[]))
     assert result.answer == "fine"

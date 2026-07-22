@@ -1,16 +1,15 @@
 from __future__ import annotations
 import json
 import inspect
-from typing import Annotated, Sequence, Any, Literal, Self, cast, assert_never, get_args, get_origin, Mapping, Union
+from typing import Annotated, Sequence, Any, Literal, Self, cast, get_args, get_origin, Mapping, Union
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from pydantic_ai import AgentRunResult, ModelSettings
     from litellm import ModelResponse 
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic import StringConstraints
-from pydantic.dataclasses import dataclass
 
 StrictStr = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 
@@ -119,7 +118,7 @@ class LLMOutputMeta(BaseModel, frozen=True):
         finish_reason = response.choices[0].finish_reason
         return cls(tokens=tokens, finish_reason=finish_reason, raw_response=response, requests=1)
     @classmethod
-    def from_pydantic_run_result(cls, run_result: "AgentRunResult") -> Self:
+    def from_pydantic_run_result[T: str | BaseModel](cls, run_result: "AgentRunResult[T]") -> Self:
         usage = run_result.usage()
         prompt = usage.input_tokens
         completion = usage.output_tokens
@@ -151,14 +150,14 @@ class LLMOutputModel[T: BaseModel | str](BaseModel, frozen=True):
         return InputMessage(role="assistant", content=content)
 
     @classmethod
-    def from_pydantic_run_result(cls, run_result: "AgentRunResult", input_messages: Sequence[InputMessage]) -> Self:
+    def from_pydantic_run_result(cls, run_result: "AgentRunResult[T]", input_messages: Sequence[InputMessage]) -> Self:
         content = run_result.output
         meta = LLMOutputMeta.from_pydantic_run_result(run_result) 
         messages = cls._from_pydantic_messages(run_result)
         return cls(content=content, meta=meta, messages=[*input_messages, *messages])
     
     @classmethod 
-    def _from_pydantic_messages(cls, run_result: "AgentRunResult") -> Sequence[InputMessage]:
+    def _from_pydantic_messages(cls, run_result: "AgentRunResult[T]") -> Sequence[InputMessage]:
         outputs = []
         for message in run_result.new_messages():
             if message.kind == "request":
@@ -174,10 +173,8 @@ class LLMOutputModel[T: BaseModel | str](BaseModel, frozen=True):
         outputs.append(cls._from_content_to_message(run_result.output))
         return outputs
 
-type SyncOutputType = type[BaseModel] | type[str]
-type SyncOutput = "LLMOutputModel | BaseModel | str"
-type SyncResultClass = type[LLMOutputModel] | type[BaseModel]  | type[str]
-
+type ResultType = Literal["pytoy-result", "native-result", "output"]
+ 
 class LLMConfig(BaseModel, frozen=True):
     temperature: float | None = None
     max_tokens: int | None = None
