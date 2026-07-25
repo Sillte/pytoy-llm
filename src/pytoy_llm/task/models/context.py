@@ -1,18 +1,17 @@
 from pytoy_llm.task.models.context_protocols import LLMFacadeProtocol, LLMTaskContextProtocol  # NOQA
 from pytoy_llm.task.models.repository import LLMTaskStateRepository
 from pytoy_llm.task.models.schemas import LLMTaskArgument, LLMTaskSpecMeta
+from pytoy_llm.llm_facade import LLMFacade
 
-
-from pydantic import BaseModel
 
 from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
-class LLMTaskContext[T: BaseModel | str]:
+class LLMTaskContext:
     task_argument: LLMTaskArgument
     task_meta: LLMTaskSpecMeta
-    llm_facade: LLMFacadeProtocol[T]
+    llm_facade: LLMFacade
     repository: LLMTaskStateRepository = field(default_factory=LLMTaskStateRepository)
 
     @property

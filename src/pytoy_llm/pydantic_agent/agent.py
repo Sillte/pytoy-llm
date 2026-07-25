@@ -1,6 +1,6 @@
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Self, assert_never, overload
+from typing import Self, overload
 
 from pydantic import BaseModel
 from pydantic_ai import (
@@ -17,9 +17,9 @@ from pytoy_llm.models import (
     Connection,
     LLMConfig,
     LLMMessage,
+    LLMMessagesLike,
     LLMOutputModel,
     LLMTool,
-    ResultType,
 )
 from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
 from pytoy_llm.pydantic_agent.factory import PydanticAIModelFactory
@@ -73,59 +73,75 @@ class PytoyPydanticAIAgent:
         return Agent(model=model, system_prompt=system_prompt, tools=tools)
 
     @overload
-    def run_sync[T: BaseModel | str](
+    def run(
         self,
-        messages: Sequence[LLMMessage] | str | LLMMessage | Sequence[Mapping[str, Any]],
+        messages: LLMMessagesLike,
+        output_type: type[str],
+        tools: Sequence[LLMTool | Callable] = tuple(),
+    ) -> str: ...
+
+    @overload
+    def run[T: BaseModel](
+        self,
+        messages: LLMMessagesLike,
         output_type: type[T],
         tools: Sequence[LLMTool | Callable] = tuple(),
-        result_type: Literal["output"] = "output",
     ) -> T: ...
 
-    @overload
-    def run_sync[T: BaseModel | str](
+    def run(
         self,
-        messages: Sequence[LLMMessage] | str | LLMMessage | Sequence[Mapping[str, Any]],
+        messages: LLMMessagesLike,
+        output_type: type[BaseModel] | type[str],
+        tools: Sequence[LLMTool | Callable] = tuple(),
+    ) -> BaseModel | str:
+        result = self.run_with_native(messages=messages, output_type=output_type, tools=tools)
+        return result.output
+
+    @overload
+    def run_with_native(
+        self,
+        messages: LLMMessagesLike,
+        output_type: type[str],
+        tools: Sequence[LLMTool | Callable] = tuple(),
+    ) -> AgentRunResult[str]: ...
+
+    @overload
+    def run_with_native[T: BaseModel](
+        self,
+        messages: LLMMessagesLike,
         output_type: type[T],
         tools: Sequence[LLMTool | Callable] = tuple(),
-        result_type: Literal["native-result"] = "native-result",
     ) -> AgentRunResult[T]: ...
 
-    @overload
-    def run_sync[T: BaseModel | str](
-        self,
-        messages: Sequence[LLMMessage] | str | LLMMessage | Sequence[Mapping[str, Any]],
-        output_type: type[T],
-        tools: Sequence[LLMTool | Callable] = tuple(),
-        result_type: Literal["pytoy-result"] = "pytoy-result",
-    ) -> LLMOutputModel[T]: ...
-
-    def run_sync[T: BaseModel | str](
-        self,
-        messages: Sequence[LLMMessage] | str | LLMMessage | Sequence[Mapping[str, Any]],
-        output_type: type[T] = str,
-        tools: Sequence[LLMTool | Callable] = tuple(),
-        result_type: ResultType = "output",
-    ) -> T | AgentRunResult[T] | LLMOutputModel[T]:
+    def run_with_native(
+        self, messages: LLMMessagesLike, output_type: type[BaseModel] | type[str], tools: Sequence[LLMTool | Callable] = tuple()
+    ) -> AgentRunResult[BaseModel | str]:
         adapter = PydanticAIMessageAdapter()
         messages = LLMMessage.to_messages(messages)
         model_messages = [adapter.to_native(message) for message in messages]
         message_history, current_message = model_messages[:-1], model_messages[-1]
         pair = CurrentModelRequestPair.from_model_message(current_message)
-
         agent = self._make_agent(system_prompt=pair.system_prompt, tools=tools)
-
         result = agent.run_sync(
             user_prompt=pair.user_prompt,
             output_type=output_type,
             message_history=message_history,
         )
+        return result
 
-        match result_type:
-            case "native-result":
-                return result
-            case "pytoy-result":
-                return adapter.to_llm_output(result)
-            case "output":
-                return result.output
-            case _:
-                assert_never(result_type)
+    @overload
+    def run_with_result[T: BaseModel](
+        self, messages: LLMMessagesLike, output_type: type[T], tools: Sequence[LLMTool | Callable] = tuple()
+    ) -> LLMOutputModel[T]: ...
+
+    @overload
+    def run_with_result(
+        self, messages: LLMMessagesLike, output_type: type[str], tools: Sequence[LLMTool | Callable] = tuple()
+    ) -> LLMOutputModel[str]: ...
+
+    def run_with_result(
+        self, messages: LLMMessagesLike, output_type: type[BaseModel] | type[str], tools: Sequence[LLMTool | Callable] = tuple()
+    ) -> LLMOutputModel[BaseModel | str]:
+        adapter = PydanticAIMessageAdapter()
+        run_result = self.run_with_native(messages, output_type=output_type, tools=tools)
+        return adapter.to_llm_output(run_result)

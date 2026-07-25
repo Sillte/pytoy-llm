@@ -1,4 +1,4 @@
-from pytoy_llm.impl import initialize_configuration  # NOQA
-from pytoy_llm.impl import get_configuration_path    # NOQA
-from pytoy_llm.impl import completion  # NOQA
-from pytoy_llm.impl import run_agent    # NOQA
+from pytoy_llm.api import initialize_configuration  # NOQA
+from pytoy_llm.api import get_configuration_path  # NOQA
+from pytoy_llm.api import completion  # NOQA
+from pytoy_llm.api import run  # NOQA

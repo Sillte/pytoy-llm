@@ -42,7 +42,7 @@ class _HunkState:
 def _to_str(arg: str | bytes) -> str:
     if isinstance(arg, str):
         return arg
-    return arg.decode("utf-8", errors="ignore")  # type: ignore
+    return arg.decode("utf-8", errors="ignore")
 
 
 class FileAddCreator:
@@ -137,12 +137,10 @@ class FileOperationCreator:
             else:
                 pass
         return file_operations
-    
+
 
 class GitDiffCollector:
-    def __init__(
-        self, repo_path: str | Path | None = None, root_folder: str | Path | None = None
-    ) -> None:
+    def __init__(self, repo_path: str | Path | None = None, root_folder: str | Path | None = None) -> None:
         # Note: `repo_path should be a directory.
         if repo_path is None:
             repo_path = Path(".")
@@ -157,17 +155,17 @@ class GitDiffCollector:
         self.root_location: Sequence[str] = self.root_folder.relative_to(self.workspace).parts
 
         self.operation_creator = FileOperationCreator()
-        
+
     def get_bundle(self, query: GitDiffBundleQuery) -> DiffBundle:
         from_rev = query.from_rev
         to_rev = query.to_rev
-        
+
         if from_rev == "index":
             base = self.repo.index
         else:
             from_rev = from_rev or "HEAD"
             base = self.repo.commit(from_rev)
-            
+
         if to_rev == "index":
             diffs = base.diff(create_patch=True)
             timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1
@@ -180,9 +178,7 @@ class GitDiffCollector:
             timestamp = self.repo.commit(to_rev).committed_date
             timestamp_provider = lambda _: float(timestamp)
         return self._create_bundle_from_ops(diffs, timestamp_provider)
-    
 
-    
     def _create_bundle_from_ops(self, diffs: Any, timestamp_provider: Callable[[Path], float]) -> DiffBundle:
         def _relative_location(operation: FileOperation) -> tuple[str, ...] | None:
             try:
@@ -192,6 +188,7 @@ class GitDiffCollector:
                 # optionally log warning here if needed
                 pass
             return None
+
         ops = self.operation_creator(diffs)
         file_diffs = [
             FileDiff(
@@ -199,14 +196,14 @@ class GitDiffCollector:
                 timestamp=timestamp_provider(op.path),
                 location=location,
             )
-            for op in ops if ((location:=_relative_location(op)) is not None)
+            for op in ops
+            if ((location := _relative_location(op)) is not None)
         ]
         return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
 
     @property
     def bundle(self) -> DiffBundle:
         return self.get_bundle(GitDiffBundleQuery(from_rev="head", to_rev="working-tree"))
-
 
 
 if __name__ == "__main__":

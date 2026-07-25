@@ -22,10 +22,13 @@ class InvocationPromptComposer:
     - SectionUsage
     - SectionData
     """
-    def __init__(self,
-                 prompt_template: SystemPromptTemplate,
-                 section_usages: Sequence[SectionUsage] | None = None,
-                 section_data_list: Sequence[SectionData] | None = None):
+
+    def __init__(
+        self,
+        prompt_template: SystemPromptTemplate,
+        section_usages: Sequence[SectionUsage] | None = None,
+        section_data_list: Sequence[SectionData] | None = None,
+    ):
         self.prompt_template = prompt_template
         self.section_usages = section_usages or []
         self.section_data_list = section_data_list or []
@@ -48,10 +51,7 @@ class InvocationPromptComposer:
         warn_forbidden_headers(role_str, min_allowed_header_level=2)
 
         # SectionUsage + SectionData
-        sections_str = SectionDataComposer.compose_sections_with_usage(
-            self.section_usages,
-            self.section_data_list
-        )
+        sections_str = SectionDataComposer.compose_sections_with_usage(self.section_usages, self.section_data_list)
 
         # Output specification
         output_description = f"## Expected Output\n\n{self.prompt_template.output_description}\n\n"
@@ -66,19 +66,25 @@ class InvocationPromptComposer:
         if self.prompt_template.reasoning_guidance:
             warn_forbidden_headers(self.prompt_template.reasoning_guidance, min_allowed_header_level=2)
         # Reasoning guidance
-        reasoning = f"## Reasoning Guidance\n\n{self.prompt_template.reasoning_guidance}\n\n" if self.prompt_template.reasoning_guidance else ""
+        reasoning = (
+            f"## Reasoning Guidance\n\n{self.prompt_template.reasoning_guidance}\n\n"
+            if self.prompt_template.reasoning_guidance
+            else ""
+        )
 
         # Compose final prompt
-        prompt = "\n".join([
-            invocation_header,
-            invocation_intent,
-            invocation_rules,
-            role_str,
-            sections_str,
-            output_description,
-            output_spec_str,
-            reasoning
-        ])
+        prompt = "\n".join(
+            [
+                invocation_header,
+                invocation_intent,
+                invocation_rules,
+                role_str,
+                sections_str,
+                output_description,
+                output_spec_str,
+                reasoning,
+            ]
+        )
         return prompt
 
     def to_output_type_instruction(self, output_type: type[BaseModel] | type[str]) -> str:
@@ -92,18 +98,19 @@ class InvocationPromptComposer:
             return self.to_output_type_instruction(output_type.__class__)  # Fallback, it is not good.
         else:
             raise ValueError(f"Invalid output type `{output_type=}`")
-    
+
     def compose_message(self, user_prompt: str | None = None) -> LLMMessage:
         system_prompt = self.compose_prompt()
         return LLMMessage.from_prompt(user_prompt=user_prompt, system_prompt=system_prompt)
 
-
     def compose_invocation_spec(self) -> LLMInvocationSpec:
-        def create_message(input: Any, context: LLMTaskContextProtocol) -> LLMMessage:
-            input = str(input) if input else None 
+        def create_messages(input: Any, context: LLMTaskContextProtocol) -> Sequence[LLMMessage]:
+            input = str(input) if input else None
             messages = self.compose_message(input)
-            return messages
-        return LLMInvocationSpec(create_messages=create_message,
-                                 output_type=self.prompt_template.output_type,
-                                 meta=InvocationSpecMeta(name=self.prompt_template.name,
-                                                          intent=self.prompt_template.intent))
+            return [messages]
+
+        return LLMInvocationSpec(
+            create_messages=create_messages,
+            output_type=self.prompt_template.output_type,
+            meta=InvocationSpecMeta(name=self.prompt_template.name, intent=self.prompt_template.intent),
+        )

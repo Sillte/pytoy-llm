@@ -3,11 +3,13 @@ from pydantic import BaseModel
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.composers.models import SectionUsage, SystemPromptTemplate
 from pytoy_llm.materials.core import ModelSectionData, TextSectionData
+from pytoy_llm.models import LLMMessage
 
 
 class SampleModel(BaseModel):
     name: str
     value: int
+
 
 def test_invocation_prompt_composer_basic():
     system_prompt = SystemPromptTemplate(
@@ -17,38 +19,28 @@ def test_invocation_prompt_composer_basic():
         output_description="Rewritten text as string",
         output_type=str,
         reasoning_guidance="Consider sentence merging if it improves clarity.",
-        role="Editor"
+        role="Editor",
     )
 
     # --- サンプル SectionUsage ---
     section_usages = [
         SectionUsage(
-            bundle_kind="TextExamples",
-            usage_rule=[
-                "Use these examples as reference.",
-                "Follow the style shown in examples."
-            ]
+            bundle_kind="TextExamples", usage_rule=["Use these examples as reference.", "Follow the style shown in examples."]
         ),
-        SectionUsage(
-            bundle_kind="ModelData",
-            usage_rule=[
-                "Use these examples as models.",
-                "Utilize models."
-            ]
-        )
+        SectionUsage(bundle_kind="ModelData", usage_rule=["Use these examples as models.", "Utilize models."]),
     ]
 
     # --- サンプル SectionData ---
     text_section = TextSectionData(
         bundle_kind="TextExamples",
         description="Example sentences to guide rewriting",
-        structured_text="This is a long example sentence that could be improved."
+        structured_text="This is a long example sentence that could be improved.",
     )
 
     model_section = ModelSectionData[SampleModel](
         bundle_kind="ModelData",
         description="Sample model instances",
-        instances=[SampleModel(name="a", value=1), SampleModel(name="b", value=2)]
+        instances=[SampleModel(name="a", value=1), SampleModel(name="b", value=2)],
     )
 
     section_data_list = [text_section, model_section]
@@ -65,12 +57,12 @@ def test_invocation_prompt_composer_basic():
     assert "Example sentences to guide rewriting" in prompt_str
     assert "Sample model instances" in prompt_str
 
-    messages = composer.compose_message(user_prompt=None)
-    assert len(messages) == 1
+    message = composer.compose_message(user_prompt=None)
+    assert isinstance(message, LLMMessage)
 
-    messages = composer.compose_message(user_prompt="UserPrompt")
-    assert len(messages) == 2
+    message = composer.compose_message(user_prompt="UserPrompt")
+    assert isinstance(message, LLMMessage)
+
 
 if __name__ == "__main__":
     test_invocation_prompt_composer_basic()
-

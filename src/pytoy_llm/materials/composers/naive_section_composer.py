@@ -4,11 +4,11 @@ from pytoy_llm.materials.core import SectionData
 
 
 class NaiveSectionComposer:
-    """Only dump the information of `SectionData`.
-    """
+    """Only dump the information of `SectionData`."""
+
     def __init__(self, sections: Sequence[SectionData]) -> None:
         self._sections: Sequence[SectionData] = sections
-        
+
     def compose_prompt(self) -> str:
         separator = "=" * 80 + "\n\n"
         contents: list[str] = []
@@ -18,5 +18,3 @@ class NaiveSectionComposer:
             content = f"{header}\n{body}\n\n"
             contents.append(content)
         return separator.join(contents)
-
-

@@ -114,7 +114,7 @@ class LLMMessage(BaseModel, frozen=True):
         return cls(kind=kind, parts=parts)
 
     @classmethod
-    def from_any(cls, arg: str | Sequence[Part] | Mapping[str, Any] | Sequence[Mapping[str, Any]] | Self) -> Self:
+    def from_any(cls, arg: str | Sequence[Part] | Mapping[str, Any] | Sequence[Mapping[str, Any]] | LLMMessage) -> Self:
         if isinstance(arg, str):
             try:
                 result = cls.model_validate_json(arg)
@@ -125,7 +125,7 @@ class LLMMessage(BaseModel, frozen=True):
         return cls.model_validate(arg)
 
     @classmethod
-    def to_messages(cls, arg: str | Self | Sequence[Self] | Sequence[Mapping[str, Any]]) -> Sequence[Self]:
+    def to_messages(cls, arg: LLMMessagesLike) -> Sequence[LLMMessage]:
         if isinstance(arg, str):
             return [cls.from_prompt(user_prompt=arg)]
         elif isinstance(arg, LLMMessage):
@@ -137,6 +137,10 @@ class LLMMessage(BaseModel, frozen=True):
     @classmethod
     def chat(cls, content: str) -> Self:
         return cls.from_prompt(user_prompt=content)
+
+
+# Type which can be converted to `Sequence[LLMMessage]
+type LLMMessagesLike = Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage
 
 
 class LLMMessageHistory(BaseModel, frozen=True):

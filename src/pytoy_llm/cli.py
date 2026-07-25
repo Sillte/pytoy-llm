@@ -5,8 +5,8 @@ import sys
 import typer
 from pydantic import BaseModel
 
+from pytoy_llm.api import completion
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
-from pytoy_llm.impl import completion
 
 app = typer.Typer(
     add_completion=False,

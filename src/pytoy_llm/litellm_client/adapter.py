@@ -53,8 +53,8 @@ class LiteLLMMessageAdapter:
         parts = [self._part_converter.from_native(elem) for elem in native_records]
         return LLMMessage(kind=kind, parts=parts)
 
-    def to_llm_model[T: BaseModel | str](
-        self, input_messages: Sequence[LLMMessage], llm_response: ModelResponse
+    def to_llm_model[T: BaseModel](
+        self, input_messages: Sequence[LLMMessage], llm_response: ModelResponse, output_type: type[str] | type[T]
     ) -> LLMOutputModel:
         import litellm
 
@@ -69,7 +69,13 @@ class LiteLLMMessageAdapter:
         choices = cast(litellm.Choices, response.choices)
         choice = choices[0]
         content = choice.message.content
+        content = cast(str, content)
 
+        if output_type is str:
+            content = str(content)
+        else:
+            t_output_type = cast(T, output_type)
+            content = t_output_type.model_validate_json(content)
         output_message = self.from_native([llm_response.json()], kind="response")
         messages = [*input_messages, output_message]
         return LLMOutputModel(output=content, meta=meta, messages=messages)
