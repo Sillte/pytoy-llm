@@ -1,15 +1,21 @@
-from pytoy_llm.models import InputMessage, LLMConfig, LLMTool
-from pytoy_llm.task.models.context import LLMTaskContext
-from pytoy_llm.task.models.context_protocols import LLMTaskContextProtocol
-from pytoy_llm.task.models.schemas import InvocationEffect, InvocationMeta, InvocationRecord, InvocationRecords, InvocationSpecMeta
+import inspect
+import time
+from collections.abc import Callable, Sequence
+from functools import wraps
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-import inspect
-import time
-from functools import wraps
-from typing import Annotated, Any, Callable, Literal, Sequence
-
+from pytoy_llm.models import LLMConfig, LLMMessage, LLMTool
+from pytoy_llm.task.models.context import LLMTaskContext
+from pytoy_llm.task.models.context_protocols import LLMTaskContextProtocol
+from pytoy_llm.task.models.schemas import (
+    InvocationEffect,
+    InvocationMeta,
+    InvocationRecord,
+    InvocationRecords,
+    InvocationSpecMeta,
+)
 
 type InvocationCallable[T: BaseModel] = Callable[[Any, LLMTaskContextProtocol[T]], InvocationEffect | T | str]
 
@@ -23,12 +29,9 @@ class FunctionInvocationSpec[T: BaseModel](BaseModel, frozen=True):
         starttime = time.time()
         output_or_effect = self.invocator(input, task_context)
         effect = InvocationEffect.from_any(output_or_effect)
-        invocation_meta = InvocationMeta(
-            started_at=starttime, ended_at=time.time(), spec_meta=self.meta, kind=self.kind
-        )
+        invocation_meta = InvocationMeta(started_at=starttime, ended_at=time.time(), spec_meta=self.meta, kind=self.kind)
         record = InvocationRecord(input=input, output=effect.output, meta=invocation_meta)
         return InvocationRecords(entries=[record], repository_updates=effect.repository_updates)
-
 
     @classmethod
     def from_any(
@@ -44,9 +47,7 @@ class FunctionInvocationSpec[T: BaseModel](BaseModel, frozen=True):
 
         if meta is None:
             intent = arg.__doc__ or "an invocation function"
-            meta = InvocationSpecMeta(
-                name=arg.__name__,  intent=intent.strip()
-            )
+            meta = InvocationSpecMeta(name=arg.__name__, intent=intent.strip())
 
         if not callable(arg):
             raise TypeError(f"{arg} is not callable")
@@ -54,6 +55,7 @@ class FunctionInvocationSpec[T: BaseModel](BaseModel, frozen=True):
         params = list(sig.parameters.values())
 
         if len(params) == 1:
+
             @wraps(arg)  # type: ignore
             def wrapped_invocator(input_data: T, _context: LLMTaskContext) -> Any:
                 return arg(input_data)  # type: ignore
@@ -71,9 +73,7 @@ class SelectedInvocationSpec[T: BaseModel](BaseModel, frozen=True):
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     spec_selector: Annotated[
         FunctionInvocationSpec[FunctionInvocationSpec[Any]],
-        Field(
-            description="Function that selects which InvocationSpec to invoke based on the input"
-        ),
+        Field(description="Function that selects which InvocationSpec to invoke based on the input"),
     ]
 
     def invoke(self, input: Any, task_context: LLMTaskContextProtocol, /) -> InvocationRecords:
@@ -87,18 +87,12 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
     kind: Annotated[Literal["llm"], Field(description="Type of invocation")] = "llm"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
 
-    output_spec: Annotated[
-        type[T], Field(description="Expected type of the output from LLM")
-    ]
+    output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
     create_messages: Annotated[
-        Callable[[Any, LLMTaskContextProtocol], Sequence[InputMessage]] | Callable[[Any], Sequence[InputMessage]],
-        Field(
-            description="Function to generate the messages for LLM based on input and task context"
-        ),
+        Callable[[Any, LLMTaskContextProtocol], LLMMessage] | Callable[[Any], LLMMessage],
+        Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
-    llm_config: Annotated[
-        LLMConfig | None, Field(description="LLM Configuration for this invocation")
-    ] = None
+    llm_config: Annotated[LLMConfig | None, Field(description="LLM Configuration for this invocation")] = None
     connection_name: Annotated[str | None, Field(description="LLM Connection")] = None
 
     def invoke(self, input: Any, task_context: LLMTaskContextProtocol[T]) -> InvocationRecords:
@@ -106,10 +100,10 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
         else:
-            input_messages = self.create_messages(input, task_context)  #type: ignore
+            input_messages = self.create_messages(input, task_context)  # type: ignore
         output_or_effect = task_context.llm_facade.completion(
             input_messages,
-            output_type=self.output_spec,
+            output_type=self.output_type,
             connection_name=self.connection_name,
             llm_config=self.llm_config,
         )
@@ -117,27 +111,18 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
         meta = InvocationMeta(started_at=starttime, ended_at=time.time(), spec_meta=self.meta, kind=self.kind)
         record = InvocationRecord(input=input, output=effect.output, meta=meta)
         return InvocationRecords(entries=[record], repository_updates=effect.repository_updates)
-    
 
 
 class AgentInvocationSpec[T: BaseModel | str](BaseModel):
     kind: Annotated[Literal["agent"], Field(description="Type of invocation")] = "agent"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
-    output_spec: Annotated[
-        type[T], Field(description="Expected type of the output from LLM")
-    ]
+    output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
     create_messages: Annotated[
-        Callable[[Any, LLMTaskContextProtocol], Sequence[InputMessage]] | Callable[[Any], Sequence[InputMessage]],
-        Field(
-            description="Function to generate the messages for LLM based on input and task context"
-        ),
+        Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
+        Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
-    tools: Annotated[
-        Sequence[Callable | LLMTool], Field(description="Tools available to the agent")
-    ] = []
-    llm_config: Annotated[
-        LLMConfig | None, Field(description="LLM Configuration for this invocation")
-    ] = None
+    tools: Annotated[Sequence[Callable | LLMTool], Field(description="Tools available to the agent")] = []
+    llm_config: Annotated[LLMConfig | None, Field(description="LLM Configuration for this invocation")] = None
     connection_name: Annotated[str | None, Field(description="PydanticAI Connection")] = None
 
     def invoke(self, input: Any, task_context: LLMTaskContextProtocol[T]) -> InvocationRecords:
@@ -145,10 +130,10 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
         else:
-            input_messages = self.create_messages(input, task_context)  #type: ignore
+            input_messages = self.create_messages(input, task_context)  # type: ignore
         output_or_effect = task_context.llm_facade.run_agent(
             input_messages,
-            output_type=self.output_spec,
+            output_type=self.output_type,
             tools=self.tools,
             connection_name=self.connection_name,
             llm_config=self.llm_config,
@@ -160,8 +145,11 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
 
     @field_validator("create_messages", mode="before")
     @classmethod
-    def wrap_create_messages(cls, fn: Callable[[Any, LLMTaskContextProtocol], Sequence[InputMessage]] | Callable[[Any,], Sequence[InputMessage]]) -> Callable[[Any, LLMTaskContextProtocol], Sequence[InputMessage]]:
+    def wrap_create_messages(
+        cls,
+        fn: Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
+    ) -> Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]]:
         sig = inspect.signature(fn)
         if len(sig.parameters) == 1:
-            return lambda input_data, _: fn(input_data)  #type: ignore
-        return fn #type: ignore
+            return lambda input_data, _: fn(input_data)  # type: ignore
+        return fn  # type: ignore

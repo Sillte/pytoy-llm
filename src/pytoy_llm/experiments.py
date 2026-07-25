@@ -1,42 +1,48 @@
-from pytoy_llm import completion
-from pytoy_llm.models import InputMessage
-from pydantic import BaseModel
+from collections.abc import Sequence
 from textwrap import dedent
-from typing import Sequence, Literal
+from typing import Literal
 
-from pytoy_llm.materials.composers.models import SectionUsage, SectionData, TextSectionData, SystemPromptTemplate
-from pytoy_llm.materials.core import TextSectionData
+from pydantic import BaseModel
+
+from pytoy_llm import completion
 from pytoy_llm.materials.basemodels import BaseModelBundle
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
+from pytoy_llm.materials.composers.models import (
+    SectionData,
+    SectionUsage,
+    SystemPromptTemplate,
+    TextSectionData,
+)
+from pytoy_llm.models import LLMMessage
 
 
 def construct_basemodel[T:BaseModel](user_prompt: str,
-                        instances: Sequence[BaseModel],
-                        output_type: type[T],
-                        output_format: type[str] | type[T], 
+                        instances: Sequence[T],
+                        output_mode: Literal["python_code", "instance"] = "python_code", 
                      *, explanation: str | None = None) -> str | T:
     """
     explanation: If addtional explanation is necessary for construction of BaseModel.
     Please provide them.
     """
+    if not instances:
+        raise ValueError("Must provide at least one `instances`.")
 
-    if output_format is str:
-        system_prompt = make_system_prompt(output_type, instances, "python_code", explanation=explanation)
-    else:
-        system_prompt = make_system_prompt(output_type, instances, "instance", explanation=explanation)
-    user_message= InputMessage(role="user", content=user_prompt)
-    messages = [InputMessage(role="system", content=system_prompt), user_message] 
-    return completion(messages, output_format=output_format)  # type:ignore
+    system_prompt = make_system_prompt(instances, output_mode, explanation=explanation)
+    message = LLMMessage.from_prompt(system_prompt=system_prompt, user_prompt=user_prompt)
+    output_type = str if output_mode == "python_code" else type(instances[0])
+    return completion(message, output_type=output_type) 
                         
-def make_system_prompt(
-    output_cls: type[BaseModel],
-    instances: Sequence[BaseModel],
+def make_system_prompt[T: BaseModel](
+    instances: Sequence[T],
     output_mode: Literal["python_code", "instance"] = "python_code",
     *,
     explanation : str | None = None
 ) -> str:
+    if not instances:
+        raise ValueError("Must provide at least one `instances`.")
+    interest_type = type(instances[0])
 
-    output_schema = output_cls.model_json_schema()
+    output_schema = interest_type.model_json_schema()
     target_class_name = output_schema["title"]
 
     bundle = BaseModelBundle(data=instances)
@@ -70,7 +76,7 @@ def make_system_prompt(
                        param_cls=ChildClass(val=2))
         ```
         """)
-        output_spec = str
+        output_type = str
     else:  # instance
         output_description = dedent(f"""
         Produce a valid `{target_class_name}` instance directly via `json`.
@@ -78,7 +84,7 @@ def make_system_prompt(
         Do not include explanations or comments.
         """).strip()
 
-        output_spec = output_cls
+        output_type = interest_type
 
     prompt_template = SystemPromptTemplate(
         name="Construct BaseModel Instances",
@@ -92,7 +98,7 @@ def make_system_prompt(
             "Do NOT add extra explanations or commentary."
         ],
         output_description=output_description,
-        output_spec=output_spec,
+        output_type=output_type,
         role=f"You are a construction assistant. You have responsibility and pride for generating useful `{target_class_name}`"
     )
     if explanation:
@@ -112,8 +118,9 @@ def make_system_prompt(
 
 
 if __name__ == "__main__":
+    from collections.abc import Sequence
+
     from pydantic import BaseModel
-    from typing import Sequence
 
     class SampleModel(BaseModel):
         name: str
@@ -140,8 +147,7 @@ if __name__ == "__main__":
     result_instance = construct_basemodel(
         user_prompt=user_input,
         instances=examples,
-        output_type=SampleModel,
-        output_format=SampleModel,  # 直接BaseModelインスタンス,
+        output_mode="python_code",  
         explanation=explanation
     )
 

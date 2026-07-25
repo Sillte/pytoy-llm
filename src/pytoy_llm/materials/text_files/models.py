@@ -1,12 +1,14 @@
 from __future__ import annotations
-from pathlib import Path
-from pydantic import BaseModel, Field, BeforeValidator
-from typing import Annotated, Self, Literal, Mapping, Any
-from collections.abc import Sequence
-from datetime import datetime
+
 import uuid
-from pytoy_llm.materials.core import StructuredText
-from pytoy_llm.materials.core import ModelSectionData, TextSectionData
+from collections.abc import Mapping, Sequence
+from datetime import datetime
+from pathlib import Path
+from typing import Annotated, Any, Literal, Self
+
+from pydantic import BaseModel, BeforeValidator, Field
+
+from pytoy_llm.materials.core import ModelSectionData, StructuredText, TextSectionData
 
 
 def check_relative_path(v: Any) -> Path:
@@ -132,7 +134,7 @@ class TextFileCollection(BaseModel):
         return "\n".join(lines)
     
     @property
-    def instances(self) -> "Sequence[TextFileInstance]":
+    def instances(self) -> Sequence[TextFileInstance]:
         ids = self.locators.keys()
 
         return [TextFileInstance(id=id_,
@@ -152,12 +154,12 @@ class TextFileInstance(BaseModel):
     ]
     
     locator: Annotated[
-        "TextFileLocator",
+        TextFileLocator,
         Field(description="Locator object for the text file")
     ]
     
     content: Annotated[
-        "TextFileContent",
+        TextFileContent,
         Field(description="Content of the text (full or summary)")
     ]
 

@@ -1,6 +1,11 @@
 from pathlib import Path
 
-from pytoy_llm.materials.text_files.models import TextFileLocator, TextFileContent, TextFileCollection
+from pytoy_llm.materials.text_files.models import (
+    TextFileCollection,
+    TextFileContent,
+    TextFileLocator,
+)
+
 
 def test_structured_text():
     locator1 = TextFileLocator(

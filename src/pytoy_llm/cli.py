@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import sys
+
 import typer
 from pydantic import BaseModel
 
-from pytoy_llm.connection_configuration import ConnectionConfiguration, DEFAULT_NAME
+from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
 from pytoy_llm.impl import completion
 
 app = typer.Typer(
@@ -45,7 +46,7 @@ def run(
     """Execute a single stateless LLM completion."""
 
     input_ = _read_stdin()
-    output = completion(input_, output_format="str", connection=connection)
+    output = completion(input_, output_type=str, connection=connection)
     if isinstance(output, BaseModel):
         typer.echo(output.model_dump_json())
     else:

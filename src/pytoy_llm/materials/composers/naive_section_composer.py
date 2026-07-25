@@ -1,4 +1,5 @@
-from typing import Sequence
+from collections.abc import Sequence
+
 from pytoy_llm.materials.core import SectionData
 
 

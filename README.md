@@ -77,7 +77,7 @@ The simplest usage:
 
 ```
 from pytoy_llm import completion
-output = completion("Hello, there.", output_format="str", connection="first_connect")
+output = completion("Hello, there.", output_type="str", connection="first_connect")
 ```
 
 More advanced output formats (e.g. Pydantic models) are supported and documented...

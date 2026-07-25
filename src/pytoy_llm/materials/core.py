@@ -1,8 +1,9 @@
-import json 
-from typing import Annotated, Sequence, Literal, Union
-from pydantic import BaseModel, Field, TypeAdapter
+import json
 import warnings
+from collections.abc import Sequence
+from typing import Annotated, Literal, Union
 
+from pydantic import BaseModel, Field, TypeAdapter
 
 # --- 基本型の定義 ---
 type StructuredText = Annotated[

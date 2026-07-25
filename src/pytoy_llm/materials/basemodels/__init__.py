@@ -1,6 +1,9 @@
+from collections.abc import Sequence
+
 from pydantic import BaseModel
-from typing import Sequence 
-from pytoy_llm.materials.core import TextSectionData, ModelSectionData
+
+from pytoy_llm.materials.core import ModelSectionData, TextSectionData
+
 
 class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
     """Container holding multiple `pydantic.BaseModel` """
@@ -82,5 +85,5 @@ classDiagram
     class InputMessage
 
     %% --- Relationships summary ---
-    InvocationPromptComposer --> InputMessage : compose_messages()
+    InvocationPromptComposer --> Message : compose_messages()
 """

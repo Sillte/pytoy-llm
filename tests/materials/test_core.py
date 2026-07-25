@@ -1,5 +1,7 @@
 from pydantic import BaseModel
-from pytoy_llm.materials.core import ModelSectionData 
+
+from pytoy_llm.materials.core import ModelSectionData
+
 
 class AModel(BaseModel):
     a: int

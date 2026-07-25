@@ -1,13 +1,17 @@
-from pytoy_llm.task import LLMTaskSpec
-from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest
-from pytoy_llm.models import InputMessage
-from pydantic import Field, BaseModel
-from typing import Annotated, Sequence, Literal
+from collections.abc import Sequence
+from typing import Annotated, Literal
 
-from pytoy_llm.task.models import AgentInvocationSpec, FunctionInvocationSpec, LLMInvocationSpec 
-from pytoy_llm.task.models import InvocationSpecMeta
-from pytoy_llm.task.models import LLMTaskSpecMeta
+from pydantic import BaseModel, Field
 
+from pytoy_llm.models import LLMMessage
+from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest, LLMTaskSpec
+from pytoy_llm.task.models import (
+    AgentInvocationSpec,
+    FunctionInvocationSpec,
+    InvocationSpecMeta,
+    LLMInvocationSpec,
+    LLMTaskSpecMeta,
+)
 
 if __name__ == "__main__":
     class IncidentSummary(BaseModel):
@@ -22,9 +26,9 @@ if __name__ == "__main__":
     
     parse_log_invocation = LLMInvocationSpec[IncidentSummaries](
         meta= InvocationSpecMeta(name="ParseLogInvocation", intent="Parse system logs to extract incident summaries."),
-    output_spec=IncidentSummaries,
+    output_type=IncidentSummaries,
     create_messages=lambda input: [
-        InputMessage(
+        LLMMessage(
             role="system",
             content=(
                 "You are a log analysis assistant.\n"
@@ -32,7 +36,7 @@ if __name__ == "__main__":
                 "Follow the output schema strictly."
             )
         ),
-        InputMessage(
+        LLMMessage(
             role="user",
             content=str(input)
         )
@@ -74,9 +78,9 @@ if __name__ == "__main__":
         return input + "free"
     decide_action_invocation = AgentInvocationSpec[IncidentActions](
         meta= InvocationSpecMeta(name="DecideIncidentActions", intent="Decide actions for each incident based on severity."),
-        output_spec=IncidentActions,
+        output_type=IncidentActions,
         create_messages=lambda summaries, ctx: [
-            InputMessage(
+            LLMMessage(
                 role="system",
                 content=(
                     "You are an incident response agent.\n"
@@ -88,7 +92,7 @@ if __name__ == "__main__":
                     "Return structured results."
                 ),
             ),
-            InputMessage(
+            LLMMessage(
                 role="user",
                 content="\n".join(
                     f"user={item.user_id}, severity={item.severity}, action={item.action}, user_name={item.user_name}"
@@ -102,16 +106,16 @@ if __name__ == "__main__":
 
     email_invocation = LLMInvocationSpec[str](
         meta= InvocationSpecMeta(name="intent=GenerateNotificationEmails", intent="Generate notification emails for affected users."),
-        output_spec=str,
+        output_type=str,
         create_messages=lambda actions, ctx: [
-            InputMessage(
+            LLMMessage(
                 role="system",
                 content=(
                     "You are a notification assistant.\n"
                     "Write emails only for actions that are 'notify' or 'escalate'."
                 ),
             ),
-            InputMessage(
+            LLMMessage(
                 role="user",
                 content="\n".join(
                     f"""

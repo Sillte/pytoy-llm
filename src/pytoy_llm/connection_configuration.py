@@ -1,9 +1,10 @@
 import json
 from pathlib import Path
+
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
-from pytoy_llm.models import Connection
 
+from pytoy_llm.models import Connection
 
 APPNAME = "pytoy_llm"
 DEFAULT_NAME = "default"
@@ -36,9 +37,7 @@ def _make_default_json(model: type[BaseModel]) -> str:
                 data[field_name] = False
             elif getattr(field_type, "__origin__", None) is list:
                 data[field_name] = []
-            elif getattr(field_type, "__origin__", None) is dict:
-                data[field_name] = {}
-            elif field_type and issubclass(field_type, BaseModel):
+            elif getattr(field_type, "__origin__", None) is dict or field_type and issubclass(field_type, BaseModel):
                 data[field_name] = {}
             else:
                 data[field_name] = None

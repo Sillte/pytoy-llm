@@ -1,7 +1,9 @@
 from pydantic import BaseModel
-from pytoy_llm.materials.composers.models import SectionUsage, SystemPromptTemplate
+
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
-from pytoy_llm.materials.core import TextSectionData, ModelSectionData
+from pytoy_llm.materials.composers.models import SectionUsage, SystemPromptTemplate
+from pytoy_llm.materials.core import ModelSectionData, TextSectionData
+
 
 class SampleModel(BaseModel):
     name: str
@@ -13,7 +15,7 @@ def test_invocation_prompt_composer_basic():
         intent="Rewrite the following text to be more concise.",
         rules=["Do not change meaning", "Keep technical terms intact"],
         output_description="Rewritten text as string",
-        output_spec=str,
+        output_type=str,
         reasoning_guidance="Consider sentence merging if it improves clarity.",
         role="Editor"
     )
@@ -63,10 +65,10 @@ def test_invocation_prompt_composer_basic():
     assert "Example sentences to guide rewriting" in prompt_str
     assert "Sample model instances" in prompt_str
 
-    messages = composer.compose_messages(user_prompt=None)
+    messages = composer.compose_message(user_prompt=None)
     assert len(messages) == 1
 
-    messages = composer.compose_messages(user_prompt="UserPrompt")
+    messages = composer.compose_message(user_prompt="UserPrompt")
     assert len(messages) == 2
 
 if __name__ == "__main__":

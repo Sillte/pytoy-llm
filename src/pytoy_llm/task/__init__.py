@@ -1,20 +1,13 @@
-from pytoy_llm.models import LLMMessageHistory
-from pytoy_llm.task.models import LLMTaskSpec  # NOQA
-from pytoy_llm.task.models.schemas import LLMTaskRecord  # NOQA
-
-from pydantic import BaseModel, Field
-
 import uuid
 from typing import Annotated, Any
 
-from pytoy_llm.task.models.invocations import (
-    AgentInvocationSpec,
-    FunctionInvocationSpec,
-    LLMInvocationSpec,
-    SelectedInvocationSpec,
-)  # NOQA
-from pytoy_llm.task.models.schemas import InvocationSpecMeta, LLMTaskSpecMeta  # NOQA
-from pytoy_llm.task.models.context import LLMTaskContext  # NOQA
+from pydantic import BaseModel, Field
+
+from pytoy_llm.models import LLMMessageHistory
+from pytoy_llm.task.models import LLMTaskSpec
+from pytoy_llm.task.models.schemas import (  # NOQA
+    LLMTaskRecord,
+)
 
 
 class LLMTaskRequest[T: BaseModel | str](BaseModel):
@@ -34,12 +27,12 @@ class LLMTaskResponse[T: BaseModel | str](BaseModel):
     id: Annotated[str, Field(description="ID of TaskRequest")]
 
     @property
-    def output(self) -> T | str:
+    def output(self) -> T:
         return self.record.output
 
 
 class LLMTaskExecutor:
-    def execute[T: BaseModel | str](self, request: LLMTaskRequest) -> LLMTaskResponse[T]:
+    def execute[T: BaseModel | str](self, request: LLMTaskRequest[T]) -> LLMTaskResponse[T]:
         request_id = request.id
         task_input = request.task_input
         history = request.history

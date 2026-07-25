@@ -1,8 +1,12 @@
-from typing import Annotated, Sequence
-from pydantic import BaseModel, Field
-from pytoy_llm.materials.core import TextSectionData, ModelSectionData, SectionData
+from collections.abc import Sequence
+from typing import Annotated
 
-class SystemPromptTemplate[T: BaseModel](BaseModel):
+from pydantic import BaseModel, Field
+
+from pytoy_llm.materials.core import ModelSectionData, SectionData, TextSectionData
+
+
+class SystemPromptTemplate[T: BaseModel | str](BaseModel):
     name: Annotated[
         str,
         Field(description="Human-readable task name")
@@ -23,8 +27,8 @@ class SystemPromptTemplate[T: BaseModel](BaseModel):
         Field(description="Semantic meaning of the output")
     ]
 
-    output_spec: Annotated[
-        type[T] | type[str],
+    output_type: Annotated[
+        type[T],
         Field(description="Specification of the expected output (type or format hint)")
     ]
 
@@ -108,9 +112,7 @@ class SectionDataComposer:
             
     def compose(self) -> str:
         header = f"----------[SECTION (bundle_kind=`{self.section.bundle_kind}`)]----------\n"
-        if isinstance(self.section, TextSectionData):
-            body = self.section.compose_str()
-        elif isinstance(self.section, ModelSectionData):
+        if isinstance(self.section, TextSectionData) or isinstance(self.section, ModelSectionData):
             body = self.section.compose_str()
         else:
             raise TypeError(f"Unknown SectionData type: {type(self.section)}")

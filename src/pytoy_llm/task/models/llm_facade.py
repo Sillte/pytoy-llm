@@ -1,12 +1,11 @@
-from pytoy_llm.connection_configuration import DEFAULT_NAME
-from pytoy_llm.impl import completion, run_agent
-from pytoy_llm.models import InputMessage, LLMConfig, LLMTool
-from pytoy_llm.task.models.context_protocols import LLMFacadeProtocol
+from collections.abc import Callable, Sequence
 
 from pydantic import BaseModel
 
-
-from typing import Callable, Sequence
+from pytoy_llm.connection_configuration import DEFAULT_NAME
+from pytoy_llm.impl import completion, run_agent
+from pytoy_llm.models import LLMConfig, LLMMessage, LLMTool
+from pytoy_llm.task.models.context_protocols import LLMFacadeProtocol
 
 
 class LLMFacade[T: BaseModel | str](LLMFacadeProtocol[T]):
@@ -16,7 +15,7 @@ class LLMFacade[T: BaseModel | str](LLMFacadeProtocol[T]):
 
     def completion(
         self,
-        input_messages: Sequence[InputMessage],
+        input_messages: Sequence[LLMMessage],
         output_type: type[T],
         llm_config: LLMConfig | None,
         connection_name: str | None = None,
@@ -29,7 +28,7 @@ class LLMFacade[T: BaseModel | str](LLMFacadeProtocol[T]):
 
     def run_agent(
         self,
-        input_messages: Sequence[InputMessage],
+        input_messages: Sequence[LLMMessage],
         output_format: type[T],
         tools: Sequence[Callable | LLMTool] = (),
         llm_config: LLMConfig | None = None,

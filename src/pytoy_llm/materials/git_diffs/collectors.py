@@ -1,18 +1,21 @@
+import re
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from pytoy_llm.materials.git_diffs.models import LineRange
-from typing import Sequence, Callable, Any
-from git import Repo, Diff, DiffIndex
+from typing import Any
+
+from git import Diff, DiffIndex, Repo
+
 from pytoy_llm.materials.git_diffs.models import (
-    FileAdd,
-    FileDelete,
-    FileModify,
-    FileDiff,
-    FileOperation,
     AtomicChange,
     DiffBundle,
-    GitDiffBundleQuery
+    FileAdd,
+    FileDelete,
+    FileDiff,
+    FileModify,
+    FileOperation,
+    GitDiffBundleQuery,
+    LineRange,
 )
-import re
 
 
 # --- HunkState (1 hunk = 1 AtomicChange) ---
@@ -167,15 +170,15 @@ class GitDiffCollector:
             
         if to_rev == "index":
             diffs = base.diff(create_patch=True)
-            timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1 # noqa: E731
+            timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1
         elif to_rev == "working-tree":
             diffs = base.diff(None, create_patch=True)
-            timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1 # noqa: E731
+            timestamp_provider = lambda path: path.stat().st_mtime if path.exists() else -1
         else:
             to_rev = to_rev or "HEAD"
             diffs = base.diff(to_rev, create_patch=True)
             timestamp = self.repo.commit(to_rev).committed_date
-            timestamp_provider = lambda _: float(timestamp) # noqa: E731
+            timestamp_provider = lambda _: float(timestamp)
         return self._create_bundle_from_ops(diffs, timestamp_provider)
     
 

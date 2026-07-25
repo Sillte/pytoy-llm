@@ -1,7 +1,7 @@
+from collections.abc import Mapping
+from typing import Any
+
 from pydantic import BaseModel, PrivateAttr
-
-
-from typing import Any, Mapping
 
 
 class LLMTaskStateRepository(BaseModel):

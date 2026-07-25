@@ -1,7 +1,9 @@
-import pytest
 import json
 from typing import Any
-from pydantic import ValidationError, BaseModel
+
+import pytest
+from pydantic import BaseModel, ValidationError
+
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import Connection
 

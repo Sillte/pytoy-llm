@@ -1,24 +1,26 @@
 from __future__ import annotations
 
-from pytoy_llm.models import LLMMessageHistory
+from collections.abc import Sequence
+from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, Field
 
-from typing import Annotated, Sequence, Self, Any
-
-from pytoy_llm.task.models.schemas import LLMTaskArgument
-from pytoy_llm.task.models.schemas import LLMTaskSpecMeta
-from pytoy_llm.task.models.schemas import InvocationSpecMeta # NOQA
-from pytoy_llm.task.models.schemas import InvocationRecords
-from pytoy_llm.task.models.schemas import LLMTaskRecord
-
-from pytoy_llm.task.models.invocations import FunctionInvocationSpec
-from pytoy_llm.task.models.invocations import LLMInvocationSpec
-from pytoy_llm.task.models.invocations import AgentInvocationSpec
-from pytoy_llm.task.models.invocations import SelectedInvocationSpec  
-
-from pytoy_llm.task.models.llm_facade import LLMFacade
+from pytoy_llm.models import LLMMessageHistory
 from pytoy_llm.task.models.context import LLMTaskContext
+from pytoy_llm.task.models.invocations import (
+    AgentInvocationSpec,
+    FunctionInvocationSpec,
+    LLMInvocationSpec,
+    SelectedInvocationSpec,
+)
+from pytoy_llm.task.models.llm_facade import LLMFacade
+from pytoy_llm.task.models.schemas import (
+    InvocationRecords,
+    InvocationSpecMeta,  # NOQA
+    LLMTaskArgument,
+    LLMTaskRecord,
+    LLMTaskSpecMeta,
+)
 
 
 class LLMTaskSpec[S: BaseModel | str](BaseModel):
@@ -33,8 +35,8 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
     meta: Annotated[LLMTaskSpecMeta, Field(description="Meta data for the task.")]
 
     @property
-    def output_spec(self) -> S | None:
-        return self.invocation_specs[-1].output_spec if self.invocation_specs else None  # type: ignore
+    def output_type(self) -> S | None:
+        return self.invocation_specs[-1].output_type if self.invocation_specs else None  # type: ignore
 
     def run(
         self, task_input: Any, history: LLMMessageHistory | None = None

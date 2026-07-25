@@ -1,12 +1,12 @@
 from __future__ import annotations
-import uuid
-from pytoy_llm.models import LLMMessageHistory
 
+import uuid
+from collections.abc import Mapping, Sequence
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-
-from typing import Annotated, Any, Literal, Mapping, Sequence
+from pytoy_llm.models import LLMMessageHistory
 
 
 class LLMTaskArgument[T: BaseModel | str](BaseModel):
@@ -67,7 +67,7 @@ class InvocationRecords(BaseModel):
     entries: Sequence[InvocationRecord] = Field(default_factory=list)
     repository_updates: Mapping[str, Any] = Field(default_factory=dict)
 
-    def updated(self, other: "InvocationRecords") -> "InvocationRecords":
+    def updated(self, other: InvocationRecords) -> InvocationRecords:
         return InvocationRecords(entries=list(self.entries) + list(other.entries),
                                  repository_updates={**self.repository_updates, **other.repository_updates})
 
@@ -83,7 +83,7 @@ class InvocationEffect(BaseModel, frozen=True):
     ]
 
     @classmethod
-    def from_any(cls, arg: Any) -> "InvocationEffect":
+    def from_any(cls, arg: Any) -> InvocationEffect:
         if isinstance(arg, InvocationEffect):
             return arg
         else:

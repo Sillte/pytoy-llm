@@ -1,6 +1,6 @@
 import os
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Callable, Sequence
 
 
 class FileGatherer:

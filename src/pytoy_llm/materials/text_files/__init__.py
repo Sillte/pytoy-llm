@@ -1,10 +1,19 @@
-from pathlib import Path
-from pydantic import BaseModel
-from typing import Sequence, Self
-from datetime import datetime
 import time
+from collections.abc import Sequence
+from datetime import datetime
+from pathlib import Path
+from typing import Self
+
+from pydantic import BaseModel
+
+from pytoy_llm.materials.text_files.models import (
+    TextFileBundle,
+    TextFileBundleQuery,
+    TextFileCollection,
+    TextFileContent,
+    TextFileLocator,
+)
 from pytoy_llm.materials.utils import FileGatherer
-from pytoy_llm.materials.text_files.models import TextFileBundle, TextFileBundleQuery, TextFileLocator, TextFileCollection, TextFileContent
 
 
 class TextFilesCollector:
