@@ -16,9 +16,11 @@ from pydantic_ai import (
 )
 from pydantic_ai import TextPart as PydanticTextPart
 
-from pytoy_llm.models import LLMMessage, LLMOutputMeta, LLMOutputModel, LLMTokens, OpaquePart
 from pytoy_llm.models import Part as LLMPart
-from pytoy_llm.models import TextPart as LLMTextPart
+from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
+from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMTokens
+from pytoy_llm.models.parts import OpaquePart
+from pytoy_llm.models.parts import TextPart as LLMTextPart
 
 
 class RequestPartConverter:
@@ -108,7 +110,7 @@ class PydanticAIMessageAdapter:
             case _:
                 assert_never(model_message.kind)
 
-    def to_llm_output[T: str | BaseModel](self, run_result: AgentRunResult[T]) -> LLMOutputModel[T]:
+    def to_llm_output[T: str | BaseModel](self, run_result: AgentRunResult[T]) -> LLMResult[T]:
         messages = [self.from_native(elem) for elem in run_result.all_messages()]
 
         usage = run_result.usage
@@ -116,4 +118,4 @@ class PydanticAIMessageAdapter:
         completion = usage.output_tokens
         tokens = LLMTokens(prompt=prompt, completion=completion, total=prompt + completion)  # NOTE: ....? really?
         meta = LLMOutputMeta(tokens=tokens, finish_reason=None, llm_calls=usage.requests)
-        return LLMOutputModel(output=run_result.output, meta=meta, messages=messages)
+        return LLMResult(output=run_result.output, meta=meta, messages=messages)

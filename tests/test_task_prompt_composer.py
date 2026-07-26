@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.composers.models import SectionUsage, SystemPromptTemplate
 from pytoy_llm.materials.core import ModelSectionData, TextSectionData
-from pytoy_llm.models import LLMMessage
+from pytoy_llm.models.llm_messages import LLMMessage
 
 
 class SampleModel(BaseModel):

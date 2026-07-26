@@ -2,106 +2,127 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal
+from dataclasses import replace
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from pytoy_llm.models import LLMMessageHistory
-
-
-class LLMTaskArgument[T: BaseModel | str](BaseModel):
-    initial_input: Annotated[
-        str | T, Field(description="The initial input to the task / first step")
-    ]
-    initial_history: Annotated[
-        LLMMessageHistory | None, Field(description="Message given_history for context")
-    ] = None
+from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
+from pytoy_llm.task.models.context import LLMTaskContext
+from pytoy_llm.task.models.repository import LLMTaskStateRepository
 
 
 class LLMTaskSpecMeta(BaseModel):
     name: Annotated[str, Field(description="Human-readable task name")]
-    intent: Annotated[str | None, Field(description="What the overall task is intended to do")] = (
-        None
-    )
-    rules: Annotated[
-        Sequence[str] | None, Field(description="Guiding rules or constraints for this task")
-    ] = None
-    description: Annotated[
-        str | None, Field(description="Optional longer explanation of the task purpose")
-    ] = None
+    intent: Annotated[str | None, Field(description="What the overall task is intended to do")] = None
+    rules: Annotated[Sequence[str] | None, Field(description="Guiding rules or constraints for this task")] = None
+    description: Annotated[str | None, Field(description="Optional longer explanation of the task purpose")] = None
 
 
-class InvocationSpecMeta(BaseModel):
-    name: Annotated[str, Field(description="Name of the invocation step.")]
-    intent: Annotated[str, Field(description="Intent of this invocation step.")] = ""
+class InvocationSpecMeta(BaseModel, frozen=True):
+    name: Annotated[str, Field(description="Name of the invocation step.")] = "No name"
+    intent: Annotated[str, Field(description="Intent of this invocation step.")] = "No description"
 
 
-class InvocationMeta(BaseModel, frozen=True):
-    spec_meta: Annotated[
-        InvocationSpecMeta, Field(description="Metadata about this invocation spec")
-    ]
-    kind: Annotated[Literal["llm", "agent", "function", "selector"], Field(description="Type of invocation")]
+class InvocationInfo(BaseModel, frozen=True):
+    kind: Annotated[str, Field(description="Type of invocation")]
     started_at: Annotated[float, Field(description="Start time of this invocation")]
     ended_at: Annotated[float, Field(description="End time of this invocation")]
-
+    meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")] = InvocationSpecMeta()
 
     @property
     def spec_name(self) -> str:
-        return self.spec_meta.name
+        return self.meta.name
 
     @property
     def intent(self) -> str:
-        return self.spec_meta.intent
+        return self.meta.intent
 
 
-class InvocationRecord[T: Any](BaseModel, frozen=True):
-    id: Annotated[str, Field(description="Unique identifier for this invocation record")] = Field(
-        default_factory=lambda: str(uuid.uuid1())
-    )
-    meta: Annotated[InvocationMeta, Field(description="Metadata about this invocation")]
-    input: Annotated[Any, Field(description="Input value given to this invocation")]
-    output: Annotated[Any, Field(description="Output value produced by this invocation")]
+class InvocationTrace(BaseModel, frozen=True):
+    id: str = Field(default_factory=lambda: str(uuid.uuid1()))
+    input: Annotated[Any, Field(description="Input")]
+    output: Annotated[Any, Field(description="Output")]
+    info: Annotated[InvocationInfo, Field(description="Metatada Information about the invocation.")]
+    details: Annotated[Mapping[str, Any], Field(description="detailed information for debug")] = {}
+    children: Annotated[Sequence[InvocationTrace], Field(description="Children of execution")] = ()
 
 
-class InvocationRecords(BaseModel):
-    entries: Sequence[InvocationRecord] = Field(default_factory=list)
-    repository_updates: Mapping[str, Any] = Field(default_factory=dict)
-
-    def updated(self, other: InvocationRecords) -> InvocationRecords:
-        return InvocationRecords(entries=list(self.entries) + list(other.entries),
-                                 repository_updates={**self.repository_updates, **other.repository_updates})
-
-    @property
-    def output(self) -> Any:
-        return self.entries[-1].output if self.entries else None
-
-
-class InvocationEffect(BaseModel, frozen=True):
-    output: Annotated[Any, Field(description="Output value produced by this invocation effect")]
+class ContextPatch(BaseModel, frozen=True):
     repository_updates: Annotated[
-        Mapping[str, Any], Field(description="Updates to be applied to the task repository")
+        Mapping[str, Any],
+        Field(description="Updates to the task repository state requested by this invocation."),
+    ] = {}
+
+    llm_messages: Annotated[
+        Sequence[LLMMessage],
+        Field(description="LLM message history updates produced during this invocation."),
+    ] = ()
+
+    def patch(self, context: LLMTaskContext) -> LLMTaskContext:
+        repository = context.repository
+        repository.update(self.repository_updates)
+
+        llm_messages = self.llm_messages
+
+        return replace(context, repository=repository, llm_messages=llm_messages)
+
+
+class InvocationResult[T](BaseModel, frozen=True):
+    output: Annotated[
+        T,
+        Field(description="Output value produced by this invocation."),
     ]
+    context_patch: Annotated[
+        ContextPatch | None,
+        Field(description=("Context changes explicitly returned by the invocation implementation. ")),
+    ] = None
 
-    @classmethod
-    def from_any(cls, arg: Any) -> InvocationEffect:
-        if isinstance(arg, InvocationEffect):
-            return arg
-        else:
-            return InvocationEffect(output=arg, repository_updates={})
+    runtime_patch: Annotated[
+        ContextPatch | None,
+        Field(
+            description=(
+                "Context changes automatically generated by the execution framework. "
+                "These changes are managed by the runtime and should not normally be provided by users."
+            )
+        ),
+    ] = None
+
+    trace: Annotated[
+        InvocationTrace | None,
+        Field(description="Execution trace generated by the runtime. "),
+    ] = None
 
 
-class LLMTaskRecord[T: BaseModel | str](BaseModel, frozen=True):
-    id: Annotated[str, Field(description="Unique identifier for this Task record")] = Field(
+class LLMTaskResult[T](BaseModel, frozen=True):
+    id: Annotated[str, Field(description="Unique identifier for this Task result")] = Field(
         default_factory=lambda: str(uuid.uuid1())
     )
-    task_name: Annotated[str, Field(description="Name of the executed task")]
     output: Annotated[T, Field(description="Final output produced by the task")]
+    traces: Annotated[
+        Sequence[InvocationTrace] | None,
+        Field(description="Trace of all invocations executed in this task"),
+    ] = None
+    task_name: Annotated[str, Field(description="Name of the executed task")] = "No Task Name"
+    task_context: Annotated[LLMTaskContext, Field(description="Final TaskContextj")]
 
-    invocation_records: Annotated[
-        Sequence[InvocationRecord],
-        Field(description="Ordered history of all invocations executed in this task"),
-    ]
 
-    repository_snapshot: Annotated[
-        dict[str, Any], Field(description="Final snapshot of the shared state repository")
-    ]
+class TaskContextState(BaseModel, frozen=True):
+    """
+    This object represents the state that can be passed between task executions.
+    """
+
+    llm_messages: Annotated[
+        Sequence[LLMMessage],
+        Field(description="LLM messages given as the history of interactions"),
+    ] = ()
+
+    repository: Annotated[
+        LLMTaskStateRepository,
+        Field(description="Persistent task state repository."),
+    ] = Field(default_factory=LLMTaskStateRepository)
+
+    @field_validator("llm_messages", mode="before")
+    @classmethod
+    def normalize_messages(cls, value: LLMMessagesLike) -> Sequence[LLMMessage]:
+        return LLMMessage.to_messages(value)

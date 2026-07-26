@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
-from pytoy_llm.models import Connection
+from pytoy_llm.models.connections import Connection
 
 APPNAME = "pytoy_llm"
 DEFAULT_NAME = "default"
@@ -24,7 +24,7 @@ def _make_default_json(model: type[BaseModel]) -> str:
             data[field_name] = field_info.default
         # 2. default_factory（listやdictなど）がある場合
         elif field_info.default_factory is not None:
-            data[field_name] = field_info.default_factory()
+            data[field_name] = field_info.default_factory()  # noqa
         else:
             # 型ヒントを取得
             field_type = field_info.annotation
@@ -68,9 +68,7 @@ class ConnectionConfiguration:
     def get_connection(self, name: str = DEFAULT_NAME) -> Connection:
         path = self.get_connection_path(name)
         if not path.exists():
-            raise IllegalConfigurationError(
-                f"`{name}`'s configuration file is not existent. See {path}."
-            )
+            raise IllegalConfigurationError(f"`{name}`'s configuration file is not existent. See {path}.")
         try:
             return Connection.model_validate_json(path.read_text())
         except Exception:

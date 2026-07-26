@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from pytoy_llm.models import LLMMessage
+from pytoy_llm.models.llm_messages import LLMMessage
 from pytoy_llm.task import LLMTaskExecutor, LLMTaskRequest, LLMTaskSpec
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         intent="Analyze system logs and notify affected users via email",
         rules=["Do not invent incidents", "Do not include internal system details", "Write clear and polite emails"],
     )
-    task_spec = LLMTaskSpec[str](
+    task_spec = LLMTaskSpec(
         meta=task_meta,
         invocation_specs=[
             parse_log_invocation,  # LLM
@@ -135,10 +135,10 @@ if __name__ == "__main__":
         ],
     )
     request = LLMTaskRequest(
-        task_spec=task_spec,
-        task_input=log_input,
+        spec=task_spec,
+        input=log_input,
     )
     response = LLMTaskExecutor().execute(request)
     print(response.output)
 
-    print("invocation_records", response.record.invocation_records)
+    print("invocation_records", response.result.traces)

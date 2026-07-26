@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Self, overload
+from typing import Self
 
 from pydantic import BaseModel
 from pydantic_ai import (
@@ -14,13 +14,12 @@ from pydantic_ai import (
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import (
-    Connection,
-    LLMConfig,
-    LLMMessage,
     LLMMessagesLike,
-    LLMOutputModel,
-    LLMTool,
 )
+from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
+from pytoy_llm.models.llm_metas import LLMConfig
+from pytoy_llm.models.llm_tools import LLMTool
 from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
 from pytoy_llm.pydantic_agent.factory import PydanticAIModelFactory
 
@@ -66,56 +65,24 @@ class PytoyPydanticAIAgent:
         else:
             return tool
 
-    def _make_agent(self, system_prompt: str | None | tuple, tools: Sequence[LLMTool | Callable]):
+    def _make_agent(self, system_prompt: str | None | tuple, tools: Sequence[LLMTool | Callable]) -> Agent:
         system_prompt = system_prompt or tuple()
         model = PydanticAIModelFactory.create(self._connection, self._llm_config)
         tools = [self._normalize_tool(tool) for tool in tools]
         return Agent(model=model, system_prompt=system_prompt, tools=tools)
 
-    @overload
-    def run(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[str],
-        tools: Sequence[LLMTool | Callable] = tuple(),
-    ) -> str: ...
-
-    @overload
-    def run[T: BaseModel](
+    def run[T: BaseModel | str](
         self,
         messages: LLMMessagesLike,
         output_type: type[T],
         tools: Sequence[LLMTool | Callable] = tuple(),
-    ) -> T: ...
-
-    def run(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[BaseModel] | type[str],
-        tools: Sequence[LLMTool | Callable] = tuple(),
-    ) -> BaseModel | str:
+    ) -> T:
         result = self.run_with_native(messages=messages, output_type=output_type, tools=tools)
         return result.output
 
-    @overload
-    def run_with_native(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[str],
-        tools: Sequence[LLMTool | Callable] = tuple(),
-    ) -> AgentRunResult[str]: ...
-
-    @overload
-    def run_with_native[T: BaseModel](
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[T],
-        tools: Sequence[LLMTool | Callable] = tuple(),
-    ) -> AgentRunResult[T]: ...
-
-    def run_with_native(
-        self, messages: LLMMessagesLike, output_type: type[BaseModel] | type[str], tools: Sequence[LLMTool | Callable] = tuple()
-    ) -> AgentRunResult[BaseModel | str]:
+    def run_with_native[T: BaseModel | str](
+        self, messages: LLMMessagesLike, output_type: type[T], tools: Sequence[LLMTool | Callable] = tuple()
+    ) -> AgentRunResult[T]:
         adapter = PydanticAIMessageAdapter()
         messages = LLMMessage.to_messages(messages)
         model_messages = [adapter.to_native(message) for message in messages]
@@ -129,19 +96,9 @@ class PytoyPydanticAIAgent:
         )
         return result
 
-    @overload
-    def run_with_result[T: BaseModel](
+    def run_with_result[T: BaseModel | str](
         self, messages: LLMMessagesLike, output_type: type[T], tools: Sequence[LLMTool | Callable] = tuple()
-    ) -> LLMOutputModel[T]: ...
-
-    @overload
-    def run_with_result(
-        self, messages: LLMMessagesLike, output_type: type[str], tools: Sequence[LLMTool | Callable] = tuple()
-    ) -> LLMOutputModel[str]: ...
-
-    def run_with_result(
-        self, messages: LLMMessagesLike, output_type: type[BaseModel] | type[str], tools: Sequence[LLMTool | Callable] = tuple()
-    ) -> LLMOutputModel[BaseModel | str]:
+    ) -> LLMResult[T]:
         adapter = PydanticAIMessageAdapter()
         run_result = self.run_with_native(messages, output_type=output_type, tools=tools)
         return adapter.to_llm_output(run_result)

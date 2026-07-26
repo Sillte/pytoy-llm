@@ -1,6 +1,7 @@
 from pydantic_ai.models import Model as PydanticAIModel
 
-from pytoy_llm.models import Connection, LLMConfig
+from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_metas import LLMConfig
 
 
 class PydanticAIModelFactory:

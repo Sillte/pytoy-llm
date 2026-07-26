@@ -5,15 +5,12 @@ from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.models import (
-    LLMMessage,
-    LLMOutputMeta,
-    LLMOutputModel,
-    LLMTokens,
-    OpaquePart,
     Part,
     PartAdapter,
-    TextPart,
 )
+from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
+from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMTokens
+from pytoy_llm.models.parts import OpaquePart, TextPart
 
 
 class LiteLLMPartConverter:
@@ -53,9 +50,9 @@ class LiteLLMMessageAdapter:
         parts = [self._part_converter.from_native(elem) for elem in native_records]
         return LLMMessage(kind=kind, parts=parts)
 
-    def to_llm_model[T: BaseModel](
-        self, input_messages: Sequence[LLMMessage], llm_response: ModelResponse, output_type: type[str] | type[T]
-    ) -> LLMOutputModel:
+    def to_llm_model[T: BaseModel | str](
+        self, input_messages: Sequence[LLMMessage], llm_response: ModelResponse, output_type: type[T]
+    ) -> LLMResult[T]:
         import litellm
 
         response = cast(litellm.TextCompletionResponse, llm_response)
@@ -75,7 +72,7 @@ class LiteLLMMessageAdapter:
             content = str(content)
         else:
             t_output_type = cast(T, output_type)
-            content = t_output_type.model_validate_json(content)
+            content = cast(T, t_output_type.model_validate_json(content))  # type:ignore
         output_message = self.from_native([llm_response.json()], kind="response")
         messages = [*input_messages, output_message]
-        return LLMOutputModel(output=content, meta=meta, messages=messages)
+        return cast(LLMResult[T], LLMResult(output=content, meta=meta, messages=messages))

@@ -6,7 +6,6 @@ from typing import Annotated, Any, Self
 from pydantic import BaseModel, Field
 
 from pytoy_llm.llm_facade import LLMFacade
-from pytoy_llm.models import LLMMessageHistory
 from pytoy_llm.task.models.context import LLMTaskContext
 from pytoy_llm.task.models.invocations import (
     AgentInvocationSpec,
@@ -15,15 +14,14 @@ from pytoy_llm.task.models.invocations import (
     SelectedInvocationSpec,
 )
 from pytoy_llm.task.models.schemas import (
-    InvocationRecords,
     InvocationSpecMeta,  # NOQA
-    LLMTaskArgument,
-    LLMTaskRecord,
+    LLMTaskResult,
     LLMTaskSpecMeta,
+    TaskContextState,
 )
 
 
-class LLMTaskSpec[S: BaseModel | str](BaseModel):
+class LLMTaskSpec[T](BaseModel):
     """
     Represents a higher-level Task composed of multiple InvocationSpecs.
     """
@@ -35,30 +33,35 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
     meta: Annotated[LLMTaskSpecMeta, Field(description="Meta data for the task.")]
 
     @property
-    def output_type(self) -> S | None:
+    def output_type(self) -> type[BaseModel] | None:
         return self.invocation_specs[-1].output_type if self.invocation_specs else None  # type: ignore
 
-    def run(self, task_input: Any, history: LLMMessageHistory | None = None) -> LLMTaskRecord[S]:
-        task_agument = LLMTaskArgument(initial_history=history, initial_input=task_input)
+    def run(self, task_input: Any, context_state: TaskContextState) -> LLMTaskResult[T]:
         llm_facade = LLMFacade()
-        task_context = LLMTaskContext(task_meta=self.meta, task_argument=task_agument, llm_facade=llm_facade)
+        task_context = LLMTaskContext(
+            llm_facade=llm_facade,
+            llm_messages=context_state.llm_messages,
+            repository=context_state.repository,
+        )
 
-        invocation_records: InvocationRecords = InvocationRecords()
+        traces = []
 
         input = task_input
         for invocation_spec in self.invocation_specs:
-            records = invocation_spec.invoke(input, task_context)
-            print("records", records)
-            # Update of the `repository` based on the `InvocationRecords`
-            task_context.repository.update(records.repository_updates)
-            invocation_records = invocation_records.updated(records)
-            input = invocation_records.output
+            invocation_result = invocation_spec.invoke(input, task_context)
+            if invocation_result.runtime_patch:
+                task_context = invocation_result.runtime_patch.patch(task_context)
+            if invocation_result.context_patch:
+                task_context = invocation_result.context_patch.patch(task_context)
+            if invocation_result.trace:
+                traces.append(invocation_result.trace)
+            input = invocation_result.output
 
-        return LLMTaskRecord(
+        return LLMTaskResult(
             task_name=self.meta.name,
-            output=invocation_records.output,
-            invocation_records=invocation_records.entries,
-            repository_snapshot=task_context.repository.snapshot,
+            output=invocation_result.output,
+            traces=traces,
+            task_context=task_context,
         )
 
     @property
@@ -69,7 +72,7 @@ class LLMTaskSpec[S: BaseModel | str](BaseModel):
     def from_single_spec(
         cls,
         meta: str | LLMTaskSpecMeta,
-        invocation_spec: LLMInvocationSpec[S],
+        invocation_spec: LLMInvocationSpec,
     ) -> Self:
         """Utility function for construction the task with 1 LLMInvocation."""
         if isinstance(meta, str):

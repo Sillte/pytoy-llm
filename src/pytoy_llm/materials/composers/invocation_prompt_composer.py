@@ -10,9 +10,9 @@ from pytoy_llm.materials.composers.models import (
     SystemPromptTemplate,
 )
 from pytoy_llm.materials.core import SectionData, warn_forbidden_headers
-from pytoy_llm.models import LLMMessage
+from pytoy_llm.models.llm_messages import LLMMessage
 from pytoy_llm.task.models import InvocationSpecMeta, LLMInvocationSpec
-from pytoy_llm.task.models.context import LLMTaskContextProtocol
+from pytoy_llm.task.models.context import LLMTaskContext
 
 
 class InvocationPromptComposer:
@@ -104,7 +104,7 @@ class InvocationPromptComposer:
         return LLMMessage.from_prompt(user_prompt=user_prompt, system_prompt=system_prompt)
 
     def compose_invocation_spec(self) -> LLMInvocationSpec:
-        def create_messages(input: Any, context: LLMTaskContextProtocol) -> Sequence[LLMMessage]:
+        def create_messages(input: Any, context: LLMTaskContext) -> Sequence[LLMMessage]:
             input = str(input) if input else None
             messages = self.compose_message(input)
             return [messages]

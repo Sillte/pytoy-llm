@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
-from pytoy_llm.models import Connection
+from pytoy_llm.models.connections import Connection
 
 
 def generate_expected_data_from_examples(klass: type[BaseModel]) -> dict[str, Any]:

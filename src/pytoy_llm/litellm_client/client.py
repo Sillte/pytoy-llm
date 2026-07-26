@@ -1,12 +1,14 @@
 from itertools import chain
-from typing import cast, overload
+from typing import cast
 
 from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter
-from pytoy_llm.models import Connection, LLMConfig, LLMMessage, LLMMessagesLike, LLMOutputModel
+from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike, LLMResult
+from pytoy_llm.models.llm_metas import LLMConfig
 
 
 class PytoyLiteLLMClient:
@@ -24,61 +26,32 @@ class PytoyLiteLLMClient:
     ) -> None:
 
         llm_config = llm_config or LLMConfig()
-
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
 
-        self._connection = connection
+        self._connection: Connection = connection
         self._llm_config = llm_config
 
     @property
     def connection(self) -> Connection:
         return self._connection
 
-    @overload
-    def completion(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[str],
-    ) -> str: ...
-
-    @overload
-    def completion[T: BaseModel](
+    def completion[T: BaseModel | str](
         self,
         messages: LLMMessagesLike,
         output_type: type[T],
-    ) -> T: ...
-
-    def completion(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[BaseModel] | type[str],
-    ) -> BaseModel | str:
+    ) -> T:
         result = self.completion_with_result(
             messages,
             output_type,
         )
         return result.output
 
-    @overload
-    def completion_with_result[T: BaseModel](
+    def completion_with_result[T: BaseModel | str](
         self,
         messages: LLMMessagesLike,
         output_type: type[T],
-    ) -> LLMOutputModel[T]: ...
-
-    @overload
-    def completion_with_result(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[str],
-    ) -> LLMOutputModel[str]: ...
-
-    def completion_with_result(
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[BaseModel] | type[str] = str,
-    ) -> LLMOutputModel[BaseModel | str]:
+    ) -> LLMResult[T]:
         message_adapter = LiteLLMMessageAdapter()
         input_messages = LLMMessage.to_messages(messages)
         model_response = self.completion_with_native(input_messages, output_type)

@@ -2,7 +2,8 @@ import pytest
 from litellm import ModelResponse
 from pydantic import BaseModel
 
-from pytoy_llm.models import LLMMessage, TextPart
+from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models.parts import TextPart
 
 
 # --- Mock Data ---

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
-from pytoy_llm.models import (
+from pytoy_llm.models.llm_metas import (
     LLMConfig,
 )
 from pytoy_llm.pydantic_agent.agent import PytoyPydanticAIAgent
@@ -12,7 +12,7 @@ def experiment_func(name: str = DEFAULT_NAME):
         summary: str
         key_points: list[str]
 
-    from pytoy_llm.models import LLMMessage
+    from pytoy_llm.models.llm_messages import LLMMessage
 
     mes = LLMMessage.chat(content="Are you happy?")
     config = LLMConfig(temperature=0.7)

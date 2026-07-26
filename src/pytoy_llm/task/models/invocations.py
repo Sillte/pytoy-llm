@@ -4,36 +4,74 @@ import inspect
 import time
 from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal, Protocol, cast
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
-from pytoy_llm.models import LLMConfig, LLMMessage, LLMTool
+from pytoy_llm.llm_facade import LLMFacade
+from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
+from pytoy_llm.models.llm_tools import LLMTool
 from pytoy_llm.task.models.context import LLMTaskContext
-from pytoy_llm.task.models.context_protocols import LLMTaskContextProtocol
 from pytoy_llm.task.models.schemas import (
-    InvocationEffect,
-    InvocationMeta,
-    InvocationRecord,
-    InvocationRecords,
+    ContextPatch,
+    InvocationInfo,
+    InvocationResult,
     InvocationSpecMeta,
+    InvocationTrace,
 )
 
-type InvocationCallable[T: BaseModel] = Callable[[Any, LLMTaskContextProtocol], InvocationEffect | T | str]
+
+class InvocationSpecProtocol(Protocol):
+    def invoke(self, input: Any, task_context: LLMTaskContext, /) -> InvocationResult: ...
 
 
-class FunctionInvocationSpec[T: BaseModel](BaseModel, frozen=True):
+type InvocationCallable[T] = Callable[[Any, LLMTaskContext], T | InvocationResult[T]]
+
+
+def to_invocation_result[T](
+    output: T | InvocationResult[T], trace: InvocationTrace, runtime_patch: ContextPatch | None = None
+) -> InvocationResult[T]:
+    if isinstance(output, InvocationResult):
+        return output.model_copy(update={"trace": trace, "runtime_patch": runtime_patch})
+    return InvocationResult(output=output, trace=trace, runtime_patch=runtime_patch)
+
+
+class InvocationResultCreator:
+    def execute[T](
+        self,
+        invocation_callable: InvocationCallable[T],
+        input: Any,
+        task_context: LLMTaskContext,
+        kind: str,
+        meta: InvocationSpecMeta | None = None,
+    ) -> InvocationResult[T]:
+        meta = meta or InvocationSpecMeta()
+        starttime = time.time()
+        output = invocation_callable(input, task_context)
+        info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=kind, meta=meta)
+        trace = InvocationTrace(input=input, output=output, info=info)
+        result = to_invocation_result(output, trace)
+        return result
+
+
+class FunctionInvocationSpec[T](BaseModel, frozen=True):
     kind: Annotated[Literal["function"], Field(description="Type of invocation")] = "function"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     invocator: InvocationCallable[T]
 
-    def invoke(self, input: Any, task_context: LLMTaskContextProtocol, /) -> InvocationRecords:
+    def invoke(self, input: Any, task_context: LLMTaskContext, /) -> InvocationResult:
         starttime = time.time()
-        output_or_effect = self.invocator(input, task_context)
-        effect = InvocationEffect.from_any(output_or_effect)
-        invocation_meta = InvocationMeta(started_at=starttime, ended_at=time.time(), spec_meta=self.meta, kind=self.kind)
-        record = InvocationRecord(input=input, output=effect.output, meta=invocation_meta)
-        return InvocationRecords(entries=[record], repository_updates=effect.repository_updates)
+        output = self.invocator(input, task_context)
+
+        info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
+        trace = InvocationTrace(input=input, output=output, info=info)
+        result = self.to_invocation_result(output, trace)
+        return result
+
+    def to_invocation_result(self, output: T | InvocationResult[T], trace: InvocationTrace) -> InvocationResult[T]:
+        if isinstance(output, InvocationResult):
+            return output.model_copy(update={"trace": trace})
+        return InvocationResult(output=output, trace=trace)
 
     @classmethod
     def from_any(
@@ -58,34 +96,39 @@ class FunctionInvocationSpec[T: BaseModel](BaseModel, frozen=True):
         params = list(sig.parameters.values())
 
         if len(params) == 1:
-            single_arg = cast(Callable[[T], InvocationEffect | T | str], arg)
+            single_arg = cast(Callable[[Any], T], arg)
 
             @wraps(single_arg)
-            def wrapped_invocator(input_data: T, _context: LLMTaskContextProtocol) -> InvocationEffect | T | str:
+            def wrapped_invocator(input_data: Any, _context: LLMTaskContext) -> T:
                 return single_arg(input_data)
 
             return cls(invocator=wrapped_invocator, meta=meta)
         elif len(params) >= 2:
-            arg = cast(Callable[[T, LLMTaskContextProtocol], InvocationEffect | T | str], arg)
+            arg = cast(Callable[[Any, LLMTaskContext], T], arg)
             # 引数2つの場合: そのまま利用
             return cls(invocator=arg, meta=meta)
         else:
             raise ValueError("Callable must have at least one argument (input)")
 
 
-class SelectedInvocationSpec[T: BaseModel](BaseModel, frozen=True):
+class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
     kind: Annotated[Literal["selector"], Field(description="Type of invocation")] = "selector"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     spec_selector: Annotated[
-        FunctionInvocationSpec[FunctionInvocationSpec[Any]],
+        FunctionInvocationSpec[FunctionInvocationSpec],
         Field(description="Function that selects which InvocationSpec to invoke based on the input"),
     ]
 
-    def invoke(self, input: Any, task_context: LLMTaskContextProtocol, /) -> InvocationRecords:
-        first_records: InvocationRecords = self.spec_selector.invoke(input, task_context)
-        spec_output: FunctionInvocationSpec = first_records.output
-        second_records = spec_output.invoke(input, task_context)
-        return first_records.updated(second_records)
+    def invoke(self, input: Any, task_context: LLMTaskContext, /) -> InvocationResult[T]:
+        starttime = time.time()
+        first_result = self.spec_selector.invoke(input, task_context)
+        spec_output = first_result.output
+        second_result = spec_output.invoke(input, task_context)
+        info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
+        children_traces = [first_result.trace] if first_result.trace else []
+        trace = InvocationTrace(input=input, output=second_result.output, info=info, children=children_traces)
+        result = to_invocation_result(second_result, trace)
+        return result
 
 
 class LLMInvocationSpec[T: BaseModel | str](BaseModel):
@@ -94,24 +137,26 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
 
     output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
     create_messages: Annotated[
-        Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
+        Callable[[Any, LLMTaskContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
-    llm_config: Annotated[LLMConfig | None, Field(description="LLM Configuration for this invocation")] = None
-    connection_name: Annotated[str | None, Field(description="LLM Connection")] = None
+    llm_facade: Annotated[LLMFacade | None, Field(description="LLMFacade for this invocation")] = None
 
-    def invoke(self, input: Any, task_context: LLMTaskContextProtocol) -> InvocationRecords:
+    def invoke(self, input: Any, task_context: LLMTaskContext) -> InvocationResult[T]:
         starttime = time.time()
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
         else:
             input_messages = self.create_messages(input, task_context)  # type: ignore
-        print("self.output_type", self.output_type)
-        output_or_effect = task_context.llm_facade.completion(input_messages, output_type=self.output_type)
-        effect = InvocationEffect.from_any(output_or_effect)
-        meta = InvocationMeta(started_at=starttime, ended_at=time.time(), spec_meta=self.meta, kind=self.kind)
-        record = InvocationRecord(input=input, output=effect.output, meta=meta)
-        return InvocationRecords(entries=[record], repository_updates=effect.repository_updates)
+        llm_facade = self.llm_facade or task_context.llm_facade
+        result = llm_facade.completion_with_result(input_messages, output_type=self.output_type)
+        output = result.output
+
+        runtime_patch = ContextPatch(llm_messages=result.messages)
+
+        info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
+        trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump()})
+        return to_invocation_result(output, trace, runtime_patch=runtime_patch)
 
 
 class AgentInvocationSpec[T: BaseModel | str](BaseModel):
@@ -119,36 +164,24 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
     create_messages: Annotated[
-        Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
+        Callable[[Any, LLMTaskContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
     tools: Annotated[Sequence[Callable | LLMTool], Field(description="Tools available to the agent")] = []
-    llm_config: Annotated[LLMConfig | None, Field(description="LLM Configuration for this invocation")] = None
-    connection_name: Annotated[str | None, Field(description="PydanticAI Connection")] = None
+    llm_facade: Annotated[LLMFacade | None, Field(description="LLMFacade for this invocation")] = None
 
-    def invoke(self, input: Any, task_context: LLMTaskContextProtocol) -> InvocationRecords:
+    def invoke(self, input: Any, task_context: LLMTaskContext) -> InvocationResult[T]:
         starttime = time.time()
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
         else:
             input_messages = self.create_messages(input, task_context)  # type: ignore
-        output_or_effect = task_context.llm_facade.run(
-            input_messages,
-            output_type=self.output_type,
-            tools=self.tools,
-        )
-        effect = InvocationEffect.from_any(output_or_effect)
-        meta = InvocationMeta(started_at=starttime, ended_at=time.time(), spec_meta=self.meta, kind=self.kind)
-        record = InvocationRecord(input=input, output=effect.output, meta=meta)
-        return InvocationRecords(entries=[record], repository_updates=effect.repository_updates)
+        llm_facade = self.llm_facade or task_context.llm_facade
+        result = llm_facade.run_with_result(input_messages, output_type=self.output_type, tools=self.tools)
+        output = result.output
 
-    @field_validator("create_messages", mode="before")
-    @classmethod
-    def wrap_create_messages(
-        cls,
-        fn: Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
-    ) -> Callable[[Any, LLMTaskContextProtocol], Sequence[LLMMessage]]:
-        sig = inspect.signature(fn)
-        if len(sig.parameters) == 1:
-            return lambda input_data, _: fn(input_data)  # type: ignore
-        return fn  # type: ignore
+        runtime_patch = ContextPatch(llm_messages=result.messages)
+
+        info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
+        trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump()})
+        return to_invocation_result(output, trace, runtime_patch=runtime_patch)
