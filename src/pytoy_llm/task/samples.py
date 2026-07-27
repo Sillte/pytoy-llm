@@ -10,7 +10,7 @@ from pytoy_llm.task.models import (
     FunctionInvocationSpec,
     LLMInvocationSpec,
 )
-from pytoy_llm.task.models.metas import InvocationSpecMeta, LLMTaskSpecMeta
+from pytoy_llm.task.models.metas import InvocationSpecMeta, TaskSpecMeta
 from pytoy_llm.task.models.task_specs import TaskSpec
 
 if __name__ == "__main__":
@@ -118,7 +118,7 @@ if __name__ == "__main__":
         ],
     )
 
-    task_meta = LLMTaskSpecMeta(
+    task_meta = TaskSpecMeta(
         name="IncidentNotificationTask",
         intent="Analyze system logs and notify affected users via email",
         rules=["Do not invent incidents", "Do not include internal system details", "Write clear and polite emails"],

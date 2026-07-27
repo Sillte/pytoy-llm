@@ -11,7 +11,7 @@ from pytoy_llm.task.models.invocation_specs import (
     LLMInvocationSpec,
     SelectedInvocationSpec,
 )
-from pytoy_llm.task.models.metas import LLMTaskSpecMeta
+from pytoy_llm.task.models.metas import TaskSpecMeta
 from pytoy_llm.task.models.task_results import TaskResult
 
 
@@ -24,7 +24,7 @@ class TaskSpec[T](BaseModel, frozen=True):
         Sequence[FunctionInvocationSpec | LLMInvocationSpec | AgentInvocationSpec | SelectedInvocationSpec],
         Field(description="Ordered list of steps or conditional branches"),
     ]
-    meta: Annotated[LLMTaskSpecMeta, Field(description="Meta data for the task.")]
+    meta: Annotated[TaskSpecMeta, Field(description="Meta data for the task.")]
     output_type: Annotated[type[T] | None, Field(description="output type of the task.", exclude=False)] = None
 
     @model_validator(mode="before")
@@ -82,12 +82,12 @@ class TaskSpec[T](BaseModel, frozen=True):
     @classmethod
     def from_single_spec(
         cls,
-        meta: str | LLMTaskSpecMeta,
+        meta: str | TaskSpecMeta,
         invocation_spec: LLMInvocationSpec,
     ) -> Self:
         """Utility function for construction the task with 1 LLMInvocation."""
         if isinstance(meta, str):
-            meta = LLMTaskSpecMeta(name=meta, intent=invocation_spec.meta.intent)
+            meta = TaskSpecMeta(name=meta, intent=invocation_spec.meta.intent)
         return cls(
             meta=meta,
             invocation_specs=[invocation_spec],

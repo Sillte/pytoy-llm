@@ -4,7 +4,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 
-class LLMTaskSpecMeta(BaseModel):
+class TaskSpecMeta(BaseModel):
     name: Annotated[str, Field(description="Human-readable task name")]
     intent: Annotated[str | None, Field(description="What the overall task is intended to do")] = None
     rules: Annotated[Sequence[str] | None, Field(description="Guiding rules or constraints for this task")] = None

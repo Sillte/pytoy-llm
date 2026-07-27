@@ -8,7 +8,7 @@ from pytoy_llm.task.models.invocation_specs import (
     LLMInvocationSpec,
     SelectedInvocationSpec,
 )
-from pytoy_llm.task.models.metas import InvocationSpecMeta, LLMTaskSpecMeta
+from pytoy_llm.task.models.metas import InvocationSpecMeta, TaskSpecMeta
 from pytoy_llm.task.models.task_request import TaskRequest
 from pytoy_llm.task.models.task_response import TaskResponse
 from pytoy_llm.task.models.task_results import TaskResult
