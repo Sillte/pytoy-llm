@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from itertools import chain
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, Field
@@ -77,6 +78,24 @@ class LLMMessage(BaseModel, frozen=True):
     @classmethod
     def chat(cls, content: str) -> Self:
         return cls.from_prompt(user=content)
+
+    @classmethod
+    def merge(
+        cls,
+        messages: Sequence["LLMMessage"],
+    ) -> "LLMMessage":
+        if not messages:
+            raise ValueError("Cannot merge empty messages.")
+
+        kind = messages[0].kind
+
+        if any(message.kind != kind for message in messages):
+            raise ValueError("Cannot merge messages with different kinds.")
+
+        return cls(
+            kind=kind,
+            parts=list(chain.from_iterable(message.parts for message in messages)),
+        )
 
 
 type LLMMessagesLike = Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage

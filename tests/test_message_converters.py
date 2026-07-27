@@ -39,3 +39,33 @@ def test_input_converter_str():
     assert isinstance(res.parts[1], TextPart)
     assert res.parts[1].role == "user"
     assert res.parts[1].content == "hello"
+
+
+def test_merge_messages():
+    first = LLMMessage.from_parts(
+        [
+            TextPart(
+                role="system",
+                content="You are helpful.",
+            )
+        ]
+    )
+
+    second = LLMMessage.from_parts(
+        [
+            TextPart(
+                role="user",
+                content="Hello",
+            )
+        ],
+        kind="request",
+    )
+
+    merged = LLMMessage.merge([first, second])
+
+    assert merged.kind == "request"
+    assert len(merged.parts) == 2
+    assert isinstance(merged.parts[0], TextPart)
+    assert isinstance(merged.parts[1], TextPart)
+    assert merged.parts[0].content == "You are helpful."
+    assert merged.parts[1].content == "Hello"
