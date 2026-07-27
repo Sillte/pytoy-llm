@@ -2279,7 +2279,7 @@ wheels = [
 
 [[package]]
 name = "pytoy-llm"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "gitpython" },

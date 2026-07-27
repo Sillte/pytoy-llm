@@ -102,7 +102,7 @@ class InvocationPromptComposer:
 
     def compose_message(self, user_prompt: str | None = None) -> LLMMessage:
         system_prompt = self.compose_prompt()
-        return LLMMessage.from_prompt(user_prompt=user_prompt, system_prompt=system_prompt)
+        return LLMMessage.from_prompt(user=user_prompt, system=system_prompt)
 
     def compose_invocation_spec(self) -> LLMInvocationSpec:
         def create_messages(input: Any, context: ExecutionContext) -> Sequence[LLMMessage]:

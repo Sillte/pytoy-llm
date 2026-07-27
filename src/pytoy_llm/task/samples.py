@@ -29,12 +29,12 @@ if __name__ == "__main__":
         output_type=IncidentSummaries,
         create_messages=lambda input: [
             LLMMessage.from_prompt(
-                system_prompt=(
+                system=(
                     "You are a log analysis assistant.\n"
                     "Extract structured incident information from the given log.\n"
                     "Follow the output schema strictly."
                 ),
-                user_prompt=str(input),
+                user=str(input),
             )
         ],
     )
@@ -79,11 +79,11 @@ if __name__ == "__main__":
         output_type=IncidentActions,
         create_messages=lambda summaries, ctx: [
             LLMMessage.from_prompt(
-                user_prompt="\n".join(
+                user="\n".join(
                     f"user={item.user_id}, severity={item.severity}, action={item.action}, user_name={item.user_name}"
                     for item in summaries.items
                 ),
-                system_prompt=(
+                system=(
                     "You are an incident response agent.\n"
                     "Decide what action should be taken for each incident.\n"
                     "Rules:\n"
@@ -104,10 +104,8 @@ if __name__ == "__main__":
         output_type=str,
         create_messages=lambda actions, ctx: [
             LLMMessage.from_prompt(
-                system_prompt=(
-                    "You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."
-                ),
-                user_prompt="\n".join(
+                system=("You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."),
+                user="\n".join(
                     f"""
     User ID: {a.user_id}, "UserName: {a.user_name}"
     Action: {a.action}

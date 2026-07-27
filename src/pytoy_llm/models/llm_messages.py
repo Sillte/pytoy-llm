@@ -21,16 +21,16 @@ class LLMMessage(BaseModel, frozen=True):
     @classmethod
     def from_prompt(
         cls,
-        system_prompt: str | None = None,
-        user_prompt: str | None = None,
+        system: str | None = None,
+        user: str | None = None,
         parts: Sequence[Part] | None = None,
     ) -> Self:
         parts = parts or []
         parts = list(parts)
-        if system_prompt:
-            parts.append(TextPart(role="system", content=system_prompt))
-        if user_prompt:
-            parts.append(TextPart(role="user", content=user_prompt))
+        if system:
+            parts.append(TextPart(role="system", content=system))
+        if user:
+            parts.append(TextPart(role="user", content=user))
         return cls(kind="request", parts=parts)
 
     @classmethod
@@ -59,7 +59,7 @@ class LLMMessage(BaseModel, frozen=True):
             try:
                 result = cls.model_validate_json(arg)
             except ValueError:
-                return cls.from_prompt(user_prompt=arg)
+                return cls.from_prompt(user=arg)
             else:
                 return result
         return cls.model_validate(arg)
@@ -67,7 +67,7 @@ class LLMMessage(BaseModel, frozen=True):
     @classmethod
     def to_messages(cls, arg: LLMMessagesLike) -> Sequence[LLMMessage]:
         if isinstance(arg, str):
-            return [cls.from_prompt(user_prompt=arg)]
+            return [cls.from_prompt(user=arg)]
         elif isinstance(arg, LLMMessage):
             return [arg]
         if not arg:
@@ -76,7 +76,7 @@ class LLMMessage(BaseModel, frozen=True):
 
     @classmethod
     def chat(cls, content: str) -> Self:
-        return cls.from_prompt(user_prompt=content)
+        return cls.from_prompt(user=content)
 
 
 type LLMMessagesLike = Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage

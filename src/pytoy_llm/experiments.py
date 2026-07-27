@@ -31,7 +31,7 @@ def construct_basemodel[T: BaseModel](
         raise ValueError("Must provide at least one `instances`.")
 
     system_prompt = make_system_prompt(instances, output_mode, explanation=explanation)
-    message = LLMMessage.from_prompt(system_prompt=system_prompt, user_prompt=user_prompt)
+    message = LLMMessage.from_prompt(system=system_prompt, user=user_prompt)
     output_type = str if output_mode == "python_code" else type(instances[0])
     return completion(message, output_type=output_type)
 
