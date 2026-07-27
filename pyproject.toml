@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytoy-llm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Thin, stateless LLM CLI wrapper for editor integrations (Vim/Neovim)."
 readme = "README.md"
 license = { text = "MIT" }
