@@ -11,7 +11,6 @@ from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_metas import LLMConfig
 from pytoy_llm.models.llm_tools import LLMTool
-from pytoy_llm.pydantic_agent.agent import PytoyPydanticAIAgent
 
 
 def initialize_configuration(name: str = DEFAULT_NAME) -> Path:
@@ -32,7 +31,7 @@ def completion[T: BaseModel | str](
     connection: str | Connection = DEFAULT_NAME,
 ) -> T:
     """Execute the `litellm.completion`."""
-    facade = LLMFacade(connection, llm_config)
+    facade = LLMFacade(connection=connection, llm_config=llm_config)
     return facade.completion(messages=messages, output_type=output_type)
 
 
@@ -44,8 +43,8 @@ def run[T: BaseModel | str](
     connection: str | Connection = DEFAULT_NAME,
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""
-    agent = PytoyPydanticAIAgent(connection, llm_config=llm_config)
-    result = agent.run(messages, output_type=output_type, tools=tools)
+    facade = LLMFacade(connection=connection, llm_config=llm_config)
+    result = facade.run(messages, output_type=output_type, tools=tools)
     return result
 
 

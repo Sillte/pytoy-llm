@@ -4,28 +4,20 @@ import inspect
 import time
 from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Annotated, Any, Literal, Protocol, cast
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import BaseModel, Field
 
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_tools import LLMTool
-from pytoy_llm.task.models.context import LLMTaskContext
-from pytoy_llm.task.models.schemas import (
+from pytoy_llm.task.models.context import (
     ContextPatch,
-    InvocationInfo,
-    InvocationResult,
-    InvocationSpecMeta,
-    InvocationTrace,
+    ExecutionContext,
 )
-
-
-class InvocationSpecProtocol(Protocol):
-    def invoke(self, input: Any, task_context: LLMTaskContext, /) -> InvocationResult: ...
-
-
-type InvocationCallable[T] = Callable[[Any, LLMTaskContext], T | InvocationResult[T]]
+from pytoy_llm.task.models.invocation_results import InvocationInfo, InvocationResult, InvocationTrace
+from pytoy_llm.task.models.metas import InvocationSpecMeta
+from pytoy_llm.task.models.types import InvocationCallable
 
 
 def to_invocation_result[T](
@@ -36,30 +28,12 @@ def to_invocation_result[T](
     return InvocationResult(output=output, trace=trace, runtime_patch=runtime_patch)
 
 
-class InvocationResultCreator:
-    def execute[T](
-        self,
-        invocation_callable: InvocationCallable[T],
-        input: Any,
-        task_context: LLMTaskContext,
-        kind: str,
-        meta: InvocationSpecMeta | None = None,
-    ) -> InvocationResult[T]:
-        meta = meta or InvocationSpecMeta()
-        starttime = time.time()
-        output = invocation_callable(input, task_context)
-        info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=kind, meta=meta)
-        trace = InvocationTrace(input=input, output=output, info=info)
-        result = to_invocation_result(output, trace)
-        return result
-
-
 class FunctionInvocationSpec[T](BaseModel, frozen=True):
     kind: Annotated[Literal["function"], Field(description="Type of invocation")] = "function"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     invocator: InvocationCallable[T]
 
-    def invoke(self, input: Any, task_context: LLMTaskContext, /) -> InvocationResult:
+    def invoke(self, input: Any, task_context: ExecutionContext, /) -> InvocationResult:
         starttime = time.time()
         output = self.invocator(input, task_context)
 
@@ -76,7 +50,7 @@ class FunctionInvocationSpec[T](BaseModel, frozen=True):
     @classmethod
     def from_any(
         cls,
-        arg: "FunctionInvocationSpec" | Callable[[T], Any] | Callable[[T, LLMTaskContext], Any],
+        arg: "FunctionInvocationSpec" | Callable[[Any], T] | Callable[[Any, ExecutionContext], T],
         *,
         meta: InvocationSpecMeta | None = None,
     ) -> "FunctionInvocationSpec":
@@ -99,12 +73,12 @@ class FunctionInvocationSpec[T](BaseModel, frozen=True):
             single_arg = cast(Callable[[Any], T], arg)
 
             @wraps(single_arg)
-            def wrapped_invocator(input_data: Any, _context: LLMTaskContext) -> T:
+            def wrapped_invocator(input_data: Any, _context: ExecutionContext) -> T:
                 return single_arg(input_data)
 
             return cls(invocator=wrapped_invocator, meta=meta)
         elif len(params) >= 2:
-            arg = cast(Callable[[Any, LLMTaskContext], T], arg)
+            arg = cast(Callable[[Any, ExecutionContext], T], arg)
             # 引数2つの場合: そのまま利用
             return cls(invocator=arg, meta=meta)
         else:
@@ -119,7 +93,7 @@ class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
         Field(description="Function that selects which InvocationSpec to invoke based on the input"),
     ]
 
-    def invoke(self, input: Any, task_context: LLMTaskContext, /) -> InvocationResult[T]:
+    def invoke(self, input: Any, task_context: ExecutionContext, /) -> InvocationResult[T]:
         starttime = time.time()
         first_result = self.spec_selector.invoke(input, task_context)
         spec_output = first_result.output
@@ -137,12 +111,12 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
 
     output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
     create_messages: Annotated[
-        Callable[[Any, LLMTaskContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike],
+        Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
     llm_facade: Annotated[LLMFacade | None, Field(description="LLMFacade for this invocation")] = None
 
-    def invoke(self, input: Any, task_context: LLMTaskContext) -> InvocationResult[T]:
+    def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
@@ -164,13 +138,13 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
     create_messages: Annotated[
-        Callable[[Any, LLMTaskContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
+        Callable[[Any, ExecutionContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
     tools: Annotated[Sequence[Callable | LLMTool], Field(description="Tools available to the agent")] = []
     llm_facade: Annotated[LLMFacade | None, Field(description="LLMFacade for this invocation")] = None
 
-    def invoke(self, input: Any, task_context: LLMTaskContext) -> InvocationResult[T]:
+    def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore

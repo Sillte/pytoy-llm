@@ -32,12 +32,12 @@ class LLMFacade(BaseModel, frozen=True):
         client = PytoyLiteLLMClient(self.connection, llm_config=self.llm_config)
         return client.completion_with_result(messages, output_type=output_type)
 
-    def run(
+    def run[T: BaseModel | str](
         self,
         messages: LLMMessagesLike,
-        output_type: type[BaseModel] | type[str],
+        output_type: type[T],
         tools: Sequence[Callable | LLMTool] = (),
-    ) -> BaseModel | str:
+    ) -> T:
         """Alias of `run_agent` for better readability."""
         agent = PytoyPydanticAIAgent(self.connection, llm_config=self.llm_config)
         return agent.run(messages, output_type=output_type, tools=tools)
