@@ -9,7 +9,9 @@ from typing import Annotated, Any, Literal, cast
 from pydantic import BaseModel, Field
 
 from pytoy_llm.llm_facade import LLMFacade
+from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
+from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMTool
 from pytoy_llm.task.models.context import (
     ContextPatch,
@@ -114,7 +116,8 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
         Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
-    llm_facade: Annotated[LLMFacade | None, Field(description="LLMFacade for this invocation")] = None
+    llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters.")] = None
+    connection: Annotated[Connection | None, Field(description="Connection for this invocation")] = None
 
     def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
@@ -122,7 +125,9 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
             input_messages = self.create_messages(input)  # type:ignore
         else:
             input_messages = self.create_messages(input, task_context)  # type: ignore
-        llm_facade = self.llm_facade or task_context.llm_facade
+        connection = self.connection or task_context.connection
+        llm_param = self.llm_param or task_context.llm_param
+        llm_facade = LLMFacade(connection=connection, llm_param=llm_param)
         result = llm_facade.completion_with_result(input_messages, output_type=self.output_type)
         output = result.output
 
@@ -142,7 +147,8 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
     tools: Annotated[Sequence[Callable | LLMTool], Field(description="Tools available to the agent")] = []
-    llm_facade: Annotated[LLMFacade | None, Field(description="LLMFacade for this invocation")] = None
+    connection: Annotated[Connection | None, Field(description="LLM Connection")] = None
+    llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters")] = None
 
     def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
@@ -150,7 +156,9 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
             input_messages = self.create_messages(input)  # type:ignore
         else:
             input_messages = self.create_messages(input, task_context)  # type: ignore
-        llm_facade = self.llm_facade or task_context.llm_facade
+        connection = self.connection or task_context.connection
+        llm_param = self.llm_param or task_context.llm_param
+        llm_facade = LLMFacade(connection=connection, llm_param=llm_param)
         result = llm_facade.run_with_result(input_messages, output_type=self.output_type, tools=self.tools)
         output = result.output
 

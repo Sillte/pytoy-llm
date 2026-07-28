@@ -6,14 +6,16 @@ from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, Field, field_validator
 
-from pytoy_llm.llm_facade import LLMFacade
+from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
+from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.task.models.task_state import TaskRunState
 
 
 @dataclass(frozen=True)
 class ExecutionContext:
-    llm_facade: LLMFacade
+    llm_param: LLMParam
+    connection: Connection | str | None
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
 

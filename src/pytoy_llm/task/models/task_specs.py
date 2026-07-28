@@ -3,7 +3,8 @@ from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from pytoy_llm.llm_facade import LLMFacade
+from pytoy_llm.connection_configuration import DEFAULT_NAME
+from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.invocation_specs import (
     AgentInvocationSpec,
@@ -48,9 +49,11 @@ class TaskSpec[T](BaseModel, frozen=True):
         return values
 
     def run(self, task_input: Any, context_state: TaskContextState) -> TaskResult[T]:
-        llm_facade = LLMFacade()
+        llm_param = LLMParam()
+        connection = DEFAULT_NAME
         task_context = ExecutionContext(
-            llm_facade=llm_facade,
+            llm_param=llm_param,
+            connection=connection,
             llm_messages=context_state.llm_messages,
             state=context_state.state,
         )
