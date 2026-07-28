@@ -9,7 +9,7 @@ from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfigura
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.connections import Connection
-from pytoy_llm.models.llm_metas import LLMConfig
+from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMTool
 
 
@@ -27,7 +27,7 @@ def get_configuration_path(name: str = DEFAULT_NAME) -> Path:
 def completion[T: BaseModel | str](
     messages: LLMMessagesLike,
     output_type: type[T] = str,  # type: ignore
-    llm_config: LLMConfig | None = None,
+    llm_config: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
 ) -> T:
     """Execute the `litellm.completion`."""
@@ -39,7 +39,7 @@ def run[T: BaseModel | str](
     messages: LLMMessagesLike,
     output_type: type[T],
     tools: Sequence[Callable | LLMTool] = tuple(),
-    llm_config: LLMConfig | None = None,
+    llm_config: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""

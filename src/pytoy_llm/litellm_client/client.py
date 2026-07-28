@@ -5,10 +5,10 @@ from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
-from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter
+from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConverter
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike, LLMResult
-from pytoy_llm.models.llm_metas import LLMConfig
+from pytoy_llm.models.llm_metas import LLMParam
 
 
 class PytoyLiteLLMClient:
@@ -22,15 +22,15 @@ class PytoyLiteLLMClient:
     def __init__(
         self,
         connection: str | Connection,
-        llm_config: LLMConfig | None = None,
+        llm_param: LLMParam | None = None,
     ) -> None:
 
-        llm_config = llm_config or LLMConfig()
+        llm_param = llm_param or LLMParam()
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
 
         self._connection: Connection = connection
-        self._llm_config = llm_config
+        self._llm_param = llm_param
 
     @property
     def connection(self) -> Connection:
@@ -78,13 +78,15 @@ class PytoyLiteLLMClient:
         chat_messages = [message_adapter.to_native(elem) for elem in input_messages]
         raw_messages = list(chain.from_iterable(chat_messages))
 
+        kwargs = LLMParamConverter().to_litellm_kwargs(self._llm_param)
+
         response = litellm_completion(
             model=self.connection.model,
             messages=raw_messages,
             api_key=self.connection.api_key,
             base_url=self.connection.base_url,
             response_format=response_format,
-            **self._llm_config.to_litellm_kwargs(),
+            **kwargs,
         )
 
         assert isinstance(response, ModelResponse)

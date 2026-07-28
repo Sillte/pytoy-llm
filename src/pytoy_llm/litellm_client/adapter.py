@@ -9,7 +9,7 @@ from pytoy_llm.models import (
     PartAdapter,
 )
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
-from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMTokens
+from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens
 from pytoy_llm.models.parts import OpaquePart, TextPart
 
 
@@ -76,3 +76,10 @@ class LiteLLMMessageAdapter:
         output_message = self.from_native([llm_response.json()], kind="response")
         messages = [*input_messages, output_message]
         return cast(LLMResult[T], LLMResult(output=content, meta=meta, messages=messages))
+
+
+class LLMParamConverter:
+    def __init__(self) -> None: ...
+
+    def to_litellm_kwargs(self, llm_param: LLMParam) -> dict:
+        return llm_param.model_dump(exclude_none=True)

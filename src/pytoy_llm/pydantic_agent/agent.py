@@ -18,7 +18,7 @@ from pytoy_llm.models import (
 )
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
-from pytoy_llm.models.llm_metas import LLMConfig
+from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMTool
 from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
 from pytoy_llm.pydantic_agent.factory import PydanticAIModelFactory
@@ -50,14 +50,14 @@ class PytoyPydanticAIAgent:
     def __init__(
         self,
         connection: str | Connection,
-        llm_config: LLMConfig | None = None,
+        llm_param: LLMParam | None = None,
     ) -> None:
-        llm_config = llm_config or LLMConfig()
+        llm_param = llm_param or LLMParam()
 
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
         self._connection = connection
-        self._llm_config = llm_config
+        self._llm_param = llm_param
 
     def _normalize_tool(self, tool: LLMTool | Callable) -> Callable:
         if isinstance(tool, LLMTool):
@@ -67,7 +67,7 @@ class PytoyPydanticAIAgent:
 
     def _make_agent(self, system_prompt: str | None | tuple, tools: Sequence[LLMTool | Callable]) -> Agent:
         system_prompt = system_prompt or tuple()
-        model = PydanticAIModelFactory.create(self._connection, self._llm_config)
+        model = PydanticAIModelFactory.create(self._connection, self._llm_param)
         tools = [self._normalize_tool(tool) for tool in tools]
         return Agent(model=model, system_prompt=system_prompt, tools=tools)
 

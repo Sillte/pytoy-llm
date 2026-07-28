@@ -9,6 +9,7 @@ from pydantic_ai import (
     ModelRequestPart,
     ModelResponse,
     ModelResponsePart,
+    ModelSettings,
     SystemPromptPart,
     ThinkingPart,
     ToolCallPart,
@@ -18,7 +19,7 @@ from pydantic_ai import TextPart as PydanticTextPart
 
 from pytoy_llm.models import Part as LLMPart
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
-from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMTokens
+from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens
 from pytoy_llm.models.parts import OpaquePart
 from pytoy_llm.models.parts import TextPart as LLMTextPart
 
@@ -119,3 +120,10 @@ class PydanticAIMessageAdapter:
         tokens = LLMTokens(prompt=prompt, completion=completion, total=prompt + completion)  # NOTE: ....? really?
         meta = LLMOutputMeta(tokens=tokens, finish_reason=None, llm_calls=usage.requests)
         return LLMResult(output=run_result.output, meta=meta, messages=messages)
+
+
+class LLMParamConverter:
+    def __init__(self) -> None: ...
+
+    def to_model_settings(self, llm_param: LLMParam) -> ModelSettings:
+        return ModelSettings(**llm_param.model_dump(exclude_none=True))

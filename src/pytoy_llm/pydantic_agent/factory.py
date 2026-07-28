@@ -1,16 +1,17 @@
 from pydantic_ai.models import Model as PydanticAIModel
 
 from pytoy_llm.models.connections import Connection
-from pytoy_llm.models.llm_metas import LLMConfig
+from pytoy_llm.models.llm_metas import LLMParam
+from pytoy_llm.pydantic_agent.adapter import LLMParamConverter
 
 
 class PydanticAIModelFactory:
     @staticmethod
-    def create(connection: Connection, llm_config: LLMConfig) -> PydanticAIModel:
+    def create(connection: Connection, llm_param: LLMParam) -> PydanticAIModel:
         base_url = connection.base_url
         model_name = connection.model
         api_key = connection.api_key
-        model_settings = llm_config.to_pydantic_model_settings()
+        model_settings = LLMParamConverter().to_model_settings(llm_param)
 
         parts = model_name.split("/")
         if len(parts) < 1:

@@ -7,14 +7,14 @@ from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
 from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMResult
-from pytoy_llm.models.llm_metas import LLMConfig
+from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMTool
 from pytoy_llm.pydantic_agent.agent import PytoyPydanticAIAgent
 
 
 class LLMFacade(BaseModel, frozen=True):
     connection: str | Connection | None = DEFAULT_NAME
-    llm_config: LLMConfig | None = None
+    llm_config: LLMParam | None = None
 
     def _resolve_connection(self) -> str | Connection:
         return self.connection or DEFAULT_NAME
@@ -24,7 +24,7 @@ class LLMFacade(BaseModel, frozen=True):
         messages: LLMMessagesLike,
         output_type: type[T],
     ) -> T:
-        client = PytoyLiteLLMClient(self._resolve_connection(), llm_config=self.llm_config)
+        client = PytoyLiteLLMClient(self._resolve_connection(), llm_param=self.llm_config)
         return client.completion(messages, output_type=output_type)
 
     def completion_with_result[T: BaseModel | str](
@@ -32,7 +32,7 @@ class LLMFacade(BaseModel, frozen=True):
         messages: LLMMessagesLike,
         output_type: type[T],
     ) -> LLMResult[T]:
-        client = PytoyLiteLLMClient(self._resolve_connection(), llm_config=self.llm_config)
+        client = PytoyLiteLLMClient(self._resolve_connection(), llm_param=self.llm_config)
         return client.completion_with_result(messages, output_type=output_type)
 
     def run[T: BaseModel | str](
@@ -42,7 +42,7 @@ class LLMFacade(BaseModel, frozen=True):
         tools: Sequence[Callable | LLMTool] = (),
     ) -> T:
         """Alias of `run_agent` for better readability."""
-        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_config=self.llm_config)
+        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_config)
         return agent.run(messages, output_type=output_type, tools=tools)
 
     def run_with_result[T: BaseModel | str](
@@ -51,7 +51,7 @@ class LLMFacade(BaseModel, frozen=True):
         output_type: type[T],
         tools: Sequence[Callable | LLMTool] = (),
     ) -> LLMResult[T]:
-        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_config=self.llm_config)
+        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_config)
         return agent.run_with_result(messages, output_type=output_type, tools=tools)
 
 
