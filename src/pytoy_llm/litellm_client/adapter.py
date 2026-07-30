@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, assert_never, cast
 
+import litellm
 from litellm import ModelResponse
 from pydantic import BaseModel
 
@@ -53,7 +56,6 @@ class LiteLLMMessageAdapter:
     def to_llm_model[T: BaseModel | str](
         self, input_messages: Sequence[LLMMessage], llm_response: ModelResponse, output_type: type[T]
     ) -> LLMResult[T]:
-        import litellm
 
         response = cast(litellm.TextCompletionResponse, llm_response)
         usage = response.usage

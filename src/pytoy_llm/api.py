@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
+from pytoy_llm.event_sinks.protocol import EventSinkProtocol
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.connections import Connection
@@ -29,9 +30,10 @@ def completion[T: BaseModel | str](
     output_type: type[T] = str,  # type: ignore
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
+    event_sink: EventSinkProtocol | None = None,
 ) -> T:
     """Execute the `litellm.completion`."""
-    facade = LLMFacade(connection=connection, llm_param=llm_param)
+    facade = LLMFacade(connection=connection, llm_param=llm_param, event_sink=event_sink)
     return facade.completion(messages=messages, output_type=output_type)
 
 
@@ -41,9 +43,10 @@ def run[T: BaseModel | str](
     tools: Sequence[Callable | LLMTool] = tuple(),
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
+    event_sink: EventSinkProtocol | None = None,
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""
-    facade = LLMFacade(connection=connection, llm_param=llm_param)
+    facade = LLMFacade(connection=connection, llm_param=llm_param, event_sink=event_sink)
     result = facade.run(messages, output_type=output_type, tools=tools)
     return result
 

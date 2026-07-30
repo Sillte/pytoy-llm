@@ -5,7 +5,10 @@ from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
+from pytoy_llm.event_sinks import NullEventSink
+from pytoy_llm.event_sinks.protocol import EventSinkProtocol
 from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConverter
+from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
@@ -23,6 +26,7 @@ class PytoyLiteLLMClient:
         self,
         connection: str | Connection,
         llm_param: LLMParam | None = None,
+        event_sink: EventSinkProtocol | None = None,
     ) -> None:
 
         llm_param = llm_param or LLMParam()
@@ -31,6 +35,7 @@ class PytoyLiteLLMClient:
 
         self._connection: Connection = connection
         self._llm_param = llm_param
+        self._event_sink = event_sink
 
     @property
     def connection(self) -> Connection:
@@ -57,10 +62,10 @@ class PytoyLiteLLMClient:
         model_response = self.completion_with_native(input_messages, output_type)
         return message_adapter.to_llm_model(input_messages=input_messages, llm_response=model_response, output_type=output_type)
 
-    def completion_with_native(
+    def completion_with_native[T: BaseModel | str](
         self,
         messages: LLMMessagesLike,
-        output_type: type[BaseModel] | type[str],
+        output_type: type[T],
     ) -> ModelResponse:
         from litellm import ModelResponse
         from litellm import completion as litellm_completion
@@ -80,14 +85,19 @@ class PytoyLiteLLMClient:
 
         kwargs = LLMParamConverter().to_litellm_kwargs(self._llm_param)
 
-        response = litellm_completion(
-            model=self.connection.model,
-            messages=raw_messages,
-            api_key=self.connection.api_key,
-            base_url=self.connection.base_url,
-            response_format=response_format,
-            **kwargs,
-        )
+        handler = LiteLLMEventHandler()
+        event_sink = self._event_sink or NullEventSink()
+
+        with handler.register(event_sink) as metadata:
+            response = litellm_completion(
+                model=self.connection.model,
+                messages=raw_messages,
+                api_key=self.connection.api_key,
+                base_url=self.connection.base_url,
+                response_format=response_format,
+                metadata=metadata,
+                **kwargs,
+            )
 
         assert isinstance(response, ModelResponse)
         return response
