@@ -3,12 +3,18 @@ from uuid import uuid4
 
 from pydantic_ai import (
     AgentStreamEvent,
+    FinalResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    OutputToolCallEvent,
+    OutputToolResultEvent,
+    PartDeltaEvent,
     PartEndEvent,
+    PartStartEvent,
     RunContext,
     TextPart,
     ThinkingPart,
+    ToolCallPart,
 )
 
 from pytoy_llm.event_sinks import EventSinkProtocol
@@ -35,15 +41,20 @@ class EventHandler:
     async def handle_event(self, stream_event: AgentStreamEvent) -> None:
         match stream_event:
             case FunctionToolCallEvent():
-                event = self._event_adapter.from_tool_call_event(stream_event)
+                event = None
+                # event = self._event_adapter.from_tool_call_event(stream_event)
             case FunctionToolResultEvent():
-                event = self._event_adapter.from_tool_result_event(stream_event)
+                event = None
+                # event = self._event_adapter.from_tool_result_event(stream_event)
             case PartEndEvent():
                 event = self._event_adapter.from_part_end_event(stream_event)
+            case PartDeltaEvent() | PartStartEvent() | FinalResultEvent() | OutputToolCallEvent() | OutputToolResultEvent():
+                event = None
             case _:
-                event = LLMMinimumEvent(event_type="unknown_event", message=f"{stream_event}")
+                event = LLMMinimumEvent(event_type="unknown_event", message=f"{stream_event.__class__.__name__}")
 
-        self._event_sink.emit(event)
+        if event:
+            self._event_sink.emit(event)
 
 
 class EventAdapter:
@@ -78,6 +89,11 @@ class EventAdapter:
                 event = LLMThinkingEvent(
                     trace_id=self._trace_id,
                     content=stream_event.part.content,
+                )
+
+            case ToolCallPart():
+                event = ToolCallEvent(
+                    trace_id=self._trace_id, call_id=stream_event.part.tool_call_id, args=stream_event.part.args
                 )
 
             case _:

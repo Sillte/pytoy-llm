@@ -26,7 +26,7 @@ class ToolCallEvent(BaseModel, frozen=True):
     tool_name: Annotated[str | None, Field(description="The name of tool")] = None
     args: Annotated[Any, Field(description="The arguments of the call")] = {}
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "tool_call"
+    event_type: Annotated[str, Field(description="Event type of the event.")] = "tool_call_event"
 
 
 class ToolResultEvent(BaseModel, frozen=True):
@@ -39,7 +39,7 @@ class ToolResultEvent(BaseModel, frozen=True):
     tool_name: Annotated[str | None, Field(description="The name of tool")] = None
     result: Annotated[Any, Field(description="The result of the call")] = None
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "tool_result"
+    event_type: Annotated[str, Field(description="Event type of the event.")] = "tool_result_event"
 
 
 class LLMRequestEvent(BaseModel, frozen=True):
@@ -53,7 +53,7 @@ class LLMRequestEvent(BaseModel, frozen=True):
     timeout: Annotated[float | None, Field(description="Timeout")] = None
     model: Annotated[str | None, Field(description="Name of model")] = None
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "request"
+    event_type: Annotated[str, Field(description="Event type of the event.")] = "request_event"
 
 
 class LLMThinkingEvent(BaseModel, frozen=True):
@@ -64,7 +64,7 @@ class LLMThinkingEvent(BaseModel, frozen=True):
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
     content: Annotated[str | None, Field(description="Content of thinking")] = None
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "thinking"
+    event_type: Annotated[str, Field(description="Event type of the event.")] = "thinking_event"
 
 
 class LLMResponseEvent(BaseModel, frozen=True):
@@ -75,7 +75,7 @@ class LLMResponseEvent(BaseModel, frozen=True):
     response: Annotated[str, Field(description="Messages from the LLM.")]
     tokens: Annotated[LLMTokens | None, Field(description="Used tokens")] = None
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "response"
+    event_type: Annotated[str, Field(description="Event type of the event.")] = "response_event"
 
 
 type LLMEvent = LLMMinimumEvent | LLMRequestEvent | LLMResponseEvent | ToolResultEvent | ToolCallEvent | LLMThinkingEvent

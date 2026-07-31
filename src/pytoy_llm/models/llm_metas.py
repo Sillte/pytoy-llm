@@ -15,6 +15,7 @@ class LLMOutputMeta(BaseModel, frozen=True):
 
 
 class LLMParam(BaseModel, frozen=True):
+    model_config = ConfigDict(extra="allow")
     temperature: float | None = None
     max_tokens: int | None = None
     frequency_penalty: float | None = None

@@ -2,6 +2,8 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
+from pytoy_llm.models.llm_metas import LLMParam
+
 StrictStr = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 
 
@@ -24,6 +26,8 @@ class Connection(BaseModel, frozen=True):
         StrictStr,
         Field(description="Credential Information for using LLM.", examples=["SECRET-KEY"]),
     ]
+
+    llm_param: Annotated[LLMParam, Field(description="Default LLM Parameter")] = LLMParam()
 
     @field_validator("base_url", mode="before")
     @classmethod

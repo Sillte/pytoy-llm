@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
-
-from pydantic import BaseModel
-from pydantic_core import PydanticUndefined
+from typing import Any, Literal, assert_never
 
 from pytoy_llm.models.connections import Connection
 
@@ -16,32 +14,24 @@ def get_configuration_folder() -> Path:
     return folder
 
 
-def _make_default_json(model: type[BaseModel]) -> str:
-    data = {}
+def _make_default_connection_dict(kind: Literal["google", "local"] | None = None) -> dict[str, Any]:
+    kind = kind or "google"
+    result = {}
 
-    for field_name, field_info in model.model_fields.items():
-        if field_info.default is not PydanticUndefined:
-            data[field_name] = field_info.default
-        # 2. default_factory（listやdictなど）がある場合
-        elif field_info.default_factory is not None:
-            data[field_name] = field_info.default_factory()  # noqa
-        else:
-            # 型ヒントを取得
-            field_type = field_info.annotation
-
-            if field_type is str:
-                data[field_name] = ""
-            elif field_type is int or field_type is float:
-                data[field_name] = 0
-            elif field_type is bool:
-                data[field_name] = False
-            elif getattr(field_type, "__origin__", None) is list:
-                data[field_name] = []
-            elif getattr(field_type, "__origin__", None) is dict or field_type and issubclass(field_type, BaseModel):
-                data[field_name] = {}
-            else:
-                data[field_name] = None
-    return json.dumps(data, indent=4, ensure_ascii=False)
+    match kind:
+        case "google":
+            result["model"] = "gemini/gemini-2.5-flash"
+            result["base_url"] = "https://generativelanguage.googleapis.com/v1beta"
+            result["api_key"] = "SECRET"
+            result["llm_param"] = {"temperature": None}
+        case "local":
+            result["model"] = "ollama/qwen2.5:7b"
+            result["base_url"] = "http://localhost:11434/"
+            result["api_key"] = "SECRET"
+            result["llm_param"] = {"temperature": None}
+        case _:
+            assert_never(kind)
+    return result
 
 
 class IllegalConfigurationError(Exception):
@@ -60,9 +50,9 @@ class ConnectionConfiguration:
         pass
 
     def initialize_connection_file(self, name: str = DEFAULT_NAME) -> Path:
-        json_str = _make_default_json(Connection)
+        json_dict = _make_default_connection_dict("local")
         path = self.get_connection_path(name)
-        path.write_text(json_str)
+        path.write_text(json.dumps(json_dict, indent=4))
         return path
 
     def get_connection(self, name: str = DEFAULT_NAME) -> Connection:
@@ -82,4 +72,5 @@ class ConnectionConfiguration:
 
 
 if __name__ == "__main__":
+    ConnectionConfiguration().initialize_connection_file()
     pass
