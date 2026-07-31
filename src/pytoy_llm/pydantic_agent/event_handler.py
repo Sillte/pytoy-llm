@@ -1,4 +1,4 @@
-from typing import AsyncIterable
+from typing import AsyncIterable, Sequence
 from uuid import uuid4
 
 from pydantic_ai import (
@@ -21,11 +21,13 @@ from pytoy_llm.event_sinks import EventSinkProtocol
 from pytoy_llm.models.llm_events import (
     LLMEvent,
     LLMMinimumEvent,
+    LLMRequestEvent,
     LLMResponseEvent,
     LLMThinkingEvent,
     ToolCallEvent,
     ToolResultEvent,
 )
+from pytoy_llm.models.llm_messages import LLMMessage
 
 
 class EventHandler:
@@ -34,6 +36,11 @@ class EventHandler:
         self._event_adapter = EventAdapter(self._trace_id)
         self._event_sink = event_sink
 
+    def emit_request(self, llm_messages: Sequence[LLMMessage]) -> None:
+        messages = [elem.model_dump() for elem in llm_messages]
+        event = LLMRequestEvent(trace_id=self._trace_id, messages=messages)
+        self._event_sink.emit(event)
+
     async def event_stream_handler(self, ctx: RunContext, event_stream: AsyncIterable[AgentStreamEvent]) -> None:
         async for event in event_stream:
             await self.handle_event(event)
@@ -41,11 +48,9 @@ class EventHandler:
     async def handle_event(self, stream_event: AgentStreamEvent) -> None:
         match stream_event:
             case FunctionToolCallEvent():
-                event = None
-                # event = self._event_adapter.from_tool_call_event(stream_event)
+                event = None  # It duplicates the `PartEndEvent`.
             case FunctionToolResultEvent():
-                event = None
-                # event = self._event_adapter.from_tool_result_event(stream_event)
+                event = self._event_adapter.from_tool_result_event(stream_event)
             case PartEndEvent():
                 event = self._event_adapter.from_part_end_event(stream_event)
             case PartDeltaEvent() | PartStartEvent() | FinalResultEvent() | OutputToolCallEvent() | OutputToolResultEvent():

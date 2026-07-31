@@ -49,7 +49,7 @@ class LLMRequestEvent(BaseModel, frozen=True):
     )
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
     call_id: Annotated[str | None, Field(description="Call ID of Request")] = None
-    messages: Annotated[list[dict[str, str]], Field(description="Messages sent to the LLM.")]
+    messages: Annotated[list[dict[str, Any]], Field(description="Messages sent to the LLM.")]
     timeout: Annotated[float | None, Field(description="Timeout")] = None
     model: Annotated[str | None, Field(description="Name of model")] = None
 

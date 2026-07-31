@@ -92,6 +92,7 @@ class PytoyPydanticAIAgent:
         agent = self._make_agent(system_prompt=pair.system_prompt, tools=tools)
         event_sink = self._event_sink or NullEventSink()
         event_handler = EventHandler(event_sink)
+        event_handler.emit_request(messages)
         result = agent.run_sync(
             user_prompt=pair.user_prompt,
             output_type=output_type,
