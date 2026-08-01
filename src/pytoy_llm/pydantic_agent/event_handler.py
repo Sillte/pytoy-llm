@@ -18,7 +18,7 @@ from pydantic_ai import (
 )
 
 from pytoy_llm.event_sinks import EventSinkProtocol
-from pytoy_llm.models.llm_events import (
+from pytoy_llm.models.events.llm_events import (
     LLMEvent,
     LLMMinimumEvent,
     LLMRequestEvent,

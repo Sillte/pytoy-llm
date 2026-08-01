@@ -6,6 +6,7 @@ from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, Field, field_validator
 
+from pytoy_llm.event_sinks import EventSinkProtocol
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
@@ -18,6 +19,7 @@ class ExecutionContext:
     connection: Connection | str | None
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
+    event_sink: EventSinkProtocol | None = None
 
 
 class ContextPatch(BaseModel, frozen=True):

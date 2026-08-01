@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.events.llm_events import ToolCallEvent, ToolResultEvent
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMTool
@@ -35,9 +36,15 @@ class FunctionInvocationSpec[T](BaseModel, frozen=True):
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     invocator: InvocationCallable[T]
 
-    def invoke(self, input: Any, task_context: ExecutionContext, /) -> InvocationResult:
+    def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult:
         starttime = time.time()
-        output = self.invocator(input, task_context)
+        event_sink = execution_context.event_sink
+
+        if event_sink:
+            event_sink.emit(ToolCallEvent(tool_name="FunctionInvocationSpec", args=input))
+        output = self.invocator(input, execution_context)
+        if event_sink:
+            event_sink.emit(ToolResultEvent(tool_name="SelectedInvocationSpec", result=output))
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
         trace = InvocationTrace(input=input, output=output, info=info)
@@ -95,11 +102,15 @@ class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
         Field(description="Function that selects which InvocationSpec to invoke based on the input"),
     ]
 
-    def invoke(self, input: Any, task_context: ExecutionContext, /) -> InvocationResult[T]:
+    def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult[T]:
         starttime = time.time()
-        first_result = self.spec_selector.invoke(input, task_context)
+        event_sink = execution_context.event_sink
+
+        first_result = self.spec_selector.invoke(input, execution_context)
+        if event_sink:
+            event_sink.emit(ToolCallEvent(tool_name="SelectedInvocationSpec", args=first_result))
         spec_output = first_result.output
-        second_result = spec_output.invoke(input, task_context)
+        second_result = spec_output.invoke(input, execution_context)
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
         children_traces = [first_result.trace] if first_result.trace else []
         trace = InvocationTrace(input=input, output=second_result.output, info=info, children=children_traces)
@@ -119,15 +130,15 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
     llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters.")] = None
     connection: Annotated[Connection | str | None, Field(description="Connection for this invocation")] = None
 
-    def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
+    def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
         else:
-            input_messages = self.create_messages(input, task_context)  # type: ignore
-        connection = self.connection or task_context.connection
-        llm_param = self.llm_param or task_context.llm_param
-        llm_facade = LLMFacade(connection=connection, llm_param=llm_param)
+            input_messages = self.create_messages(input, execution_context)  # type: ignore
+        connection = self.connection or execution_context.connection
+        llm_param = self.llm_param or execution_context.llm_param
+        llm_facade = LLMFacade(connection=connection, llm_param=llm_param, event_sink=execution_context.event_sink)
         result = llm_facade.completion_with_result(input_messages, output_type=self.output_type)
         output = result.output
 
@@ -150,15 +161,15 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
     connection: Annotated[Connection | str | None, Field(description="LLM Connection")] = None
     llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters")] = None
 
-    def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
+    def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
         if len(inspect.signature(self.create_messages).parameters) == 1:
             input_messages = self.create_messages(input)  # type:ignore
         else:
-            input_messages = self.create_messages(input, task_context)  # type: ignore
-        connection = self.connection or task_context.connection
-        llm_param = self.llm_param or task_context.llm_param
-        llm_facade = LLMFacade(connection=connection, llm_param=llm_param)
+            input_messages = self.create_messages(input, execution_context)  # type: ignore
+        connection = self.connection or execution_context.connection
+        llm_param = self.llm_param or execution_context.llm_param
+        llm_facade = LLMFacade(connection=connection, llm_param=llm_param, event_sink=execution_context.event_sink)
         result = llm_facade.run_with_result(input_messages, output_type=self.output_type, tools=self.tools)
         output = result.output
 

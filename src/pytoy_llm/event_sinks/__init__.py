@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from pytoy_llm.models.llm_events import LLMEvent
+from pytoy_llm.models.events.llm_events import LLMEvent
 
 from .protocol import EventSinkProtocol
 

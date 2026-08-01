@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from pytoy_llm.models.llm_events import LLMEvent
+from pytoy_llm.models.events.llm_events import LLMEvent
 
 
 class EventSinkProtocol(Protocol):

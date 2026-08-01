@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from pytoy_llm.event_sinks import NullEventSink
 from pytoy_llm.event_sinks.protocol import EventSinkProtocol
-from pytoy_llm.models.llm_events import LLMMinimumEvent, LLMRequestEvent, LLMResponseEvent
+from pytoy_llm.models.events.llm_events import LLMMinimumEvent, LLMRequestEvent, LLMResponseEvent
 from pytoy_llm.models.llm_metas import LLMTokens
 
 

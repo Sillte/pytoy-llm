@@ -4,6 +4,7 @@ from typing import Annotated, Any, Self
 from pydantic import BaseModel, Field, model_validator
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
+from pytoy_llm.event_sinks import EventSinkProtocol
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.invocation_specs import (
@@ -48,25 +49,28 @@ class TaskSpec[T](BaseModel, frozen=True):
             raise ValueError(msg)
         return values
 
-    def run(self, task_input: Any, context_state: TaskContextState) -> TaskResult[T]:
+    def run(
+        self, task_input: Any, context_state: TaskContextState, event_sink: EventSinkProtocol | None = None
+    ) -> TaskResult[T]:
         llm_param = LLMParam()
         connection = DEFAULT_NAME
-        task_context = ExecutionContext(
+        execution_context = ExecutionContext(
             llm_param=llm_param,
             connection=connection,
             llm_messages=context_state.llm_messages,
             state=context_state.state,
+            event_sink=event_sink,
         )
 
         traces = []
 
         invocation_input = task_input
         for invocation_spec in self.invocation_specs:
-            invocation_result = invocation_spec.invoke(invocation_input, task_context)
+            invocation_result = invocation_spec.invoke(invocation_input, execution_context)
             if invocation_result.runtime_patch:
-                task_context = invocation_result.runtime_patch.patch(task_context)
+                execution_context = invocation_result.runtime_patch.patch(execution_context)
             if invocation_result.context_patch:
-                task_context = invocation_result.context_patch.patch(task_context)
+                execution_context = invocation_result.context_patch.patch(execution_context)
             if invocation_result.trace:
                 traces.append(invocation_result.trace)
             invocation_input = invocation_result.output
@@ -75,7 +79,7 @@ class TaskSpec[T](BaseModel, frozen=True):
             task_name=self.meta.name,
             output=invocation_result.output,
             traces=traces,
-            context_state=TaskContextState.from_execution_context(task_context),
+            context_state=TaskContextState.from_execution_context(execution_context),
         )
 
     @property
