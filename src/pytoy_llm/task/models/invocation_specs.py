@@ -117,7 +117,7 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
     llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters.")] = None
-    connection: Annotated[Connection | None, Field(description="Connection for this invocation")] = None
+    connection: Annotated[Connection | str | None, Field(description="Connection for this invocation")] = None
 
     def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
@@ -147,7 +147,7 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
     tools: Annotated[Sequence[Callable | LLMTool], Field(description="Tools available to the agent")] = []
-    connection: Annotated[Connection | None, Field(description="LLM Connection")] = None
+    connection: Annotated[Connection | str | None, Field(description="LLM Connection")] = None
     llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters")] = None
 
     def invoke(self, input: Any, task_context: ExecutionContext) -> InvocationResult[T]:
