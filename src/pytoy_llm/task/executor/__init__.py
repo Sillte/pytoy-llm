@@ -13,5 +13,5 @@ class TaskExecutor:
         request_id = request.id
         task_input = request.input
         context_state = request.context_state or TaskContextState()
-        record = request.spec.run(task_input=task_input, context_state=context_state)
+        record = request.spec.run(task_input=task_input, context_state=context_state, event_sink=event_sink)
         return TaskResponse(result=record, request_id=request_id)
