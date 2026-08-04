@@ -19,13 +19,11 @@ with strong emphasis on:
 
 ## Design Philosophy
 
-`pytoy-llm` intentionally avoids being “smart”.
+`pytoy-llm` intentionally avoids being smart.
 
 It does **not**:
 - Manage conversation state
 - Store chat history
-- Own prompt construction logic
-- Act as an agent framework
 
 Instead, it acts as a **pure execution boundary**:
 
