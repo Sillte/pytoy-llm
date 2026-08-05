@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from functools import wraps
 from typing import Annotated, Any, Literal, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models.connections import Connection
@@ -32,6 +32,7 @@ def to_invocation_result[T](
 
 
 class FunctionInvocationSpec[T](BaseModel, frozen=True):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     kind: Annotated[Literal["function"], Field(description="Type of invocation")] = "function"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     invocator: InvocationCallable[T]
@@ -95,6 +96,7 @@ class FunctionInvocationSpec[T](BaseModel, frozen=True):
 
 
 class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     kind: Annotated[Literal["selector"], Field(description="Type of invocation")] = "selector"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     spec_selector: Annotated[
@@ -119,6 +121,7 @@ class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
 
 
 class LLMInvocationSpec[T: BaseModel | str](BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     kind: Annotated[Literal["llm"], Field(description="Type of invocation")] = "llm"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
 
@@ -150,6 +153,7 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
 
 
 class AgentInvocationSpec[T: BaseModel | str](BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     kind: Annotated[Literal["agent"], Field(description="Type of invocation")] = "agent"
     meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
     output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
@@ -157,7 +161,7 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
         Callable[[Any, ExecutionContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
-    tools: Annotated[LLMToolsLike, Field(description="Tools available to the agent")] = []
+    tools: Annotated[LLMToolsLike, Field(description="Tools available to the agent", exclude=True)] = []
     connection: Annotated[Connection | str | None, Field(description="LLM Connection")] = None
     llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters")] = None
 

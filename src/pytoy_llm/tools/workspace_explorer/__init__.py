@@ -304,12 +304,30 @@ class WorkspaceExplorer:
 
         result = []
 
-        for p in root.rglob("*"):
-            if self._excluded(p):
-                continue
+        try:
+            for current, dirs, files in os.walk(root):
+                dirs[:] = [d for d in dirs if not self._excluded(Path(current) / d)]
 
-            if p.is_file() and fnmatch.fnmatch(p.name, pattern):
-                result.append(FileInfo.from_absolute_path(p, self.workspace))
+                for file_name in files:
+                    file_path = Path(current) / file_name
+
+                    if self._excluded(file_path):
+                        continue
+
+                    if fnmatch.fnmatch(file_name, pattern):
+                        result.append(
+                            FileInfo.from_absolute_path(
+                                file_path,
+                                self.workspace,
+                            )
+                        )
+
+        except OSError as exc:
+            return ToolError(
+                kind=ToolErrorKind.UNKNOWN,
+                msg=str(exc),
+                retry=False,
+            )
 
         return sorted(result, key=lambda x: x.path)
 
@@ -387,9 +405,9 @@ class WorkspaceExplorer:
         root = self._resolve(path)
         if isinstance(root, ToolError):
             return root
-
         flags = 0 if case_sensitive else re.IGNORECASE
 
+        compiled = None
         if regex:
             try:
                 compiled = re.compile(pattern, flags)
@@ -402,60 +420,74 @@ class WorkspaceExplorer:
 
         results: list[GrepMatch] = []
 
-        for file in root.rglob("*"):
-            if len(results) >= max_results:
-                break
+        try:
+            for current, dirs, files in os.walk(root):
+                if len(results) >= max_results:
+                    break
 
-            if file.is_dir():
-                continue
+                dirs[:] = [d for d in dirs if not self._excluded(Path(current) / d)]
 
-            if self._excluded(file):
-                continue
-
-            if not fnmatch.fnmatch(file.name, file_pattern):
-                continue
-
-            try:
-                for lineno, line in enumerate(
-                    file.read_text(
-                        encoding="utf-8",
-                        errors="ignore",
-                    ).splitlines(),
-                ):
-                    if regex:
-                        m = compiled.search(line)
-
-                        if m:
-                            results.append(
-                                GrepMatch(
-                                    path=str(file.relative_to(self.workspace)),
-                                    line=lineno,
-                                    column=m.start(),
-                                    text=line,
-                                )
-                            )
-
-                    else:
-                        source = line if case_sensitive else line.lower()
-                        target = pattern if case_sensitive else pattern.lower()
-
-                        idx = source.find(target)
-
-                        if idx != -1:
-                            results.append(
-                                GrepMatch(
-                                    path=str(file.relative_to(self.workspace)),
-                                    line=lineno,
-                                    column=idx,
-                                    text=line,
-                                )
-                            )
-
+                for file_name in files:
                     if len(results) >= max_results:
                         break
 
-            except OSError:
-                continue
+                    file_path = Path(current) / file_name
+
+                    if self._excluded(file_path):
+                        continue
+
+                    if not fnmatch.fnmatch(file_name, file_pattern):
+                        continue
+
+                    try:
+                        lines = file_path.read_text(
+                            encoding="utf-8",
+                            errors="ignore",
+                        ).splitlines()
+
+                    except OSError:
+                        continue
+
+                    for lineno, line in enumerate(lines):
+                        if regex:
+                            assert compiled is not None
+                            match = compiled.search(line)
+
+                            if match:
+                                results.append(
+                                    GrepMatch(
+                                        path=str(file_path.relative_to(self.workspace)),
+                                        line=lineno,
+                                        column=match.start(),
+                                        text=line,
+                                    )
+                                )
+
+                        else:
+                            source = line if case_sensitive else line.lower()
+                            target = pattern if case_sensitive else pattern.lower()
+
+                            idx = source.find(target)
+
+                            if idx != -1:
+                                results.append(
+                                    GrepMatch(
+                                        path=str(file_path.relative_to(self.workspace)),
+                                        line=lineno,
+                                        column=idx,
+                                        text=line,
+                                    )
+                                )
+
+                        if len(results) >= max_results:
+                            break
+
+        except OSError as exc:
+            return ToolError(
+                kind=ToolErrorKind.UNKNOWN,
+                msg=str(exc),
+                retry=False,
+            )
 
         return results
 

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Annotated, Any, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.event_sinks import EventSinkProtocol
@@ -21,6 +21,8 @@ class TaskSpec[T](BaseModel, frozen=True):
     """
     Represents a higher-level Task composed of multiple InvocationSpecs.
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     invocation_specs: Annotated[
         Sequence[FunctionInvocationSpec | LLMInvocationSpec | AgentInvocationSpec | SelectedInvocationSpec],
