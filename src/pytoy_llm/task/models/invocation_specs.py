@@ -13,7 +13,7 @@ from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.events.llm_events import ToolCallEvent, ToolResultEvent
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
-from pytoy_llm.models.llm_tools import LLMTool
+from pytoy_llm.models.llm_tools import LLMToolsLike
 from pytoy_llm.task.models.context import (
     ContextPatch,
     ExecutionContext,
@@ -157,7 +157,7 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
         Callable[[Any, ExecutionContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
         Field(description="Function to generate the messages for LLM based on input and task context"),
     ]
-    tools: Annotated[Sequence[Callable | LLMTool], Field(description="Tools available to the agent")] = []
+    tools: Annotated[LLMToolsLike, Field(description="Tools available to the agent")] = []
     connection: Annotated[Connection | str | None, Field(description="LLM Connection")] = None
     llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters")] = None
 

@@ -1,4 +1,3 @@
-from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Self
 
@@ -20,7 +19,7 @@ from pytoy_llm.models import (
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
-from pytoy_llm.models.llm_tools import LLMTool
+from pytoy_llm.models.llm_tools import LLMToolsLike, from_llm_tools_like
 from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
 from pytoy_llm.pydantic_agent.event_handler import EventHandler
 from pytoy_llm.pydantic_agent.factory import PydanticAIModelFactory
@@ -60,29 +59,23 @@ class PytoyPydanticAIAgent:
         self._llm_param = llm_param
         self._event_sink = event_sink
 
-    def _normalize_tool(self, tool: LLMTool | Callable) -> Callable:
-        if isinstance(tool, LLMTool):
-            return tool.to_pydantic_tool()
-        else:
-            return tool
-
-    def _make_agent(self, system_prompt: str | None | tuple, tools: Sequence[LLMTool | Callable]) -> Agent:
+    def _make_agent(self, system_prompt: str | None | tuple, tools: LLMToolsLike) -> Agent:
         system_prompt = system_prompt or tuple()
         model = PydanticAIModelFactory.create(self._connection, self._llm_param)
-        tools = [self._normalize_tool(tool) for tool in tools]
+        tools = from_llm_tools_like(tools)
         return Agent(model=model, system_prompt=system_prompt, tools=tools)
 
     def run[T: BaseModel | str](
         self,
         messages: LLMMessagesLike,
         output_type: type[T],
-        tools: Sequence[LLMTool | Callable] = tuple(),
+        tools: LLMToolsLike = tuple(),
     ) -> T:
         result = self.run_with_native(messages=messages, output_type=output_type, tools=tools)
         return result.output
 
     def run_with_native[T: BaseModel | str](
-        self, messages: LLMMessagesLike, output_type: type[T], tools: Sequence[LLMTool | Callable] = tuple()
+        self, messages: LLMMessagesLike, output_type: type[T], tools: LLMToolsLike = tuple()
     ) -> AgentRunResult[T]:
         adapter = PydanticAIMessageAdapter()
         messages = LLMMessage.to_messages(messages)
@@ -102,7 +95,7 @@ class PytoyPydanticAIAgent:
         return result
 
     def run_with_result[T: BaseModel | str](
-        self, messages: LLMMessagesLike, output_type: type[T], tools: Sequence[LLMTool | Callable] = tuple()
+        self, messages: LLMMessagesLike, output_type: type[T], tools: LLMToolsLike = tuple()
     ) -> LLMResult[T]:
         adapter = PydanticAIMessageAdapter()
         run_result = self.run_with_native(messages, output_type=output_type, tools=tools)

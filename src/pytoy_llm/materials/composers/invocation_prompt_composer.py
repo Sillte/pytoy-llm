@@ -11,7 +11,8 @@ from pytoy_llm.materials.composers.models import (
 )
 from pytoy_llm.materials.core import SectionData, warn_forbidden_headers
 from pytoy_llm.models.llm_messages import LLMMessage
-from pytoy_llm.task.models import LLMInvocationSpec
+from pytoy_llm.models.llm_tools import LLMToolsLike
+from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext
 from pytoy_llm.task.models.metas import InvocationSpecMeta
 
@@ -104,7 +105,7 @@ class InvocationPromptComposer:
         system_prompt = self.compose_prompt()
         return LLMMessage.from_prompt(user=user_prompt, system=system_prompt)
 
-    def compose_invocation_spec(self) -> LLMInvocationSpec:
+    def compose_llm_invocation_spec(self) -> LLMInvocationSpec:
         def create_messages(input: Any, context: ExecutionContext) -> Sequence[LLMMessage]:
             input = str(input) if input else None
             messages = self.compose_message(input)
@@ -114,4 +115,17 @@ class InvocationPromptComposer:
             create_messages=create_messages,
             output_type=self.prompt_template.output_type,
             meta=InvocationSpecMeta(name=self.prompt_template.name, intent=self.prompt_template.intent),
+        )
+
+    def comopse_agent_invocation_spec(self, tools: LLMToolsLike = tuple()) -> AgentInvocationSpec:
+        def create_messages(input: Any, context: ExecutionContext) -> Sequence[LLMMessage]:
+            input = str(input) if input else None
+            messages = self.compose_message(input)
+            return [messages]
+
+        return AgentInvocationSpec(
+            meta=InvocationSpecMeta(name=self.prompt_template.name, intent=self.prompt_template.intent),
+            output_type=self.prompt_template.output_type,
+            create_messages=create_messages,
+            tools=tools,
         )

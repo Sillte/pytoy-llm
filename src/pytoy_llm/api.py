@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -11,7 +10,7 @@ from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_metas import LLMParam
-from pytoy_llm.models.llm_tools import LLMTool
+from pytoy_llm.models.llm_tools import LLMToolsLike
 
 
 def initialize_configuration(name: str = DEFAULT_NAME) -> Path:
@@ -40,7 +39,7 @@ def completion[T: BaseModel | str](
 def run[T: BaseModel | str](
     messages: LLMMessagesLike,
     output_type: type[T],
-    tools: Sequence[Callable | LLMTool] = tuple(),
+    tools: LLMToolsLike = tuple(),
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
     event_sink: EventSinkProtocol | None = None,

@@ -1,5 +1,3 @@
-from collections.abc import Callable, Sequence
-
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
@@ -9,7 +7,7 @@ from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
-from pytoy_llm.models.llm_tools import LLMTool
+from pytoy_llm.models.llm_tools import LLMToolsLike
 from pytoy_llm.pydantic_agent.agent import PytoyPydanticAIAgent
 
 
@@ -47,7 +45,7 @@ class LLMFacade:
         self,
         messages: LLMMessagesLike,
         output_type: type[T],
-        tools: Sequence[Callable | LLMTool] = (),
+        tools: LLMToolsLike = (),
     ) -> T:
         """Alias of `run_agent` for better readability."""
         agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
@@ -57,7 +55,7 @@ class LLMFacade:
         self,
         messages: LLMMessagesLike,
         output_type: type[T],
-        tools: Sequence[Callable | LLMTool] = (),
+        tools: LLMToolsLike = (),
     ) -> LLMResult[T]:
         agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
         return agent.run_with_result(messages, output_type=output_type, tools=tools)
