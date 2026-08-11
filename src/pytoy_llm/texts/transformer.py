@@ -20,24 +20,33 @@ class StrongSemanticPreservationRule(BaseTransformRule, frozen=True):
     rule: str = """
     Preserve the original semantic content as completely as possible.
 
-    The transformed text must not add, remove, or alter any proposition,
-    event, participant, temporal relation, spatial relation, or other
-    semantic relation directly supported by the original text.
+    The transformation must preserve the semantic content represented
+    in the original semantic OUTCOME, including propositions, events,
+    participants and their relations, temporal and spatial relations,
+    modality, negation, repetition or recurrence, and other semantic
+    relations relevant to the original text.
 
-    In particular, preserve absolutely the core truth-conditional content
-    or minimal truth-conditional content identifiable and directly supported in the
-    original text, insofar as such content can be determined.
+    Semantic content represented as `explicit` should be preserved
+    without alteration whenever possible. Semantic content represented
+    as `inferred` should also be preserved insofar as it constitutes
+    a semantic interpretation supported by the text.
 
     If satisfying the transformation instruction requires a change
     to the semantic content, prioritize preservation of the original
     semantic content and make the smallest necessary change.
-    If necessary change requested by instruction contradicts
-    core truth-conditional content or minimal truth-conditional content directly supported in the text, 
-    prioritize the preservation of them, disregard the conflicting part of the instruction.
 
-    Note that linguistic terms such as `core truth-conditional content`
-    and `minimal truth-conditional content` are used as conceptual guidance
-    rather than as a requirement for a formally exact semantic analysis.
+    If the requested transformation conflicts with `explicit` semantic content
+    that must be preserved, prioritize preservation of that content
+    and disregard the conflicting part of the instruction.
+
+    If the requested transformation conflicts with `inferred` semantic content
+    that should be preserved, prioritize the requested transformation
+    to the extent that it remains consistent with the `explicit` semantic
+    content, and make the smallest necessary change.
+
+    The distinction between `explicit` and `inferred` describes
+    how semantic content is recovered in the analysis; it does not
+    itself determine the strength of semantic preservation.
     """.strip()
 
 
@@ -45,24 +54,47 @@ class WeakSemanticPreservationRule(BaseTransformRule, frozen=True):
     """Request to maintain the semantic content of the text to some extent."""
 
     rule: str = """
-    Preserve the original semantic content where it does not conflict
-    with the transformation instruction.
+    Preserve the original semantic content to the extent reasonably possible.
 
-    In particular, preserve the core truth-conditional content
-    or minimal truth-conditional content identifiable in the
-    original text, insofar as such content can be determined.
+    The transformation should preserve the semantic content represented
+    in the original semantic OUTCOME, including propositions, events,
+    participants and their relations, temporal and spatial relations,
+    modality, negation, repetition or recurrence, and other semantic
+    relations relevant to the original text.
 
-    When the transformation instruction conflicts with the original
-    semantic content, prioritize satisfying the instruction and allow
-    the necessary changes to the semantic content, including changes
-    to the core truth-conditional content or minimal truth-conditional
-    content when required.
+    In particular, preserve the core truth-conditional content or
+    minimal semantic content directly supported by the text, insofar
+    as such content can be determined.
 
-    Prioritize the semantics properties directly supported in the text over the semantic properties inferred.
+    If satisfying the transformation instruction requires a change
+    to the semantic content, prioritize the transformation instruction
+    over semantic content that is not essential to the core
+    truth-conditional or minimal semantic content, and make the
+    smallest necessary change.
 
-    Note that linguistic terms such as `core truth-conditional content`
-    and `minimal truth-conditional content` are used as conceptual guidance
-    rather than as a requirement for a formally exact semantic analysis.
+    If the requested transformation conflicts with `explicit` semantic
+    content that constitutes core truth-conditional or minimal semantic
+    content, prioritize preservation of that content and disregard
+    the conflicting part of the instruction.
+
+    If the requested transformation conflicts with `explicit` semantic
+    content that is regarded not to constitute core truth-conditional or
+    minimal semantic content, prioritize the requested transformation,
+    making the smallest necessary change to the `explicit` semantic content
+    while maintaining the core truth-conditional or minimal semantic content.
+
+    If the requested transformation conflicts only with `inferred`
+    semantic content, prioritize the requested transformation while
+    preserving that inferred content where it remains compatible
+    with the transformation.
+
+    The distinction between `explicit` and `inferred` describes
+    how semantic content is recovered in the analysis; it does not
+    itself determine the strength of semantic preservation.
+
+    Note that linguistic terms such as ``core truth-conditional content``
+    and ``minimal semantic content`` are used as conceptual guidance
+    rather than as requirements for a formally exact semantic analysis.
 """.strip()
 
 
@@ -85,17 +117,19 @@ class StrongPragmaticPreservationRule(BaseTransformRule, frozen=True):
     If satisfying the transformation instruction requires a change
     to the pragmatic outcome, make the smallest necessary change.
 
-    If the transformation instruction conflicts with an original
-    pragmatic property, prioritize preservation of that pragmatic property
-    unless the instruction explicitly requires changing it.
+    If the transformation instruction conflicts with an `explicit`
+    pragmatic property, prioritize preservation of that content
+    and disregard the conflicting part of the instruction.
 
-    Prioritize preservation of pragmatic properties that are directly
-    supported by the original text over properties that depend primarily
-    on contextual inference.
+    If the transformation instruction conflicts with an `inferred`
+    pragmatic property, prioritize the requested transformation while
+    making the smallest necessary change to that `inferred` pragmatic
+    property, insofar as the result remains consistent with the
+    `explicit` pragmatic properties.
 
-    Note that pragmatic properties may depend on contextual interpretation.
-    They should be preserved insofar as they can reasonably be determined
-    from the original text and the provided context.
+    The distinction between `explicit` and `inferred` describes
+    how pragmatic properties are recovered in the analysis; it does not
+    itself determine the strength of pragmatic preservation.
     """.strip()
 
 
@@ -103,25 +137,33 @@ class WeakPragmaticPreservationRule(BaseTransformRule, frozen=True):
     """Request to maintain the pragmatic properties of the text weakly."""
 
     rule: str = """
-    Preserve the original pragmatic OUTCOME as much as possible.
+    Preserve the original pragmatic content to the extent reasonably possible.
 
-    The transformed text should preserve the original communicative function,
-    including the speech act, intended direction of action, interpersonal stance,
-    degree of directness, urgency, politeness, and other pragmatic properties
-    represented in the original OUTCOME unless specified by the instruction. 
+    The transformed text should preserve the original communicative
+    function and pragmatic properties represented in the original OUTCOME,
+    including, where applicable, the speech act, intended direction of action,
+    interpersonal stance, degree of directness, urgency, politeness,
+    and other pragmatic properties.
 
     If satisfying the transformation instruction requires a change
-    to the pragmatic outcome, make the necessary changes.
+    to the pragmatic outcome, make the smallest necessary changes.
 
-    If the transformation instruction conflicts with an original
-    pragmatic property, prioritize the instruction over preservation of the original pragmatic OUTCOME.  
-    Prioritize preservation of the pragmatic properties explicitly represented in the original pragmatic OUTCOME
-    over preservation of the inferred pragmatic properties in the original pragmatic OUTCOME. 
+    If the transformation instruction conflicts with an `explicit`
+    pragmatic property, prioritize the requested transformation.
+    However, preserve that pragmatic property to the extent reasonably
+    possible, for example by making the smallest necessary changes
+    while retaining enough of the original property for it to remain
+    recoverable from the transformed text.
 
-    Note that pragmatic properties may depend on contextual interpretation.
-    They should be preserved insofar as they can reasonably be determined
-    from the original text and the provided context.
-    """
+    If the transformation instruction conflicts with an `inferred`
+    pragmatic property, prioritize the requested transformation while
+    preserving that property where it remains compatible with the
+    transformation and the `explicit` pragmatic properties.
+
+    The distinction between `explicit` and `inferred` describes
+    how pragmatic properties are recovered in the analysis; it does not
+    itself determine the strength of pragmatic preservation.
+""".strip()
 
 
 class CompositeTransformationRule(BaseTransformRule, frozen=True):
