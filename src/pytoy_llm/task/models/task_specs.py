@@ -92,7 +92,7 @@ class TaskSpec[T](BaseModel, frozen=True):
     def from_single_spec(
         cls,
         meta: str | TaskSpecMeta,
-        invocation_spec: LLMInvocationSpec,
+        invocation_spec: FunctionInvocationSpec | LLMInvocationSpec | AgentInvocationSpec | SelectedInvocationSpec,
     ) -> Self:
         """Utility function for construction the task with 1 LLMInvocation."""
         if isinstance(meta, str):
