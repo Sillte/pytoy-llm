@@ -1,8 +1,18 @@
 from pydantic_ai.models import Model as PydanticAIModel
+from pydantic_ai.models import ModelProfile, merge_profile
 
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.pydantic_agent.adapter import LLMParamConverter
+
+
+def thinking_override(profile: ModelProfile) -> ModelProfile:
+    return merge_profile(
+        profile,
+        {
+            "supports_thinking": True,
+        },
+    )
 
 
 class PydanticAIModelFactory:
@@ -34,7 +44,8 @@ class PydanticAIModelFactory:
             # For Google, `openai` or in local LLM, you must pass the url.
             provider = OpenAIProvider(api_key=api_key, base_url=base_url)
             sub_name = "/".join(parts[1:])
-            return OpenAIChatModel(sub_name, provider=provider, settings=model_settings)
+
+            return OpenAIChatModel(sub_name, provider=provider, settings=model_settings, profile=thinking_override)
         else:
             assert base_url, "for fool proof."
             from pydantic_ai_litellm import LiteLLMModel

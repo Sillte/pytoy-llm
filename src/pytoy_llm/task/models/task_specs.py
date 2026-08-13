@@ -3,9 +3,7 @@ from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.event_sinks import EventSinkProtocol
-from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.invocation_specs import (
     AgentInvocationSpec,
@@ -54,8 +52,8 @@ class TaskSpec[T](BaseModel, frozen=True):
     def run(
         self, task_input: Any, context_state: TaskContextState, event_sink: EventSinkProtocol | None = None
     ) -> TaskResult[T]:
-        llm_param = LLMParam()
-        connection = DEFAULT_NAME
+        llm_param = None
+        connection = None
         execution_context = ExecutionContext(
             llm_param=llm_param,
             connection=connection,

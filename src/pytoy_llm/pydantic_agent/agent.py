@@ -51,10 +51,9 @@ class PytoyPydanticAIAgent:
     def __init__(
         self, connection: str | Connection, llm_param: LLMParam | None = None, event_sink: EventSinkProtocol | None = None
     ) -> None:
-        llm_param = llm_param or LLMParam()
-
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
+        llm_param = llm_param or connection.llm_param or LLMParam()
         self._connection = connection
         self._llm_param = llm_param
         self._event_sink = event_sink

@@ -1,4 +1,9 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
+
+type ReasoningEffort = Literal["none", "minimal", "low", "medium", "high"]
+type Verbosity = Literal["low", "medium", "high"]
 
 
 class LLMTokens(BaseModel, frozen=True):
@@ -20,3 +25,5 @@ class LLMParam(BaseModel, frozen=True):
     max_tokens: int | None = None
     frequency_penalty: float | None = None
     presence_penalty: float | None = None
+    reasoning_effort: ReasoningEffort | None = None
+    verbosity: Verbosity | None = None

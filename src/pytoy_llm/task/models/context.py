@@ -15,7 +15,7 @@ from pytoy_llm.task.models.task_state import TaskRunState
 
 @dataclass(frozen=True)
 class ExecutionContext:
-    llm_param: LLMParam
+    llm_param: LLMParam | None
     connection: Connection | str | None
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)

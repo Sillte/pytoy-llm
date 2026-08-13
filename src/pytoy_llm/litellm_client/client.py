@@ -29,9 +29,9 @@ class PytoyLiteLLMClient:
         event_sink: EventSinkProtocol | None = None,
     ) -> None:
 
-        llm_param = llm_param or LLMParam()
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
+        llm_param = llm_param or connection.llm_param or LLMParam()
 
         self._connection: Connection = connection
         self._llm_param = llm_param

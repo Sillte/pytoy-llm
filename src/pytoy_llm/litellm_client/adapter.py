@@ -84,4 +84,12 @@ class LLMParamConverter:
     def __init__(self) -> None: ...
 
     def to_litellm_kwargs(self, llm_param: LLMParam) -> dict:
-        return llm_param.model_dump(exclude_none=True)
+        result = llm_param.model_dump(exclude_none=True)
+        candidates = ["reasoning_effort", "verbosity"]
+        allowed_openai_params = list(result.get("allowed_openai_params", []))
+        for cand in candidates:
+            if cand not in allowed_openai_params and cand in result:
+                allowed_openai_params.append(cand)
+        if allowed_openai_params:
+            result["allowed_openai_params"] = allowed_openai_params
+        return result

@@ -16,10 +16,11 @@ from pydantic_ai import (
     UserPromptPart,
 )
 from pydantic_ai import TextPart as PydanticTextPart
+from pydantic_ai.settings import ThinkingLevel
 
 from pytoy_llm.models import Part as LLMPart
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
-from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens
+from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens, ReasoningEffort
 from pytoy_llm.models.parts import OpaquePart
 from pytoy_llm.models.parts import TextPart as LLMTextPart
 
@@ -126,4 +127,21 @@ class LLMParamConverter:
     def __init__(self) -> None: ...
 
     def to_model_settings(self, llm_param: LLMParam) -> ModelSettings:
-        return ModelSettings(**llm_param.model_dump(exclude_none=True))
+        raw = llm_param.model_dump(exclude_none=True)
+
+        # Meaning conversions.
+        if "reasoning_effort" in raw:
+            raw["thinking"] = self._to_thinking(raw.pop("reasoning_effort"))
+
+        result = ModelSettings(**raw)
+        return result
+
+    def _to_thinking(
+        self,
+        value: ReasoningEffort,
+    ) -> ThinkingLevel:
+        match value:
+            case "none":
+                return False
+            case _:
+                return value

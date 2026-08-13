@@ -71,7 +71,6 @@ class TextAnalysisModel(BaseModel, frozen=True):
 class TextAnalyzer:
     def __init__(self, event_sink: None | EventSinkProtocol = None) -> None:
         self._event_sink = event_sink
-        pass
 
     def analyze(self, text: str) -> TextAnalysisModel:
         template = SystemPromptTemplate(
