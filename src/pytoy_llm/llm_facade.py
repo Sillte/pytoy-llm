@@ -64,7 +64,6 @@ class LLMFacade:
 if __name__ == "__main__":
     facade = LLMFacade()
     result = facade.completion_with_result("Hello", output_type=str)
-    result.output.islower
 
     from pydantic import BaseModel
 

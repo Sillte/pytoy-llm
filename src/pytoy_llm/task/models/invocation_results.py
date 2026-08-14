@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 from pytoy_llm.task.models.context import ContextPatch
 from pytoy_llm.task.models.metas import InvocationSpecMeta
@@ -30,7 +30,7 @@ class InvocationTrace(BaseModel, frozen=True):
     input: Annotated[Any, Field(description="Input")]
     output: Annotated[Any, Field(description="Output")]
     info: Annotated[InvocationInfo, Field(description="Metatada Information about the invocation.")]
-    details: Annotated[Mapping[str, Any], Field(description="detailed information for debug")] = {}
+    details: Annotated[Mapping[str, JsonValue], Field(description="detailed information for debugging")] = {}
     children: Annotated[Sequence[InvocationTrace], Field(description="Children of execution")] = ()
 
 

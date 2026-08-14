@@ -142,6 +142,4 @@ if __name__ == "__main__":
         user_prompt=user_input, instances=examples, output_mode="python_code", explanation=explanation
     )
 
-    print("result_instance", result_instance)
-
     print("Generated SampleModel:", result_instance)

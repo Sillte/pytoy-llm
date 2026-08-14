@@ -1,14 +1,13 @@
-from typing import Annotated
-
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
 
 from pytoy_llm.task.models.context import TaskContextState
 from pytoy_llm.task.models.task_results import TaskResult
 
 
-class TaskResponse[T: BaseModel | str](BaseModel):
+@dataclass(frozen=True)
+class TaskResponse[T]:
     result: TaskResult[T]
-    request_id: Annotated[str, Field(description="ID of TaskRequest")]
+    request_id: str  # ID of request.
 
     @property
     def output(self) -> T:

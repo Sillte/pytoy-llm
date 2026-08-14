@@ -3,10 +3,11 @@ from __future__ import annotations
 import inspect
 import time
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from functools import wraps
-from typing import Annotated, Any, Literal, cast
+from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models.connections import Connection
@@ -20,7 +21,8 @@ from pytoy_llm.task.models.context import (
 )
 from pytoy_llm.task.models.invocation_results import InvocationInfo, InvocationResult, InvocationTrace
 from pytoy_llm.task.models.metas import InvocationSpecMeta
-from pytoy_llm.task.models.types import InvocationCallable
+
+type InvocationCallable[T] = Callable[[Any, ExecutionContext], T | InvocationResult[T]]
 
 
 def to_invocation_result[T](
@@ -31,11 +33,11 @@ def to_invocation_result[T](
     return InvocationResult(output=output, trace=trace, runtime_patch=runtime_patch)
 
 
-class FunctionInvocationSpec[T](BaseModel, frozen=True):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    kind: Annotated[Literal["function"], Field(description="Type of invocation")] = "function"
-    meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
+@dataclass(frozen=True)
+class FunctionInvocationSpec[T]:
     invocator: InvocationCallable[T]
+    meta: InvocationSpecMeta = field(default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A"))
+    kind: Literal["function"] = "function"
 
     def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult:
         starttime = time.time()
@@ -45,7 +47,7 @@ class FunctionInvocationSpec[T](BaseModel, frozen=True):
             event_sink.emit(ToolCallEvent(tool_name="FunctionInvocationSpec", args=input))
         output = self.invocator(input, execution_context)
         if event_sink:
-            event_sink.emit(ToolResultEvent(tool_name="SelectedInvocationSpec", result=output))
+            event_sink.emit(ToolResultEvent(tool_name="FunctionInvocationSpec", result=output))
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
         trace = InvocationTrace(input=input, output=output, info=info)
@@ -89,20 +91,16 @@ class FunctionInvocationSpec[T](BaseModel, frozen=True):
             return cls(invocator=wrapped_invocator, meta=meta)
         elif len(params) >= 2:
             arg = cast(Callable[[Any, ExecutionContext], T], arg)
-            # 引数2つの場合: そのまま利用
             return cls(invocator=arg, meta=meta)
         else:
             raise ValueError("Callable must have at least one argument (input)")
 
 
-class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    kind: Annotated[Literal["selector"], Field(description="Type of invocation")] = "selector"
-    meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
-    spec_selector: Annotated[
-        FunctionInvocationSpec[FunctionInvocationSpec],
-        Field(description="Function that selects which InvocationSpec to invoke based on the input"),
-    ]
+@dataclass(frozen=True)
+class SelectedInvocationSpec[T]:
+    spec_selector: FunctionInvocationSpec[FunctionInvocationSpec]
+    meta: InvocationSpecMeta = field(default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A"))
+    kind: Literal["selector"] = "selector"
 
     def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult[T]:
         starttime = time.time()
@@ -120,18 +118,14 @@ class SelectedInvocationSpec[T: BaseModel | str](BaseModel, frozen=True):
         return result
 
 
-class LLMInvocationSpec[T: BaseModel | str](BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    kind: Annotated[Literal["llm"], Field(description="Type of invocation")] = "llm"
-    meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
-
-    output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
-    create_messages: Annotated[
-        Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike],
-        Field(description="Function to generate the messages for LLM based on input and task context"),
-    ]
-    llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters.")] = None
-    connection: Annotated[Connection | str | None, Field(description="Connection for this invocation")] = None
+@dataclass(frozen=True)
+class LLMInvocationSpec[T: BaseModel | str]:
+    output_type: type[T]
+    create_messages: Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike]
+    llm_param: LLMParam | None = None
+    connection: Connection | str | None = None
+    meta: InvocationSpecMeta = field(default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A"))
+    kind: Literal["llm"] = "llm"
 
     def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
@@ -148,22 +142,20 @@ class LLMInvocationSpec[T: BaseModel | str](BaseModel):
         runtime_patch = ContextPatch(llm_messages=result.messages)
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
-        trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump()})
+        trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump(mode="json")})
         return to_invocation_result(output, trace, runtime_patch=runtime_patch)
 
 
-class AgentInvocationSpec[T: BaseModel | str](BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    kind: Annotated[Literal["agent"], Field(description="Type of invocation")] = "agent"
-    meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")]
-    output_type: Annotated[type[T], Field(description="Expected type of the output from LLM")]
-    create_messages: Annotated[
-        Callable[[Any, ExecutionContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]],
-        Field(description="Function to generate the messages for LLM based on input and task context"),
-    ]
-    tools: Annotated[LLMToolsLike, Field(description="Tools available to the agent", exclude=True)] = []
-    connection: Annotated[Connection | str | None, Field(description="LLM Connection")] = None
-    llm_param: Annotated[LLMParam | None, Field(description="LLM Parameters")] = None
+@dataclass(frozen=True)
+class AgentInvocationSpec[T: BaseModel | str]:
+    output_type: type[T]
+    create_messages: Callable[[Any, ExecutionContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]]
+    tools: LLMToolsLike = field(default_factory=list)
+    connection: Connection | str | None = None
+    llm_param: LLMParam | None = None
+
+    meta: InvocationSpecMeta = field(default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A"))
+    kind: Literal["agent"] = "agent"
 
     def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         starttime = time.time()
@@ -180,5 +172,8 @@ class AgentInvocationSpec[T: BaseModel | str](BaseModel):
         runtime_patch = ContextPatch(llm_messages=result.messages)
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
-        trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump()})
+        trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump(mode="json")})
         return to_invocation_result(output, trace, runtime_patch=runtime_patch)
+
+
+type InvocationSpec = FunctionInvocationSpec | LLMInvocationSpec | AgentInvocationSpec | SelectedInvocationSpec

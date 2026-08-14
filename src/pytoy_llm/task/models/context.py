@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, MutableMapping, Self
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -10,7 +10,8 @@ from pytoy_llm.event_sinks import EventSinkProtocol
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
-from pytoy_llm.task.models.task_state import TaskRunState
+
+type TaskRunState = MutableMapping[str, Any]
 
 
 @dataclass(frozen=True)
