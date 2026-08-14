@@ -123,7 +123,7 @@ if __name__ == "__main__":
         intent="Analyze system logs and notify affected users via email",
         rules=["Do not invent incidents", "Do not include internal system details", "Write clear and polite emails"],
     )
-    task_spec = TaskSpec(
+    task_spec = TaskSpec.from_specs(
         meta=task_meta,
         invocation_specs=[
             parse_log_invocation,  # LLM

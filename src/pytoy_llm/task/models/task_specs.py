@@ -45,9 +45,9 @@ class TaskSpec[T]:
         for invocation_spec in self.invocation_specs:
             invocation_result = invocation_spec.invoke(invocation_input, execution_context)
             if invocation_result.runtime_patch:
-                execution_context = invocation_result.runtime_patch.patch(execution_context)
+                execution_context = invocation_result.runtime_patch.apply(execution_context)
             if invocation_result.context_patch:
-                execution_context = invocation_result.context_patch.patch(execution_context)
+                execution_context = invocation_result.context_patch.apply(execution_context)
             if invocation_result.trace:
                 traces.append(invocation_result.trace)
             invocation_input = invocation_result.output

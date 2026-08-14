@@ -242,7 +242,7 @@ class TextTransformer:
             transform_rule=transform_rule,
         )
 
-        task_spec = TaskSpec.from_single_spec("TextTransform", llm_spec)
+        task_spec = TaskSpec.from_single_spec(llm_spec, meta="TextTransform")
         request = TaskRequest(spec=task_spec, input=transform_request.model_dump_json(indent=2))
 
         response = TaskExecutor().execute(request, event_sink=self._event_sink)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import wraps
 from typing import Any, Literal, cast
 
@@ -16,8 +16,8 @@ from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
 from pytoy_llm.task.models.context import (
-    ContextPatch,
     ExecutionContext,
+    RuntimeContextPatch,
 )
 from pytoy_llm.task.models.invocation_results import InvocationInfo, InvocationResult, InvocationTrace
 from pytoy_llm.task.models.metas import InvocationSpecMeta
@@ -26,10 +26,10 @@ type InvocationCallable[T] = Callable[[Any, ExecutionContext], T | InvocationRes
 
 
 def to_invocation_result[T](
-    output: T | InvocationResult[T], trace: InvocationTrace, runtime_patch: ContextPatch | None = None
+    output: T | InvocationResult[T], trace: InvocationTrace, runtime_patch: RuntimeContextPatch | None = None
 ) -> InvocationResult[T]:
     if isinstance(output, InvocationResult):
-        return output.model_copy(update={"trace": trace, "runtime_patch": runtime_patch})
+        return replace(output, trace=trace, runtime_patch=runtime_patch)
     return InvocationResult(output=output, trace=trace, runtime_patch=runtime_patch)
 
 
@@ -56,7 +56,7 @@ class FunctionInvocationSpec[T]:
 
     def to_invocation_result(self, output: T | InvocationResult[T], trace: InvocationTrace) -> InvocationResult[T]:
         if isinstance(output, InvocationResult):
-            return output.model_copy(update={"trace": trace})
+            return replace(output, trace=trace)
         return InvocationResult(output=output, trace=trace)
 
     @classmethod
@@ -139,7 +139,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
         result = llm_facade.completion_with_result(input_messages, output_type=self.output_type)
         output = result.output
 
-        runtime_patch = ContextPatch(llm_messages=result.messages)
+        runtime_patch = RuntimeContextPatch(llm_messages=result.messages)
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
         trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump(mode="json")})
@@ -169,7 +169,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
         result = llm_facade.run_with_result(input_messages, output_type=self.output_type, tools=self.tools)
         output = result.output
 
-        runtime_patch = ContextPatch(llm_messages=result.messages)
+        runtime_patch = RuntimeContextPatch(llm_messages=result.messages)
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
         trace = InvocationTrace(input=input, output=output, info=info, details={"llm_result": result.model_dump(mode="json")})

@@ -23,24 +23,45 @@ class ExecutionContext:
     event_sink: EventSinkProtocol | None = None
 
 
+@dataclass(frozen=True)
+class RuntimeContextPatch:
+    """Represents changes to an `ExecutionContext` automatically produced by the runtime.
+
+    This patch is applied before `ContextPatch`.
+    """
+
+    llm_messages: Sequence[LLMMessage]
+    """The latest LLM message history for this context."""
+
+    def apply(self, context: ExecutionContext) -> ExecutionContext:
+        return replace(context, llm_messages=self.llm_messages)
+
+
 class ContextPatch(BaseModel, frozen=True):
-    state_updates: Annotated[
-        Mapping[str, Any],
-        Field(description="Updates to the task state requested by this invocation."),
-    ] = {}
+    """Represents changes to an `ExecutionContext` produced by an invocation.
+
+    The patch describes changes to be applied when constructing the context
+    for subsequent invocations. This is applied after `RuntimeContextPatch`.
+    """
+
+    state: Annotated[
+        Mapping[str, Any] | None,
+        Field(description="New states requested by the invocation."),
+    ] = None
 
     llm_messages: Annotated[
-        Sequence[LLMMessage],
-        Field(description="LLM message history updates produced during this invocation."),
-    ] = ()
+        Sequence[LLMMessage] | None,
+        Field(
+            description=("Overrides the LLM message history for this context. Applied after `RuntimeContextPatch`."),
+        ),
+    ] = None
 
-    def patch(self, context: ExecutionContext) -> ExecutionContext:
-        state = context.state
-        state.update(self.state_updates)
-
-        llm_messages = self.llm_messages
-
-        return replace(context, state=state, llm_messages=llm_messages)
+    def apply(self, context: ExecutionContext) -> ExecutionContext:
+        if self.state is not None:
+            context = replace(context, state=self.state)
+        if self.llm_messages is not None:
+            context = replace(context, llm_messages=self.llm_messages)
+        return context
 
 
 class TaskContextState(BaseModel, frozen=True):
