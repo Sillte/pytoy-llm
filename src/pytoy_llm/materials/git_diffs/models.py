@@ -123,10 +123,6 @@ class DiffBundle(BaseModel, frozen=True):
     file_diffs: Annotated[Sequence[FileDiff], Field(description="List of file diffs contained in this container")]
 
     @property
-    def bundle_kind(self) -> str:
-        return "DiffBundle"
-
-    @property
     def text_section_data(self) -> TextMaterialData:
         """LLM-friendly structured text for the diff bundle."""
 
@@ -141,7 +137,7 @@ class DiffBundle(BaseModel, frozen=True):
             f"{body}"
         )
         description = "Structured representation of file diffs in this bundle."
-        return TextMaterialData(structured_text=structured_text, description=description)
+        return TextMaterialData(content=structured_text, description=description)
 
     @property
     def model_section_data(self) -> ModelMaterialData:

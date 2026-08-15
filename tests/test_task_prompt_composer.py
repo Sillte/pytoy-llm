@@ -2,11 +2,13 @@ from pydantic import BaseModel
 
 from pytoy_llm.composers.models import OutputSpec, SystemPromptSpec
 from pytoy_llm.composers.system_prompt_composer import SystemPromptComposer
-from pytoy_llm.materials.composers.models import (
+from pytoy_llm.materials.models import (
     MaterialSection,
+    MaterialUsage,
+    ModelMaterialData,
+    TextMaterialData,
     build_material_sections,
 )
-from pytoy_llm.materials.models import MaterialUsage, ModelMaterialData, TextMaterialData
 from pytoy_llm.models.llm_messages import LLMMessage
 
 
@@ -34,23 +36,27 @@ def test_system_prompt_composer_with_material_sections():
 
     # --- Material usage ---
     text_usage = MaterialUsage(
-        usage_rule=[
-            "Use these examples as reference.",
-            "Follow the style shown in examples.",
-        ],
+        usage="\n".join(
+            [
+                "Use these examples as reference.",
+                "Follow the style shown in examples.",
+            ]
+        ),
     )
 
     model_usage = MaterialUsage(
-        usage_rule=[
-            "Use these examples as models.",
-            "Utilize the observed structure when constructing output.",
-        ],
+        usage="\n".join(
+            [
+                "Use these examples as models.",
+                "Utilize the observed structure when constructing output.",
+            ]
+        ),
     )
 
     # --- Material data ---
     text_material = TextMaterialData(
         description="Example sentences to guide rewriting.",
-        structured_text="This is a long example sentence that could be improved.",
+        content="This is a long example sentence that could be improved.",
     )
 
     model_material = ModelMaterialData[SampleModel](
@@ -66,12 +72,12 @@ def test_system_prompt_composer_with_material_sections():
         MaterialSection(
             name="TextExamples",
             usage=text_usage,
-            section_data=text_material,
+            data=text_material,
         ),
         MaterialSection(
             name="ModelData",
             usage=model_usage,
-            section_data=model_material,
+            data=model_material,
         ),
     ]
 

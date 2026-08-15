@@ -1,9 +1,7 @@
 import logging
-from queue import Queue
-from typing import Any
-
 from pathlib import Path
-from typing import Literal
+from queue import Queue
+from typing import Any, Literal
 
 from pydantic import BaseModel
 

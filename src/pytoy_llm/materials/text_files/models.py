@@ -150,7 +150,7 @@ class TextFileBundle(BaseModel, frozen=True):
     def text_section_data(self) -> TextMaterialData:
         structured_text = self.collection.structured_text
         description = self.description
-        return TextMaterialData(structured_text=structured_text, description=description)
+        return TextMaterialData(content=structured_text, description=description)
 
     @property
     def model_section_data(self) -> ModelMaterialData:

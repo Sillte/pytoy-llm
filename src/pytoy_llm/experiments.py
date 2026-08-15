@@ -8,13 +8,12 @@ from pytoy_llm import completion
 from pytoy_llm.composers.models import OutputSpec, SystemPromptSpec
 from pytoy_llm.composers.system_prompt_composer import SystemPromptComposer
 from pytoy_llm.materials.basemodels import BaseModelBundle
-
-# from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
-from pytoy_llm.materials.composers.models import (
+from pytoy_llm.materials.models import (
     MaterialSection,
+    MaterialUsage,
+    TextMaterialData,
     build_material_sections,
 )
-from pytoy_llm.materials.models import MaterialUsage, TextMaterialData
 from pytoy_llm.models.llm_messages import LLMMessage
 
 
@@ -53,14 +52,16 @@ def make_system_prompt[T: BaseModel](
     bundle = BaseModelBundle(data=instances)
 
     usage = MaterialUsage(
-        usage_rule=[
-            "Use these examples as reference.",
-            "Follow the structure exactly.",
-            "The output MUST be regarded natual as one of examples of the reference.",
-            "Respect field descriptions as guidance.",
-        ],
+        usage="\n".join(
+            [
+                "Use these examples as reference.",
+                "Follow the structure exactly.",
+                "The output MUST be regarded natual as one of examples of the reference.",
+                "Respect field descriptions as guidance.",
+            ]
+        ),
     )
-    sections.append(MaterialSection(name="BaseModelBundle", usage=usage, section_data=bundle.model_section_data))
+    sections.append(MaterialSection(name="BaseModelBundle", usage=usage, data=bundle.model_section_data))
 
     # Decide output instruction
     if output_mode == "python_code":
@@ -101,9 +102,9 @@ def make_system_prompt[T: BaseModel](
         output_spec=OutputSpec(output_type=output_type, description=output_description),
     )
     if explanation:
-        section_data = TextMaterialData(description=explanation, structured_text=explanation)
-        usage = MaterialUsage(usage_rule=["This section provides problem-specific hints not covered by the examples."])
-        sections.append(MaterialSection(name="AddtionalExplanation", usage=usage, section_data=section_data))
+        section_data = TextMaterialData(description=explanation, content=explanation)
+        usage = MaterialUsage(usage="This section provides problem-specific hints not covered by the examples.")
+        sections.append(MaterialSection(name="AddtionalExplanation", usage=usage, data=section_data))
 
     composer = SystemPromptComposer(prompt_spec)
     return composer.compose_prompt(supplementary_sections=build_material_sections(sections))
