@@ -2,41 +2,34 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from pytoy_llm.materials.core import ModelSectionData, TextSectionData
+from pytoy_llm.materials.models import ModelMaterialData, TextMaterialData
 
 
 class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
-    """Container holding multiple `pydantic.BaseModel` """
+    """Container holding multiple `pydantic.BaseModel`"""
+
     data: Sequence[T]
 
     @property
-    def bundle_kind(self):
-        return "BaseModelBundle"
-    
-    @property
-    def text_section_data(self) -> TextSectionData:
-        bundle_kind = self.bundle_kind
-        structured_text =  self.structured_text
+    def text_section_data(self) -> TextMaterialData:
+        structured_text = self.structured_text
         description = self.description
-        return TextSectionData(bundle_kind=bundle_kind,
-                                         structured_text=structured_text,
-                                         description=description)
+        return TextMaterialData(structured_text=structured_text, description=description)
 
     @property
-    def model_section_data(self) -> ModelSectionData:
-        # Note: `TextFileBundleData` requires a memory space of 
-        # text data. 
-        # If we would like to use the big data, 
+    def model_section_data(self) -> ModelMaterialData:
+        # Note: `TextFileBundleData` requires a memory space of
+        # text data.
+        # If we would like to use the big data,
         # `chunk` or `iter` iteration is necessary regarding `data`.
-        return ModelSectionData(bundle_kind=self.bundle_kind,
-                                description=self.description,
-                                instances=self.data)
-        
+        return ModelMaterialData(description=self.description, instances=self.data)
+
     @property
     def description(self) -> str:
-        description = ("This section contains multiple instances of `pydantic.BaseModel`\n"
-                       "Both of Json Schemas and Json Data are given as below."
-                        )
+        description = (
+            "This section contains multiple instances of `pydantic.BaseModel`\n"
+            "Both of Json Schemas and Json Data are given as below."
+        )
         return description
 
     @property
@@ -49,41 +42,3 @@ class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
             f"When you would like to use json-schemas or json-instances, please notify the caller.\n"
             f"Because in this mode, JsonSchema and JsonInstances are ommited."
         )
-
-"""
-Mermaid Class Diagram of pytoy_llm compositional structure
-
-```mermaid
-classDiagram
-    %% --- Core SectionData ---
-    class SectionData
-    SectionData <|-- TextSectionData
-    SectionData <|-- ModelSectionData
-
-    %% --- Section Usage ---
-    class SectionUsage
-
-    %% --- BaseModel bundle ---
-    class BaseModelBundle
-    BaseModelBundle --> SectionData : provides ModelSectionData
-    BaseModelBundle --> SectionData : provides TextSectionData
-
-    %% --- InvocationSpec ---
-    class LLMInvocationSpec
-
-    %% --- Composers ---
-    class SectionDataComposer
-    SectionDataComposer --> SectionData : compose()
-    SectionDataComposer --> SectionUsage : compose_sections_with_usage()
-
-    class InvocationPromptComposer
-    InvocationPromptComposer --> LLMInvocationSpec : uses
-    InvocationPromptComposer --> SectionUsage : uses
-    InvocationPromptComposer --> SectionData : uses directly (via compose_sections_with_usage)
-
-    %% --- Messages ---
-    class InputMessage
-
-    %% --- Relationships summary ---
-    InvocationPromptComposer --> Message : compose_messages()
-"""

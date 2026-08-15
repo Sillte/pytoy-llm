@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, BeforeValidator, Field
 
-from pytoy_llm.materials.core import ModelSectionData, StructuredText, TextSectionData
+from pytoy_llm.materials.models import ModelMaterialData, StructuredText, TextMaterialData
 
 
 def check_relative_path(v: Any) -> Path:
@@ -127,7 +127,7 @@ class DiffBundle(BaseModel, frozen=True):
         return "DiffBundle"
 
     @property
-    def text_section_data(self) -> TextSectionData:
+    def text_section_data(self) -> TextMaterialData:
         """LLM-friendly structured text for the diff bundle."""
 
         timestamp = time.time()
@@ -141,10 +141,10 @@ class DiffBundle(BaseModel, frozen=True):
             f"{body}"
         )
         description = "Structured representation of file diffs in this bundle."
-        return TextSectionData(bundle_kind=self.bundle_kind, structured_text=structured_text, description=description)
+        return TextMaterialData(structured_text=structured_text, description=description)
 
     @property
-    def model_section_data(self) -> ModelSectionData:
+    def model_section_data(self) -> ModelMaterialData:
         """Raw BaseModel representation of the diff bundle."""
         timestamp = time.time()
         description = (
@@ -152,7 +152,7 @@ class DiffBundle(BaseModel, frozen=True):
             f"Current Timestamp: {timestamp} / {datetime.fromtimestamp(timestamp).isoformat()}\n"
             f"Root location of the instances: {self.root_location}\n"
         )
-        return ModelSectionData(bundle_kind=self.bundle_kind, description=description, instances=self.file_diffs)
+        return ModelMaterialData(description=description, instances=self.file_diffs)
 
 
 class GitDiffBundleQuery(BaseModel, frozen=True):

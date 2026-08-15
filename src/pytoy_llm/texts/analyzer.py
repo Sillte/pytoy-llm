@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field
 
+from pytoy_llm.composers.invocation_composer import InvocationComposer
+from pytoy_llm.composers.models import SystemPromptSpec
 from pytoy_llm.event_sinks import EventSinkProtocol
-from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer, SystemPromptTemplate
 from pytoy_llm.task import TaskExecutor, TaskRequest
 from pytoy_llm.task.models import TaskSpec
 from pytoy_llm.texts.models import TextOutcomeModel, TextRealizationModel
@@ -73,16 +74,13 @@ class TextAnalyzer:
         self._event_sink = event_sink
 
     def analyze(self, text: str) -> TextAnalysisModel:
-        template = SystemPromptTemplate(
+        prompt_spec = SystemPromptSpec.from_any(
             name="TextAnalyzer",
             intent="Analyze the text and generate `TextAnalysisModel`",
             rules=(),
-            output_description="Analyzed model",
-            output_type=TextAnalysisModel,
-            reasoning_guidance="Please refer to JSON Schema",
-            role="Expert of the linguistics and education teacher.",
+            output_spec=TextAnalysisModel,
         )
-        composer = InvocationPromptComposer(prompt_template=template)
+        composer = InvocationComposer(system_prompt_spec=prompt_spec)
         llm_spec = composer.compose_llm_invocation_spec()
         request = TaskRequest(spec=TaskSpec.from_single_spec(meta="TextAnalyzer", invocation_spec=llm_spec), input=text)
         response = TaskExecutor().execute(request, event_sink=self._event_sink)

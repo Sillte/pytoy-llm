@@ -1,8 +1,12 @@
 from pydantic import BaseModel
 
-from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
-from pytoy_llm.materials.composers.models import SectionUsage, SystemPromptTemplate
-from pytoy_llm.materials.core import ModelSectionData, TextSectionData
+from pytoy_llm.composers.models import OutputSpec, SystemPromptSpec
+from pytoy_llm.composers.system_prompt_composer import SystemPromptComposer
+from pytoy_llm.materials.composers.models import (
+    MaterialSection,
+    build_material_sections,
+)
+from pytoy_llm.materials.models import MaterialUsage, ModelMaterialData, TextMaterialData
 from pytoy_llm.models.llm_messages import LLMMessage
 
 
@@ -11,58 +15,110 @@ class SampleModel(BaseModel):
     value: int
 
 
-def test_invocation_prompt_composer_basic():
-    system_prompt = SystemPromptTemplate(
+def test_system_prompt_composer_with_material_sections():
+    # --- System prompt specification ---
+    prompt_spec = SystemPromptSpec.from_any(
         name="Sample invocation",
         intent="Rewrite the following text to be more concise.",
-        rules=["Do not change meaning", "Keep technical terms intact"],
-        output_description="Rewritten text as string",
-        output_type=str,
+        rules=[
+            "Do not change meaning.",
+            "Keep technical terms intact.",
+        ],
+        output_spec=OutputSpec(
+            output_type=str,
+            description="Rewritten text as string.",
+        ),
+        guidance_role="Editor",
         reasoning_guidance="Consider sentence merging if it improves clarity.",
-        role="Editor",
     )
 
-    # --- サンプル SectionUsage ---
-    section_usages = [
-        SectionUsage(
-            bundle_kind="TextExamples", usage_rule=["Use these examples as reference.", "Follow the style shown in examples."]
-        ),
-        SectionUsage(bundle_kind="ModelData", usage_rule=["Use these examples as models.", "Utilize models."]),
-    ]
+    # --- Material usage ---
+    text_usage = MaterialUsage(
+        usage_rule=[
+            "Use these examples as reference.",
+            "Follow the style shown in examples.",
+        ],
+    )
 
-    # --- サンプル SectionData ---
-    text_section = TextSectionData(
-        bundle_kind="TextExamples",
-        description="Example sentences to guide rewriting",
+    model_usage = MaterialUsage(
+        usage_rule=[
+            "Use these examples as models.",
+            "Utilize the observed structure when constructing output.",
+        ],
+    )
+
+    # --- Material data ---
+    text_material = TextMaterialData(
+        description="Example sentences to guide rewriting.",
         structured_text="This is a long example sentence that could be improved.",
     )
 
-    model_section = ModelSectionData[SampleModel](
-        bundle_kind="ModelData",
-        description="Sample model instances",
-        instances=[SampleModel(name="a", value=1), SampleModel(name="b", value=2)],
+    model_material = ModelMaterialData[SampleModel](
+        description="Sample model instances.",
+        instances=[
+            SampleModel(name="a", value=1),
+            SampleModel(name="b", value=2),
+        ],
     )
 
-    section_data_list = [text_section, model_section]
+    # --- Material sections ---
+    sections = [
+        MaterialSection(
+            name="TextExamples",
+            usage=text_usage,
+            section_data=text_material,
+        ),
+        MaterialSection(
+            name="ModelData",
+            usage=model_usage,
+            section_data=model_material,
+        ),
+    ]
 
-    # --- Compose prompt ---
-    composer = InvocationPromptComposer(system_prompt, section_usages, section_data_list)
-    prompt_str = composer.compose_prompt()
+    supplementary_sections = build_material_sections(sections)
 
-    # --- 簡単なチェック ---
+    # --- Compose system prompt ---
+    composer = SystemPromptComposer(prompt_spec)
+    prompt_str = composer.compose_prompt(
+        supplementary_sections=supplementary_sections,
+    )
+
+    # --- Basic prompt checks ---
     assert "Sample invocation" in prompt_str
     assert "Rewrite the following text" in prompt_str
+    assert "Do not change meaning." in prompt_str
+    assert "Keep technical terms intact." in prompt_str
+
+    # Output specification
+    assert "Task Output" in prompt_str
+    assert "plain text string" in prompt_str
+    assert "Rewritten text as string." in prompt_str
+
+    # Auxiliary guidance
+    assert "Auxiliary Guidance" in prompt_str
+    assert "Editor" in prompt_str
+    assert "Consider sentence merging" in prompt_str
+
+    # Supplementary sections
+    assert "Supplementary Sections" in prompt_str
+    assert "TextExamples" in prompt_str
+    assert "ModelData" in prompt_str
+    assert "Example sentences to guide rewriting." in prompt_str
+    assert "Sample model instances." in prompt_str
+
+    # Material usage
+    assert "Follow the style shown in examples." in prompt_str
+    assert "Utilize the observed structure when constructing output." in prompt_str
+
     print(prompt_str)
-    assert "## Section (bundle_kind=`TextExamples`)" in prompt_str
-    assert "Example sentences to guide rewriting" in prompt_str
-    assert "Sample model instances" in prompt_str
 
-    message = composer.compose_message(user_prompt=None)
-    assert isinstance(message, LLMMessage)
-
-    message = composer.compose_message(user_prompt="UserPrompt")
+    # --- Compose message ---
+    message = LLMMessage.from_prompt(
+        user="UserPrompt",
+        system=prompt_str,
+    )
     assert isinstance(message, LLMMessage)
 
 
 if __name__ == "__main__":
-    test_invocation_prompt_composer_basic()
+    test_system_prompt_composer_with_material_sections()

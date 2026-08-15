@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import wraps
 from typing import Any, Literal, cast
@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.events.llm_events import ToolCallEvent, ToolResultEvent
-from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
+from pytoy_llm.models.llm_messages import LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
 from pytoy_llm.task.models.context import (
@@ -149,7 +149,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
 @dataclass(frozen=True)
 class AgentInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: Callable[[Any, ExecutionContext], Sequence[LLMMessage]] | Callable[[Any], Sequence[LLMMessage]]
+    create_messages: Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike]
     tools: LLMToolsLike = field(default_factory=list)
     connection: Connection | str | None = None
     llm_param: LLMParam | None = None

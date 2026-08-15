@@ -5,14 +5,16 @@ from typing import Literal
 from pydantic import BaseModel
 
 from pytoy_llm import completion
+from pytoy_llm.composers.models import OutputSpec, SystemPromptSpec
+from pytoy_llm.composers.system_prompt_composer import SystemPromptComposer
 from pytoy_llm.materials.basemodels import BaseModelBundle
-from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
+
+# from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer
 from pytoy_llm.materials.composers.models import (
-    SectionData,
-    SectionUsage,
-    SystemPromptTemplate,
-    TextSectionData,
+    MaterialSection,
+    build_material_sections,
 )
+from pytoy_llm.materials.models import MaterialUsage, TextMaterialData
 from pytoy_llm.models.llm_messages import LLMMessage
 
 
@@ -46,12 +48,11 @@ def make_system_prompt[T: BaseModel](
     output_schema = interest_type.model_json_schema()
     target_class_name = output_schema["title"]
 
-    bundle = BaseModelBundle(data=instances)
-    section_data_list: list[SectionData] = [bundle.model_section_data]
-    usages: list[SectionUsage] = []
+    sections: list[MaterialSection] = []
 
-    usage = SectionUsage(
-        bundle_kind=bundle.bundle_kind,
+    bundle = BaseModelBundle(data=instances)
+
+    usage = MaterialUsage(
         usage_rule=[
             "Use these examples as reference.",
             "Follow the structure exactly.",
@@ -59,7 +60,7 @@ def make_system_prompt[T: BaseModel](
             "Respect field descriptions as guidance.",
         ],
     )
-    usages.append(usage)
+    sections.append(MaterialSection(name="BaseModelBundle", usage=usage, section_data=bundle.model_section_data))
 
     # Decide output instruction
     if output_mode == "python_code":
@@ -87,32 +88,25 @@ def make_system_prompt[T: BaseModel](
 
         output_type = interest_type
 
-    prompt_template = SystemPromptTemplate(
+    prompt_spec = SystemPromptSpec.from_any(
         name="Construct BaseModel Instances",
         intent=(
-            "Construct instances strictly following the examples provided.\n"
-            "Do not invent new relationships not observed in the instances.\n"
-            "Follow the field descriptions as guidance.\n"
+            f"Construct a useful `{target_class_name}` instance from the user's request.\n"
+            "Use the provided examples and their field descriptions as the primary guidance for construction."
         ),
         rules=[
-            "Do NOT invent new relationships not observed in the instances.",
-            "Do NOT add extra explanations or commentary.",
+            "Do NOT invent new relationships that are not supported by the examples.",
+            "Do NOT add explanations or commentary.",
         ],
-        output_description=output_description,
-        output_type=output_type,
-        role=f"You are a construction assistant. You have responsibility and pride for generating useful `{target_class_name}`",
+        output_spec=OutputSpec(output_type=output_type, description=output_description),
     )
     if explanation:
-        bundle_kind = "AdditionalExplanation"
-        section_data = TextSectionData(bundle_kind=bundle_kind, description=explanation, structured_text=explanation)
-        usage = SectionUsage(
-            bundle_kind=bundle_kind, usage_rule=["This section provides problem-specific hints not covered by the examples."]
-        )
-        usages.append(usage)
-        section_data_list.append(section_data)
+        section_data = TextMaterialData(description=explanation, structured_text=explanation)
+        usage = MaterialUsage(usage_rule=["This section provides problem-specific hints not covered by the examples."])
+        sections.append(MaterialSection(name="AddtionalExplanation", usage=usage, section_data=section_data))
 
-    composer = InvocationPromptComposer(prompt_template, usages, section_data_list)
-    return composer.compose_prompt()
+    composer = SystemPromptComposer(prompt_spec)
+    return composer.compose_prompt(supplementary_sections=build_material_sections(sections))
 
 
 if __name__ == "__main__":

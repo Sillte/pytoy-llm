@@ -2,8 +2,9 @@ from typing import Self
 
 from pydantic import BaseModel, Field
 
+from pytoy_llm.composers.invocation_composer import InvocationComposer
+from pytoy_llm.composers.models import OutputSpec, SystemPromptSpec
 from pytoy_llm.event_sinks import EventSinkProtocol
-from pytoy_llm.materials.composers.invocation_prompt_composer import InvocationPromptComposer, SystemPromptTemplate
 from pytoy_llm.task import TaskExecutor, TaskRequest
 from pytoy_llm.task.models import TaskSpec
 from pytoy_llm.texts.analyzer import TextAnalysisModel, TextAnalyzer
@@ -201,7 +202,8 @@ class TextTransformRequest(BaseModel, frozen=True):
     orig_realization: TextRealizationModel | None = Field(description="Original realization if given.", default=None)
     transform_rule: str = Field(description="Rule for transformation")
     instruction: str = Field(
-        description="Instruction for transforming the text. As long as transform_rule permits, this instruction determines what modification should be performed on the `orig_text`."
+        description="Instruction for transforming the text. As long as transform_rule permits,"
+        " this instruction determines what modification should be performed on the `orig_text`."
     )
 
 
@@ -221,17 +223,15 @@ class TextTransformer:
         if isinstance(transform_rule, BaseTransformRule):
             transform_rule = transform_rule.rule
 
-        template = SystemPromptTemplate(
+        spec = SystemPromptSpec.from_any(
             name="TextTransform",
             intent="Transform the text based on instruction.",
             rules=["Return only the transformed text.", "Do not include other information such as reasoning."],
-            output_description="Transform the text",
-            output_type=str,
-            reasoning_guidance="Please refer to JSON Schema",
-            role="Expert of the linguistics and education teacher.",
+            output_spec=OutputSpec(output_type=str, description="Transformed Text"),
+            guidance_role="Expert of the linguistics and education teacher.",
         )
 
-        composer = InvocationPromptComposer(prompt_template=template)
+        composer = InvocationComposer(system_prompt_spec=spec)
         llm_spec = composer.compose_llm_invocation_spec()
 
         transform_request = TextTransformRequest(
