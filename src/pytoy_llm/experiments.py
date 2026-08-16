@@ -59,7 +59,7 @@ def make_system_prompt[T: BaseModel](
             ]
         ),
     )
-    sections.append(MaterialSection(name="BaseModelBundle", usage=usage, data=bundle.model_section_data))
+    sections.append(MaterialSection(name="BaseModelBundle", usage=usage, data=bundle.model_material_data))
 
     # Decide output instruction
     if output_mode == "python_code":
