@@ -41,12 +41,11 @@ class MaterialSection(SupplementarySectionProtocol):
         sub_header_depth = header_depth + 1
         sub_header_prefix = "#" * sub_header_depth + " "
 
-        header_title = f"{header_prefix}Material {self.name}\n\n"
-        header_usage = f"{sub_header_prefix}Task Usage\n\n"
-        header_data = f"{sub_header_prefix}Data\n\n"
-        body_data = self.data.compose_body(sub_header_depth)
-
-        return "\n".join([header_title, header_usage, f"{self.usage.usage}\n", header_data, f"{body_data}\n"])
+        header_title = f"{header_prefix}Material {self.name}"
+        header_usage = f"{sub_header_prefix}Task Usage"
+        header_data = f"{sub_header_prefix}Data"
+        body_data = self.data.compose_explanation(sub_header_depth)
+        return _join_blocks([header_title, header_usage, self.usage.usage, header_data, body_data])
 
     @classmethod
     def from_any(
@@ -67,3 +66,9 @@ class MaterialSection(SupplementarySectionProtocol):
     @classmethod
     def build_supplementary_sections(cls, material_sections: Sequence[Self]) -> SupplementarySections:
         return build_material_sections(material_sections)
+
+
+def _join_blocks(blocks: Sequence[str]) -> str:
+    blocks = [block.strip("\n") for block in blocks]
+    blocks = [block for block in blocks if block]
+    return "\n\n".join(blocks)

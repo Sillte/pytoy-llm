@@ -13,6 +13,12 @@ from pytoy_llm.composer.models import (
 )
 
 
+def _join_blocks(blocks: Sequence[str]) -> str:
+    blocks = [block.strip("\n") for block in blocks]
+    blocks = [block for block in blocks if block]
+    return "\n\n".join(blocks)
+
+
 class SystemPromptComposer:
     """Compose a system prompt from its semantic specification."""
 
@@ -25,84 +31,73 @@ class SystemPromptComposer:
         if supplementary_sections is not None:
             supplementary_sections = SupplementarySections.from_any(supplementary_sections)
 
-        warn_forbidden_headers(self.prompt_spec.name, min_allowed_header_level=5)
-        task_header = f"# Task: {self.prompt_spec.name}\n\n"
+        blocks = []
 
+        warn_forbidden_headers(self.prompt_spec.name, min_allowed_header_level=5)
+
+        task_header = f"# Task: {self.prompt_spec.name}"
         task_output_spec = self._to_output_spec_instruction(self.prompt_spec.output_spec)
+        blocks = [*blocks, task_header, task_output_spec]
 
         if self.prompt_spec.intent:
             warn_forbidden_headers(self.prompt_spec.intent, min_allowed_header_level=3)
-            task_intent = f"## Task Intent\n\n{self.prompt_spec.intent}\n\n"
-        else:
-            task_intent = "\n"
+            blocks = [*blocks, "## Task Intent", self.prompt_spec.intent]
 
         if self.prompt_spec.rules:
-            task_rules = "## Task Rules\n\n" + "\n".join(f"* {rule}" for rule in self.prompt_spec.rules) + "\n\n"
-        else:
-            task_rules = "\n"
+            rules_body = "\n".join(f"* {rule}" for rule in self.prompt_spec.rules)
+            blocks = [*blocks, "## Task Rules", rules_body]
 
         if self.prompt_spec.auxiliary_guidance:
             task_auxiliary_guidance = self._to_auxiliary_guidance_instruction(self.prompt_spec.auxiliary_guidance)
-        else:
-            task_auxiliary_guidance = ""
+            blocks = [*blocks, task_auxiliary_guidance]
 
         if supplementary_sections is not None:
             task_supplement = self._to_supplementary_instruction(supplementary_sections=supplementary_sections)
-        else:
-            task_supplement = ""
+            blocks = [*blocks, task_supplement]
 
-        # Compose final prompt
-        prompt = "\n".join([task_header, task_output_spec, task_intent, task_rules, task_auxiliary_guidance, task_supplement])
+        prompt = _join_blocks(blocks)
         return prompt
 
     def _to_output_spec_instruction(self, output_spec: OutputSpec) -> str:
-        header = "## Task Output\n\n"
-        output_type_instruction = self._to_output_type_explanation(output_spec.output_type)
-
-        warn_forbidden_headers(output_type_instruction, min_allowed_header_level=4)
-        task_output_type = f"### Output Type\n\n{output_type_instruction}\n\n"
+        blocks = []
+        output_type_explanation = self._to_output_type_explanation(output_spec.output_type)
+        warn_forbidden_headers(output_type_explanation, min_allowed_header_level=4)
+        blocks = [*blocks, "## Task Output", "### Output Type", output_type_explanation]
         if output_spec.description:
             warn_forbidden_headers(output_spec.description, min_allowed_header_level=4)
-            task_output_description = f"### Output Description\n\n{output_spec.description}\n\n"
-        else:
-            task_output_description = "\n"
-
-        return "\n".join([header, task_output_type, task_output_description])
+            blocks = [*blocks, "### Output Description", output_spec.description]
+        return _join_blocks(blocks)
 
     def _to_auxiliary_guidance_instruction(self, auxiliary_guidance: AuxiliaryGuidance) -> str:
-        header = "## Auxiliary Guidance\n\n"
+        blocks = [
+            "## Auxiliary Guidance",
+        ]
         if auxiliary_guidance.guidance_role:
             warn_forbidden_headers(auxiliary_guidance.guidance_role, min_allowed_header_level=4)
-            guidance_role = f"### Guidance Role\n\n{auxiliary_guidance.guidance_role}\n\n"
-        else:
-            guidance_role = ""
+            blocks = [*blocks, "### Guidance Role", auxiliary_guidance.guidance_role]
+
         if auxiliary_guidance.reasoning_guidance:
             warn_forbidden_headers(auxiliary_guidance.reasoning_guidance, min_allowed_header_level=4)
-            reasoning_guidance = f"### Reasoning Guidance\n\n{auxiliary_guidance.reasoning_guidance}\n\n"
-        else:
-            reasoning_guidance = ""
-        return "\n".join([header, guidance_role, reasoning_guidance])
+            blocks = [*blocks, "### Reasoning Guidance", auxiliary_guidance.reasoning_guidance]
+        return _join_blocks(blocks)
 
     def _to_supplementary_instruction(self, supplementary_sections: SupplementarySections) -> str:
-        header = "## Supplementary Sections\n\n"
+        blocks = ["## Supplementary Sections"]
         if supplementary_sections.description:
-            description = f"{supplementary_sections.description}\n\n"
-        else:
-            description = ""
+            blocks = [*blocks, supplementary_sections.description]
+
         section_header_depth = 2 + 1
-        explanations = []
         for section in supplementary_sections.sections:
             section_explanation = section.compose(header_depth=section_header_depth)
             warn_request_headers(section_explanation, section_header_depth)
-            explanations.append(section_explanation)
-        explanation_instruction = "\n\n".join(explanations)
-        return "\n".join([header, description, explanation_instruction])
+            blocks = [*blocks, section_explanation]
+        return _join_blocks(blocks)
 
     def _to_output_type_explanation(self, output_type: type[BaseModel] | type[str]) -> str:
         """Return explanation to include in prompt based on BaseModel schema"""
         if isinstance(output_type, type) and issubclass(output_type, BaseModel):
             schema_json = json.dumps(output_type.model_json_schema())
-            return f"The output must be a JSON matching the following schema:\n```json\n{schema_json}```\n\n"
+            return f"The output must be a JSON matching the following schema:\n```json\n{schema_json}```"
         elif output_type is str:
             return "The output must be as plain text string."
         elif isinstance(output_type, BaseModel):
@@ -152,3 +147,16 @@ def warn_request_headers(text: str, header_depth: int) -> None:
 
     if not first_line.startswith(expected_prefix):
         warnings.warn(f"Section must start with a Markdown header at depth {header_depth}: `{expected_prefix}<title>`")
+
+
+if __name__ == "__main__":
+    from pytoy_llm.composers.materials import MaterialDataExplorerTaskComposer
+    from pytoy_llm.materials.text_files import TextFilesCollector
+
+    collector = TextFilesCollector(
+        __file__,
+    )
+    bundle = collector.bundle
+    composer = MaterialDataExplorerTaskComposer([bundle.text_material_data])
+    section_text = composer.compose_system_prompt()
+    print(section_text)

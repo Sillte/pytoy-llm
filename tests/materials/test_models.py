@@ -17,7 +17,7 @@ def test_model_section_single_type():
         instances=[AModel(a=1), AModel(a=2)],
     )
 
-    dumped = section.compose_body(1)
+    dumped = section.compose_explanation(1)
     assert '"a":1' in dumped
     assert '"a":2' in dumped
 
@@ -28,7 +28,7 @@ def test_model_section_union_types():
         instances=[AModel(a=1), BModel(b="x")],
     )
 
-    dumped = section.compose_body(3)
+    dumped = section.compose_explanation(3)
 
     assert '"a":1' in dumped
     assert '"b":"x"' in dumped
@@ -40,7 +40,7 @@ def test_model_section_empty_data():
         instances=[],
     )
 
-    dumped = section.compose_body(3)
+    dumped = section.compose_explanation(3)
     assert "No" in dumped
 
 
@@ -50,7 +50,7 @@ def test_compose_str_contains_sections():
         instances=[AModel(a=1)],
     )
 
-    text = section.compose_body(3 - 1)
+    text = section.compose_explanation(3 - 1)
 
     assert "### Description" in text
     assert "### JSON Schemas" in text
