@@ -1,12 +1,9 @@
 import json
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
-
-from pytoy_llm.composers.models import SupplementarySectionProtocol, SupplementarySections
 
 type StructuredText = Annotated[
     str,
@@ -42,7 +39,6 @@ class TextMaterialData(BaseModel, frozen=True):
         """Compose the material body under a parent Markdown section."""
         # The below comment out for `warn_forbiddenn_headers` is intentional.
         # Since `structure_text` is free format inside the tag.
-        # warn_forbidden_headers(self.structured_text)
         sub_header_depth = parent_header_depth + 1
         sub_header_prefix = "#" * sub_header_depth
         header_description = f"{sub_header_prefix} Description\n\n"
@@ -117,65 +113,6 @@ class ModelMaterialData[T: BaseModel](BaseModel, frozen=True):
 
 
 type MaterialData = TextMaterialData | ModelMaterialData
-
-
-class MaterialUsage(BaseModel, frozen=True):
-    """Describes how the material should be used when solving the task."""
-
-    usage: Annotated[
-        str,
-        Field(
-            description=("Human-readable guidance describing how the material should be used when solving the task."),
-        ),
-    ]
-
-
-@dataclass(frozen=True)
-class MaterialSection(SupplementarySectionProtocol):
-    name: str
-    usage: MaterialUsage
-    data: MaterialData
-
-    def compose(self, header_depth: int) -> str:
-        header_prefix = "#" * header_depth + " "
-        sub_header_depth = header_depth + 1
-        sub_header_prefix = "#" * sub_header_depth + " "
-
-        header_title = f"{header_prefix}Material {self.name}\n\n"
-        header_usage = f"{sub_header_prefix}Task Usage\n\n"
-        header_data = f"{sub_header_prefix}Data\n\n"
-        body_data = self.data.compose_body(sub_header_depth)
-
-        return "\n".join([header_title, header_usage, f"{self.usage.usage}\n", header_data, f"{body_data}\n"])
-
-    @classmethod
-    def from_any(
-        cls,
-        name: str,
-        usage: MaterialUsage | str,
-        data: MaterialData,
-    ) -> Self:
-        if isinstance(usage, str):
-            usage = MaterialUsage(usage=usage)
-
-        return cls(
-            name=name,
-            usage=usage,
-            data=data,
-        )
-
-    @classmethod
-    def build_supplementary_sections(cls, material_sections: Sequence[Self]) -> SupplementarySections:
-        return build_material_sections(material_sections)
-
-
-def build_material_sections(material_sections: Sequence[MaterialSection]) -> SupplementarySections:
-    description = """Supplementary Section consists of `MATERIAL`. 
-`Task Usage` describes how to utilize the information for solving Task.
-`Data` describes the data itself and its meta information.  
-``
-    """.strip()
-    return SupplementarySections(sections=material_sections, description=description)
 
 
 def warn_forbidden_headers(text: str, min_allowed_header_level: int = 4, skip_first: bool = True) -> None:

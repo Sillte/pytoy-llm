@@ -14,7 +14,6 @@ from pytoy_llm.materials.models import ModelMaterialData, StructuredText, TextMa
 def check_relative_path(v: Any) -> Path:
     p = Path(v)
     if p.is_absolute():
-        # raise するのが正しい。PydanticがこれをキャッチしてValidationErrorに変換する
         raise ValueError("Path must be relative")
     return p
 
@@ -147,7 +146,7 @@ class TextFileBundle(BaseModel, frozen=True):
     description: Annotated[str, Field(description="Explanation about the collection.")] = "Collection of textfiles."
 
     @property
-    def text_section_data(self) -> TextMaterialData:
+    def text_material_data(self) -> TextMaterialData:
         structured_text = self.collection.structured_text
         description = self.description
         return TextMaterialData(content=structured_text, description=description)

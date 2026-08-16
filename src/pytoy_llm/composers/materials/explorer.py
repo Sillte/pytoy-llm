@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from pytoy_llm.composers import InvocationComposer, SystemPromptSpec
-from pytoy_llm.materials.models import MaterialData, MaterialSection, MaterialUsage
+from pytoy_llm.composer import InvocationComposer, SystemPromptSpec
+from pytoy_llm.composers.materials.models import MaterialData, MaterialSection, MaterialUsage
 from pytoy_llm.task.models import LLMInvocationSpec, TaskSpec
 
 

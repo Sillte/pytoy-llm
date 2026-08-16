@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from pytoy_llm.composers.models import (
+from pytoy_llm.composer.models import (
     AuxiliaryGuidance,
     OutputSpec,
     SupplementarySectionProtocol,
@@ -127,7 +127,7 @@ def warn_forbidden_headers(text: str, min_allowed_header_level: int | None = 4, 
         if stripped.startswith("#"):
             if min_allowed_header_level is None:
                 warnings.warn(
-                    f"Line {i}: `Usage of the header is not recommened here. ",
+                    f"Line {i}: `Usage of the header is not recommended here. ",
                     UserWarning,
                 )
             else:

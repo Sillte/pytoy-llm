@@ -3,11 +3,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from pytoy_llm.composers.models import (
+from pytoy_llm.composer.models import (
     SupplementarySectionsLike,
     SystemPromptSpec,
 )
-from pytoy_llm.composers.system_prompt_composer import SystemPromptComposer
+from pytoy_llm.composer.system_prompt_composer import SystemPromptComposer
 from pytoy_llm.models import LLMMessage, LLMToolsLike
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext
