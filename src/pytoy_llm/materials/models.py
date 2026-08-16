@@ -110,16 +110,13 @@ def _join_blocks(blocks: Sequence[str]) -> str:
     return "\n\n".join(blocks)
 
 
-def warn_forbidden_headers(text: str, min_allowed_header_level: int = 4, skip_first: bool = True) -> None:
+def warn_forbidden_headers(text: str, min_allowed_header_level: int = 4) -> None:
     """
     Check each line. Warn if a header is too high (e.g., # or ##)
     compared to the minimum allowed header level.
     """
-    if skip_first:
-        start = 1
-    else:
-        start = 0
-    for i, line in enumerate(text.splitlines(), start=start):
+
+    for i, line in enumerate(text.splitlines()):
         stripped = line.lstrip()
         if stripped.startswith("#"):
             header_level = len(stripped) - len(stripped.lstrip("#"))

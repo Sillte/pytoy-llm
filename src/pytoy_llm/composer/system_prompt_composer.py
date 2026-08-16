@@ -108,16 +108,12 @@ class SystemPromptComposer:
             raise ValueError(f"Invalid output type `{output_type=}`")
 
 
-def warn_forbidden_headers(text: str, min_allowed_header_level: int | None = 4, skip_first: bool = True) -> None:
+def warn_forbidden_headers(text: str, min_allowed_header_level: int | None = 4) -> None:
     """
     Check each line. Warn if a header is too high (e.g., # or ##)
     compared to the minimum allowed header level.
     """
-    if skip_first:
-        start = 1
-    else:
-        start = 0
-    for i, line in enumerate(text.splitlines(), start=start):
+    for i, line in enumerate(text.splitlines()):
         stripped = line.lstrip()
         if stripped.startswith("#"):
             if min_allowed_header_level is None:
