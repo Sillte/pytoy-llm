@@ -152,7 +152,7 @@ class TextFileBundle(BaseModel, frozen=True):
         return TextMaterialData(content=structured_text, description=description)
 
     @property
-    def model_section_data(self) -> ModelMaterialData:
+    def model_material_data(self) -> ModelMaterialData:
         # Note: `TextFileBundleData` requires a memory space of
         # text data.
         # If we would like to use the big data,
