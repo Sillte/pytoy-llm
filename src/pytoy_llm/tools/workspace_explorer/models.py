@@ -68,6 +68,20 @@ class GrepMatch(BaseModel, frozen=True):
     text: str = Field(description="Entire line containing the match.")
 
 
+class GrepContext(BaseModel, frozen=True):
+    """A portion of a file containing one or more grep matches."""
+
+    path: WorkspacePath = Field(description="Relative path of the file.")
+
+    content: str = Field(description="The portion of the file surrounding the grep matches.")
+
+    start_line: int = Field(ge=0, description="Zero-based start line of the content, inclusive.")
+
+    end_line: int = Field(ge=0, description="Zero-based end line of the content, exclusive.")
+
+    matches: list[GrepMatch] = Field(description="Grep matches contained in this context.")
+
+
 class TreeNode(BaseModel, frozen=True):
     """Directory tree node."""
 

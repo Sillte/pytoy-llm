@@ -1,5 +1,5 @@
 from pydantic_ai.models import Model as PydanticAIModel
-from pydantic_ai.models import ModelProfile, merge_profile
+from pydantic_ai.profiles import ModelProfile, merge_profile
 
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_metas import LLMParam

@@ -17,8 +17,10 @@ from pydantic_ai import (
 )
 from pydantic_ai import TextPart as PydanticTextPart
 from pydantic_ai.settings import ThinkingLevel
+from pydantic_ai.usage import UsageLimits
 
 from pytoy_llm.models import Part as LLMPart
+from pytoy_llm.models.agent_metas import UsageLimit as PytoyUsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens, ReasoningEffort
 from pytoy_llm.models.parts import OpaquePart
@@ -145,3 +147,10 @@ class LLMParamConverter:
                 return False
             case _:
                 return value
+
+
+class UsageLimitConverter:
+    def __init__(self) -> None: ...
+
+    def to_usage_limits(self, usage_limit: PytoyUsageLimit) -> UsageLimits:
+        return UsageLimits(total_tokens_limit=usage_limit.max_total_tokens, request_limit=usage_limit.max_requests)

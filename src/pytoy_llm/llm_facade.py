@@ -4,6 +4,7 @@ from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.event_sinks.protocol import EventSinkProtocol
 from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
 from pytoy_llm.models import LLMMessagesLike
+from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
@@ -46,19 +47,17 @@ class LLMFacade:
         messages: LLMMessagesLike,
         output_type: type[T],
         tools: LLMToolsLike = (),
+        usage_limit: UsageLimit | None = None,
     ) -> T:
         """Alias of `run_agent` for better readability."""
         agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
         return agent.run(messages, output_type=output_type, tools=tools)
 
     def run_with_result[T: BaseModel | str](
-        self,
-        messages: LLMMessagesLike,
-        output_type: type[T],
-        tools: LLMToolsLike = (),
+        self, messages: LLMMessagesLike, output_type: type[T], tools: LLMToolsLike = (), usage_limit: UsageLimit | None = None
     ) -> LLMResult[T]:
         agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
-        return agent.run_with_result(messages, output_type=output_type, tools=tools)
+        return agent.run_with_result(messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
     data: Sequence[T]
 
     @property
-    def text_section_data(self) -> TextMaterialData:
+    def text_material_data(self) -> TextMaterialData:
         structured_text = self.structured_text
         description = self.description
         return TextMaterialData(content=structured_text, description=description)

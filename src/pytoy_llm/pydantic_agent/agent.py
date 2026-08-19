@@ -16,11 +16,12 @@ from pytoy_llm.event_sinks import EventSinkProtocol, NullEventSink
 from pytoy_llm.models import (
     LLMMessagesLike,
 )
+from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike, from_llm_tools_like
-from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
+from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter, UsageLimitConverter
 from pytoy_llm.pydantic_agent.event_handler import EventHandler
 from pytoy_llm.pydantic_agent.factory import PydanticAIModelFactory
 
@@ -69,15 +70,22 @@ class PytoyPydanticAIAgent:
         messages: LLMMessagesLike,
         output_type: type[T],
         tools: LLMToolsLike = tuple(),
+        usage_limit: UsageLimit | None = None,
     ) -> T:
         result = self.run_with_native(messages=messages, output_type=output_type, tools=tools)
         return result.output
 
     def run_with_native[T: BaseModel | str](
-        self, messages: LLMMessagesLike, output_type: type[T], tools: LLMToolsLike = tuple()
+        self,
+        messages: LLMMessagesLike,
+        output_type: type[T],
+        tools: LLMToolsLike = tuple(),
+        usage_limit: UsageLimit | None = None,
     ) -> AgentRunResult[T]:
-        adapter = PydanticAIMessageAdapter()
+        usage_limits = UsageLimitConverter().to_usage_limits(usage_limit or UsageLimit())
+
         messages = LLMMessage.to_messages(messages)
+        adapter = PydanticAIMessageAdapter()
         model_messages = [adapter.to_native(message) for message in messages]
         message_history, current_message = model_messages[:-1], model_messages[-1]
         pair = CurrentModelRequestPair.from_model_message(current_message)
@@ -89,12 +97,17 @@ class PytoyPydanticAIAgent:
             user_prompt=pair.user_prompt,
             output_type=output_type,
             message_history=message_history,
+            usage_limits=usage_limits,
             event_stream_handler=event_handler.event_stream_handler,
         )
         return result
 
     def run_with_result[T: BaseModel | str](
-        self, messages: LLMMessagesLike, output_type: type[T], tools: LLMToolsLike = tuple()
+        self,
+        messages: LLMMessagesLike,
+        output_type: type[T],
+        tools: LLMToolsLike = tuple(),
+        usage_limit: UsageLimit | None = None,
     ) -> LLMResult[T]:
         adapter = PydanticAIMessageAdapter()
         run_result = self.run_with_native(messages, output_type=output_type, tools=tools)

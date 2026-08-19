@@ -10,6 +10,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel
 
 from pytoy_llm.llm_facade import LLMFacade
+from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.events.llm_events import ToolCallEvent, ToolResultEvent
 from pytoy_llm.models.llm_messages import LLMMessagesLike
@@ -153,6 +154,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
     tools: LLMToolsLike = field(default_factory=list)
     connection: Connection | str | None = None
     llm_param: LLMParam | None = None
+    usage_limit: UsageLimit | None = None
 
     meta: InvocationSpecMeta = field(default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A"))
     kind: Literal["agent"] = "agent"
@@ -166,7 +168,9 @@ class AgentInvocationSpec[T: BaseModel | str]:
         connection = self.connection or execution_context.connection
         llm_param = self.llm_param or execution_context.llm_param
         llm_facade = LLMFacade(connection=connection, llm_param=llm_param, event_sink=execution_context.event_sink)
-        result = llm_facade.run_with_result(input_messages, output_type=self.output_type, tools=self.tools)
+        result = llm_facade.run_with_result(
+            input_messages, output_type=self.output_type, tools=self.tools, usage_limit=self.usage_limit
+        )
         output = result.output
 
         runtime_patch = RuntimeContextPatch(llm_messages=result.messages)
