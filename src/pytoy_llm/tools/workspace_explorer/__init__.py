@@ -7,7 +7,15 @@ from typing import Annotated, Callable, Sequence
 from pydantic import Field
 
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
-from pytoy_llm.tools.workspace_explorer.models import FileContent, FileInfo, FilePartContent, GrepContext, GrepMatch, TreeNode
+from pytoy_llm.tools.workspace_explorer.models import (
+    DirectoryInfo,
+    FileContent,
+    FileInfo,
+    FilePartContent,
+    GrepContext,
+    GrepMatch,
+    TreeNode,
+)
 from pytoy_llm.tools.workspace_explorer.semantic_types import (
     FileGlob,
     LineNumber,
@@ -50,6 +58,7 @@ class WorkspaceExplorer:
             self.read_files,
             self.read_file_range,
             self.find_files,
+            self.find_directories,
             self.tree,
             self.grep,
             self.grep_context,
@@ -80,22 +89,6 @@ class WorkspaceExplorer:
     ) -> list[FileInfo] | ToolError:
         """
         List files and directories under a directory in the workspace.
-
-        Use this tool when you need to understand the structure
-        of a workspace or inspect available files.
-
-        This tool provides metadata only.
-        It does not return file contents.
-
-        Typical usage:
-            - Explore an unfamiliar project.
-            - Check which files exist before reading them.
-            - Inspect a directory before choosing another tool.
-
-        Prefer:
-            - tree() when you need a hierarchical overview.
-            - find_files() when searching by filename pattern.
-            - grep() when searching by file content.
 
         Args:
             path:
@@ -150,15 +143,12 @@ class WorkspaceExplorer:
     def read_file(
         self,
         path: WorkspacePath,
-        max_lines: int = 1000,
+        max_lines: int | None = 20,
     ) -> FilePartContent | FileContent | ToolError:
         """
         Read a text file, returning its complete contents when it fits
-        within the line limit, or a partial prefix otherwise.
+        within the line limit, otherwise, returning a partial content.
 
-        Use this tool when the exact file content is required.
-        Prefer grep() or find_files() first when the target file
-        is not known yet.
 
         Args:
             path:
@@ -166,18 +156,15 @@ class WorkspaceExplorer:
 
             max_lines:
                 Maximum number of lines to read.
-                If the file contains more than this number of lines,
-                only the first `max_lines` lines are returned as
-                FilePartContent.
+                - integer: return at most this many lines.
+                - null: read the entire file.
 
         Returns:
             FileContent:
-                The complete file contents when the file has at most
-                `max_lines` lines.
+                The complete file contents.
 
             FilePartContent:
-                The first `max_lines` lines when the file contains
-                more than `max_lines` lines.
+                The first `max_lines` lines of the file.
 
             ToolError:
                 When the file does not exist, is outside the workspace,
@@ -185,12 +172,8 @@ class WorkspaceExplorer:
 
         Notes:
             This tool reads the file as UTF-8 text.
-            Binary files are not supported.
-
-            FilePartContent uses zero-based, half-open line ranges:
-            `start_line` is inclusive and `end_line` is exclusive.
         """
-        if max_lines < 1:
+        if max_lines is not None and max_lines < 1:
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT,
                 msg="`max_lines` must be greater than or equal to 1.",
@@ -200,6 +183,9 @@ class WorkspaceExplorer:
         abs_path = self._resolve(path)
         if isinstance(abs_path, ToolError):
             return abs_path
+
+        if max_lines is None:
+            return FileContent(path=path, content=abs_path.read_text(encoding="utf8"))
 
         try:
             with abs_path.open("r", encoding="utf-8") as f:
@@ -245,26 +231,19 @@ class WorkspaceExplorer:
     def read_files(
         self,
         paths: Sequence[WorkspacePath],
-        max_lines: int = 1000,
+        max_lines: int | None = 10,
     ) -> list[FileContent | FilePartContent] | ToolError:
         """
         Read multiple text files from the workspace.
 
         Each file is read using the same line limit as read_file().
-        Files containing more than `max_lines` lines return
-        FilePartContent containing the first `max_lines` lines.
-
-        Use this tool when:
-            - multiple file paths are already known
-            - several related files need to be inspected together
-            - calling read_file() separately for each file would be unnecessary
-
         Args:
             paths:
                 File paths relative to the workspace root.
 
             max_lines:
-                Maximum number of lines to read from each file.
+                - integer: return at most this many lines.
+                - null: read the entire file.
 
         Returns:
             A list containing FileContent or FilePartContent for each
@@ -283,7 +262,7 @@ class WorkspaceExplorer:
             - FilePartContent is returned when the file exceeds `max_lines`.
             - Binary files are not supported.
         """
-        if max_lines < 1:
+        if max_lines is not None and max_lines < 1:
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT,
                 msg="`max_lines` must be greater than or equal to 1.",
@@ -313,13 +292,7 @@ class WorkspaceExplorer:
     ) -> FilePartContent | ToolError:
         """
         Read a specific line range from a text file.
-
-        Use this tool when:
-            - the target file is already known
-            - only a portion of the file needs to be inspected
-
-        Prefer read_file() when the entire file content is required.
-        Prefer grep() or find_files() when the target file is not known yet.
+        Use this tool when surrounding context is needed around a specific part of a file.
 
         Args:
             path:
@@ -332,10 +305,8 @@ class WorkspaceExplorer:
                 the end line number of the range. Zero-based and exclusive.
 
         Returns:
-            FilePartContent containing the requested file contents.
-
-            The returned range follows Python slice semantics:
-            start_line is inclusive and end_line is exclusive.
+            FilePartContent containing the requested partial file content.
+            Start_line is inclusive and end_line is exclusive.
 
         ToolError when:
             - the file does not exist
@@ -344,14 +315,26 @@ class WorkspaceExplorer:
 
         Notes:
             This tool reads the file as UTF-8 text.
-            Binary files are not supported.
-
         """
+        if end_line <= start_line:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg="end_line must be greater than start_line.",
+                retry=False,
+            )
+        if start_line < 0:
+            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg="start_line must be a non-negative integer.")
         abs_path = self._resolve(path)
         if isinstance(abs_path, ToolError):
             return abs_path
         try:
             lines = abs_path.read_text(encoding="utf-8").splitlines()
+
+            if len(lines) < end_line:
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"The file has {len(lines)}, so `{end_line=}` is out of range.",
+                )
             return FilePartContent(
                 path=path, content="\n".join(lines[start_line:end_line]), start_line=start_line, end_line=end_line
             )
@@ -369,16 +352,6 @@ class WorkspaceExplorer:
     ) -> list[FileInfo] | ToolError:
         """
         Find files recursively by file name pattern.
-
-        This tool searches files under `path`.
-        The pattern is matched against the file name only,
-        not the full relative path.
-
-        Examples:
-
-            *.py
-            *.md
-            test_*.py
 
         Use this tool when you need to locate multiple files
         whose names satisfy a certain pattern.
@@ -437,6 +410,68 @@ class WorkspaceExplorer:
 
         return sorted(result, key=lambda x: x.path)
 
+    def find_directories(
+        self,
+        pattern: SearchPattern,
+        path: WorkspacePath = "",
+    ) -> list[DirectoryInfo] | ToolError:
+        """
+        Find directories recursively by directory name pattern.
+
+        Use this tool when you need to locate directories
+        whose names satisfy a certain pattern.
+
+        Args:
+            pattern:
+                Directory name glob pattern.
+
+            path:
+                Directory relative to the workspace root.
+                Search starts from this directory.
+
+        Returns:
+            A list of matching directories.
+
+            ToolError when:
+                - the path is outside the workspace
+                - the search directory cannot be accessed
+                - another filesystem error occurs.
+
+        Notes:
+            - Matching is performed against directory names only.
+            - Excluded directories are skipped.
+        """
+
+        root = self._resolve(path)
+        if isinstance(root, ToolError):
+            return root
+
+        result = []
+
+        try:
+            for current, dirs, _files in os.walk(root):
+                dirs[:] = [d for d in dirs if not self._excluded(Path(current) / d)]
+
+                for dir_name in dirs:
+                    dir_path = Path(current) / dir_name
+
+                    if fnmatch.fnmatch(dir_name, pattern):
+                        result.append(
+                            DirectoryInfo.from_absolute_path(
+                                dir_path,
+                                self.workspace,
+                            )
+                        )
+
+        except OSError as exc:
+            return ToolError(
+                kind=ToolErrorKind.UNKNOWN,
+                msg=str(exc),
+                retry=False,
+            )
+
+        return sorted(result, key=lambda x: x.path)
+
     # ---------------------------------------------------------
 
     def grep(
@@ -459,13 +494,6 @@ class WorkspaceExplorer:
 
         This tool searches file contents line by line
         using plain text matching or regular expressions.
-
-        Prefer to use this tool before read_file()
-        when you need to locate symbols, functions,
-        classes, configuration keys, or other text.
-
-        Prefer specific `pattern` and `file_pattern`
-        to avoid unnecessary file scanning.
 
         The search is performed recursively under `path`.
 
@@ -625,18 +653,6 @@ class WorkspaceExplorer:
         This tool combines content search with local file context. Each returned
         GrepContext contains a contiguous range of file contents together with
         the grep matches contained in that range.
-
-        Use this tool when:
-            - a symbol, function, class, configuration key, or text has been found
-              and the surrounding code or text is needed
-            - grep() alone provides too little information to understand a match
-            - the relevant portion of a file should be inspected without reading
-              the entire file
-
-        Prefer:
-            - grep() when only the matching lines are needed
-            - read_file_range() when the exact line range is already known
-            - read_file() when the complete file contents are required
 
         Args:
             pattern:
@@ -799,14 +815,6 @@ class WorkspaceExplorer:
         This tool helps understand the project structure
         before reading individual files.
 
-        Use this tool when:
-            - the project layout is not known yet
-            - you need to discover directories or files
-            - you need to decide which files should be inspected next
-
-        The tree is generated recursively under `path`.
-        Directory expansion stops when `max_depth` is reached.
-
         Args:
             path:
                 Directory path relative to the workspace root.
@@ -889,21 +897,8 @@ class WorkspaceExplorer:
         """
         Return recently modified files in the workspace.
 
-        Use this tool when you need to understand which files have
-        been changed or touched recently.
-
         This tool orders files by filesystem modification time,
         with the most recently modified files first.
-
-        Use this tool when:
-            - analyzing recent development activity
-            - identifying files likely involved in a recent change
-            - exploring an unfamiliar workspace before deeper inspection
-
-        Prefer:
-            - find_files() when the target is known by file name pattern
-            - grep() when searching for specific content
-            - tree() when understanding project structure
 
         Args:
             path:

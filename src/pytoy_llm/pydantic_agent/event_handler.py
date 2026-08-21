@@ -48,7 +48,7 @@ class EventHandler:
     async def handle_event(self, stream_event: AgentStreamEvent) -> None:
         match stream_event:
             case FunctionToolCallEvent():
-                event = None  # It duplicates the `PartEndEvent`.
+                event = self._event_adapter.from_tool_call_event(stream_event)
             case FunctionToolResultEvent():
                 event = self._event_adapter.from_tool_result_event(stream_event)
             case PartEndEvent():

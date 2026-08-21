@@ -72,7 +72,7 @@ class PytoyPydanticAIAgent:
         tools: LLMToolsLike = tuple(),
         usage_limit: UsageLimit | None = None,
     ) -> T:
-        result = self.run_with_native(messages=messages, output_type=output_type, tools=tools)
+        result = self.run_with_native(messages=messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
         return result.output
 
     def run_with_native[T: BaseModel | str](
@@ -110,5 +110,5 @@ class PytoyPydanticAIAgent:
         usage_limit: UsageLimit | None = None,
     ) -> LLMResult[T]:
         adapter = PydanticAIMessageAdapter()
-        run_result = self.run_with_native(messages, output_type=output_type, tools=tools)
+        run_result = self.run_with_native(messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
         return adapter.to_llm_output(run_result)
