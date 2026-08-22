@@ -20,7 +20,7 @@ class PathGatherer:
         }
     )
 
-    def __init__(self, default_excludes: frozenset[str] | tuple[str, ...] | None = None):
+    def __init__(self, default_excludes: frozenset[str] | Sequence[str] | None = None):
         if default_excludes is None:
             default_excludes = DEFAULT_EXCLUDED_PATTERNS
         self.default_excludes = frozenset(default_excludes)
@@ -29,8 +29,8 @@ class PathGatherer:
         self,
         root: Path | str,
         max_depth: int | None = None,
-        patterns: tuple[str, ...] = ("*",),
-        excludes: tuple[str, ...] | frozenset[str] = (),
+        patterns: Sequence[str] = ("*",),
+        excludes: Sequence[str] | frozenset[str] = (),
         target: Literal["all", "directory", "file"] = "all",
     ) -> Sequence[Path]:
         """Gather files matching filename patterns while excluding paths from traversal.
@@ -54,7 +54,7 @@ class PathGatherer:
 
         root = Path(root)
         if not root.is_dir():
-            raise ValueError("`root` must be a directory.")
+            raise ValueError(f"`{root=}` must be a directory.")
 
         paths: list[Path] = []
 

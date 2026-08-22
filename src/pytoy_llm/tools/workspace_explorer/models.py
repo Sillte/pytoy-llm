@@ -5,6 +5,7 @@ from typing import Self
 
 from pydantic import BaseModel, Field
 
+from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.semantic_types import WorkspacePath
 
 
@@ -90,7 +91,7 @@ class GrepMatch(BaseModel, frozen=True):
     text: str = Field(description="Entire line containing the match.")
 
 
-class GrepContext(BaseModel, frozen=True):
+class GrepMatchContext(BaseModel, frozen=True):
     """A portion of a file containing one or more grep matches."""
 
     path: WorkspacePath = Field(description="Relative path of the file.")
@@ -104,29 +105,17 @@ class GrepContext(BaseModel, frozen=True):
     matches: list[GrepMatch] = Field(description="Grep matches contained in this context.")
 
 
-class TreeNode(BaseModel, frozen=True):
-    """Directory tree node."""
-
-    name: str = Field(description="File or directory name.")
-
-    path: WorkspacePath = Field(description="Relative path from the workspace root.")
-
-    is_dir: bool = Field(description="Whether this node is a directory.")
-
-    children: list["TreeNode"] = Field(default_factory=list, description="Immediate child nodes.")
-
-
 DEFAULT_EXCLUDED_PATTERNS = frozenset(
     {
-        "**/.venv",
-        "**/venv",
-        "**/node_modules",
-        "**/.mypy_cache",
-        "**/.pytest_cache",
-        "**/.ruff_cache",
-        "**/.tox",
-        "**/.nox",
-        "**/*.egg-info",
+        ".venv",
+        "venv",
+        "node_modules",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        ".nox",
+        "*.egg-info",
     }
 )
 
@@ -141,5 +130,8 @@ class WorkspaceAccess:
         excludes = excludes or DEFAULT_EXCLUDED_PATTERNS
         return cls(workspace=Path(workspace).resolve(), excludes=excludes)
 
-    def to_absolute(self, path: WorkspacePath) -> Path:
-        return self.workspace / path
+    def resolve(self, path: WorkspacePath) -> Path | ToolError:
+        abs_path = self.workspace / path
+        if not abs_path.is_relative_to(self.workspace):
+            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} is outside workspace", retry=False)
+        return abs_path
