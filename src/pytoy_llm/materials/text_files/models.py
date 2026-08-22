@@ -6,6 +6,7 @@ from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, BeforeValidator, Field
 
+from pytoy_llm.foundation.paths import PathTree
 from pytoy_llm.materials.models import ModelMaterialData, TextMaterialData
 
 
@@ -108,12 +109,15 @@ class TextFilesMaterial(BaseModel, frozen=True):
         lines.append("  - path: Relative path to the workspace")
         lines.append("  - modified_at: Last modification time of the file (epoch seconds)")
         lines.append("  - size: File size in bytes (FileMeta only)")
+        lines.append("")
         lines.append("* entry:")
         lines.append("  - TextFile entries include the file body.")
         lines.append("  - FileMeta entries include metadata only; the body is not loaded.")
+        lines.append("")
         lines.append("* body: The actual content of the file")
         lines.append("  - Present only for TextFile entries.")
         lines.append("  - body is wrapped between <<<BEGIN>>> and <<<END>>>")
+        lines.append("")
         lines.append("\n")
 
         lines += ["===Instances==="]
@@ -122,30 +126,9 @@ class TextFilesMaterial(BaseModel, frozen=True):
         return "\n".join(lines)
 
     def _make_tree(self) -> str:
-        tree: dict = {}
-
-        for file in self.files:
-            current = tree
-
-            for part in file.path.parts:
-                current = current.setdefault(part, {})
-
-        lines: list[str] = []
-
-        def render(node: dict, prefix: str = "") -> None:
-            entries = sorted(node.items())
-
-            for index, (name, children) in enumerate(entries):
-                is_last = index == len(entries) - 1
-                branch = "└── " if is_last else "├── "
-                lines.append(f"{prefix}{branch}{name}")
-
-                if children:
-                    child_prefix = prefix + ("    " if is_last else "│   ")
-                    render(children, child_prefix)
-
-        render(tree)
-        return "\n".join(lines)
+        paths = [file.path for file in self.files]
+        tree = PathTree.from_paths(paths=paths, root_path=Path("."))
+        return tree.render(include_root=False)
 
 
 class TextFilesMaterialQuery(BaseModel, frozen=True):

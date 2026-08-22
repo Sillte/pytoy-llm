@@ -7,6 +7,7 @@ from typing import Annotated, Callable, Sequence
 from pydantic import Field
 
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tools.workspace_explorer.discovery import WorkspaceDiscovery
 from pytoy_llm.tools.workspace_explorer.models import (
     DirectoryInfo,
     FileContent,
@@ -15,6 +16,7 @@ from pytoy_llm.tools.workspace_explorer.models import (
     GrepContext,
     GrepMatch,
     TreeNode,
+    WorkspaceAccess,
 )
 from pytoy_llm.tools.workspace_explorer.semantic_types import (
     FileGlob,
@@ -45,21 +47,22 @@ class WorkspaceExplorer:
     def __init__(
         self,
         workspace: Path,
-        exclude_names: Sequence[str] | None = None,
+        excludes: Sequence[str] | None = None,
     ) -> None:
         self.workspace = workspace.resolve()
-        self.exclude_names = set(exclude_names or DEFAULT_EXCLUDE_NAMES)
+        self.excludes = set(excludes or DEFAULT_EXCLUDE_NAMES)
+        self.exclude_names = DEFAULT_EXCLUDE_NAMES
+        self.access = WorkspaceAccess.from_any(workspace=workspace, excludes=frozenset(self.excludes))
+        self.discovery = WorkspaceDiscovery(self.access)
 
     @property
     def tools(self) -> Sequence[Callable]:
         return [
-            self.list_files,
+            self.discovery.find_paths,
             self.read_file,
             self.read_files,
             self.read_file_range,
-            self.find_files,
-            self.find_directories,
-            self.tree,
+            #            self.tree,
             self.grep,
             self.grep_context,
             self.recent_files,

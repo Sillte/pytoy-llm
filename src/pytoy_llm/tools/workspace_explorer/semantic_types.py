@@ -6,7 +6,15 @@ WorkspacePath = Annotated[
     str,
     Field(
         description=("Path relative to the workspace root. The path must never escape the workspace."),
-        examples=["", "src", "src/pytoy_llm/api.py"],
+        examples=["./", "src", "src/pytoy_llm/api.py"],
+    ),
+]
+
+GlobPattern = Annotated[
+    str,
+    Field(
+        description=("Patterns use Python pathlib.Path.match() semantics, so `**` is unavailable."),
+        examples=["*", "*.py", "src/*.py"],
     ),
 ]
 

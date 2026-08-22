@@ -1,14 +1,17 @@
+from __future__ import annotations
+
 import os
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
 
 DEFAULT_EXCLUDED_PATTERNS = frozenset(
     {".venv", "venv", "node_modules", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".nox", "**/*.egg-info/**"}
 )
 
 
-class FilesGatherer:
-    """Gathers file paths under a root directory with depth and pattern filters."""
+class PathGatherer:
+    """Gathers paths under a root directory with depth and pattern filters."""
 
     _ALWAYS_EXCLUDED_DIRECTORIES = frozenset(
         {
@@ -26,43 +29,58 @@ class FilesGatherer:
         self,
         root: Path | str,
         max_depth: int | None = None,
-        filename_patterns: tuple[str, ...] = ("*",),
+        patterns: tuple[str, ...] = ("*",),
         excludes: tuple[str, ...] | frozenset[str] = (),
+        target: Literal["all", "directory", "file"] = "all",
     ) -> Sequence[Path]:
         """Gather files matching filename patterns while excluding paths from traversal.
 
+        ``patterns`` applies to the candidates of the elements of the return. If empty, all non-excluded paths are returned.
         ``excludes`` applies to relative paths and controls directory traversal.
-        ``filename_patterns`` applies only to filenames and controls collected files.
         ``max_depth`` limits the traversal depth from ``root``.
+        ``target``: the kind of `paths` which are returned.
 
         Return:
             A sequence of absolute paths.
 
         """
+        if not patterns:
+            patterns = ("*",)
+
+        def _is_pattern_matched(relative_path: Path) -> bool:
+            return any(relative_path.match(pattern) for pattern in patterns)
+
         excludes = self.default_excludes | set(excludes)
 
         root = Path(root)
         if not root.is_dir():
-            raise ValueError(f"`{root=}` must be a directory.")
+            raise ValueError("`root` must be a directory.")
 
         paths: list[Path] = []
 
         for current_root, dirs, files in os.walk(root, topdown=True):
             current = Path(current_root)
-            relative = current.relative_to(root)
 
             # directory exclusion
-            dirs[:] = [directory for directory in dirs if not self._is_excluded(relative / directory, excludes, max_depth)]
-
-            # filename inclusion
-            if filename_patterns:
-                files[:] = [
-                    filename for filename in files if any(Path(filename).match(pattern) for pattern in filename_patterns)
-                ]
+            dirs[:] = [
+                directory
+                for directory in dirs
+                if not self._is_excluded((current / directory).relative_to(root), excludes, max_depth)
+            ]
 
             # path exclusion
-            is_path_excluded = lambda path: self._matches_exclude(path.relative_to(root), excludes)
-            paths += [path for filename in files if not is_path_excluded(path := (current / filename))]
+            def is_path_target(relative_path: Path) -> bool:
+                return not self._matches_exclude(relative_path, excludes) and _is_pattern_matched(relative_path)
+
+            # file path
+            if target == "file" or target == "all":
+                file_paths = [current / filename for filename in files]
+                paths += [path for path in file_paths if is_path_target(path.relative_to(root))]
+
+            # directory path
+            if target in {"all", "directory"}:
+                directory_paths = [current / directory for directory in dirs]
+                paths += [path for path in directory_paths if is_path_target(path.relative_to(root))]
 
         return tuple(paths)
 

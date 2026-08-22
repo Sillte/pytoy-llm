@@ -3,13 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Self
 
-from pytoy_llm.materials.text_files.gatherer import FilesGatherer
+from pytoy_llm.foundation.paths import PathGatherer
 from pytoy_llm.materials.text_files.models import FileMeta, TextFile, TextFilesMaterial, TextFilesMaterialQuery
 
 
 class TextFilesCollector:
     def __init__(self, *, workspace: Path | str, default_excludes: None | tuple[str, ...] = None) -> None:
-        workspace = Path(workspace).absolute()
+        workspace = Path(workspace).resolve()
         if not workspace.is_dir():
             workspace = workspace.parent
         self._workspace = Path(workspace).absolute()
@@ -43,21 +43,32 @@ class TextFilesCollector:
             root = self.workspace / pivot_path
 
         if self.workspace != root and self.workspace not in root.resolve().parents:
-            msg = "Specified collection root folder must be inside `workspace`."
+            msg = "Specified collection root folder must be inside `workspace`.\n"
+            msg += f"workspace=`{self.workspace}`, collection_root=`{root}`"
             raise ValueError(msg)
 
-        gatherer = FilesGatherer(default_excludes=self._default_excludes)
-        file_paths = gatherer.gather(
-            root, max_depth=query.max_depth, filename_patterns=query.filename_patterns, excludes=query.excludes
-        )
+        gatherer = PathGatherer(default_excludes=self._default_excludes)
+        patterns = self._to_patterns(query.filename_patterns)
+        file_paths = gatherer.gather(root, max_depth=query.max_depth, patterns=patterns, excludes=query.excludes, target="file")
         if query.only_meta:
             text_files = [FileMeta.from_path(path, self.workspace) for path in file_paths]
         else:
             text_files = [TextFile.from_path(path, self.workspace) for path in file_paths]
         return TextFilesMaterial(files=text_files)
 
+    def _to_patterns(self, filename_patterns: tuple[str, ...]) -> tuple[str, ...]:
+        def _to_pattern(filename_pattern: str):
+            for char in ("/", "\\"):
+                if char in filename_pattern:
+                    raise ValueError(f"`filename_pattern` cannot include `{char}`")
+            return [filename_pattern]
+
+        return tuple(sum((_to_pattern(filename_pattern) for filename_pattern in filename_patterns), []))
+
 
 if __name__ == "__main__":
-    collector = TextFilesCollector(workspace=Path(__file__).parent)
-    query = TextFilesMaterialQuery(max_depth=2)
+    collector = TextFilesCollector.from_inferred_workspace(__file__)
+    query = TextFilesMaterialQuery(pivot=(Path(__file__)), max_depth=1, only_meta=True)
+
+    print(collector.get_material(query))
     print(collector.get_material(query).text_material_data.content)

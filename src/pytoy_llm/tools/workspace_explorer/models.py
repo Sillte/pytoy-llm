@@ -1,5 +1,7 @@
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Self
 
 from pydantic import BaseModel, Field
 
@@ -7,10 +9,10 @@ from pytoy_llm.tools.workspace_explorer.semantic_types import WorkspacePath
 
 
 class FileInfo(BaseModel, frozen=True):
-    """Metadata of a workspace file or directory."""
+    """Metadata of a file inside the workspace."""
 
     path: WorkspacePath = Field(description="Relative path from the workspace root.")
-    size: int = Field(description="File size in bytes. Directories may report platform-dependent values.")
+    size: int = Field(description="File size in bytes.")
 
     modified: datetime = Field(description="Last modification timestamp.")
 
@@ -36,6 +38,8 @@ class FileInfo(BaseModel, frozen=True):
 
 
 class DirectoryInfo(BaseModel, frozen=True):
+    """Metadata of a directory inside the workspace."""
+
     path: WorkspacePath = Field(description="Relative path from the workspace root.")
     modified: datetime = Field(description="Last modification timestamp.")
 
@@ -110,3 +114,32 @@ class TreeNode(BaseModel, frozen=True):
     is_dir: bool = Field(description="Whether this node is a directory.")
 
     children: list["TreeNode"] = Field(default_factory=list, description="Immediate child nodes.")
+
+
+DEFAULT_EXCLUDED_PATTERNS = frozenset(
+    {
+        "**/.venv",
+        "**/venv",
+        "**/node_modules",
+        "**/.mypy_cache",
+        "**/.pytest_cache",
+        "**/.ruff_cache",
+        "**/.tox",
+        "**/.nox",
+        "**/*.egg-info",
+    }
+)
+
+
+@dataclass(frozen=True)
+class WorkspaceAccess:
+    workspace: Path
+    excludes: frozenset[str] = DEFAULT_EXCLUDED_PATTERNS
+
+    @classmethod
+    def from_any(cls, workspace: Path | str, excludes: frozenset[str] | None = None) -> Self:
+        excludes = excludes or DEFAULT_EXCLUDED_PATTERNS
+        return cls(workspace=Path(workspace).resolve(), excludes=excludes)
+
+    def to_absolute(self, path: WorkspacePath) -> Path:
+        return self.workspace / path

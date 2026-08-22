@@ -19,6 +19,10 @@ import pytest
         ("src/main.py", "other/**", False),
         ("src/__pycache__/a.pyc", "**/__pycache__/**", True),
         ("src/src2/__pycache__/a.pyc", "**/__pycache__/**", True),
+        ("src/.venv/a/", "**/.venv/**", True),
+        ("src/.venv/a.py/", "**/*.py", True),
+        ("a.py/", "**/*.py", False),
+        ("src/.venv/a.py/", "*", True),
     ],
 )
 def test_path_match(
