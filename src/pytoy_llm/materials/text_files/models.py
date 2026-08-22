@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import uuid
-from collections.abc import Mapping, Sequence
-from datetime import datetime
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, BeforeValidator, Field
 
-from pytoy_llm.materials.models import ModelMaterialData, StructuredText, TextMaterialData
+from pytoy_llm.materials.models import ModelMaterialData, TextMaterialData
 
 
 def check_relative_path(v: Any) -> Path:
@@ -20,145 +18,155 @@ def check_relative_path(v: Any) -> Path:
 
 TextFilePath = Annotated[Path, Field(description="Relative path"), BeforeValidator(check_relative_path)]
 
-TextFileID = Annotated[
-    str,
-    Field(description="Unique identifier."),
-]
 
-
-class TextFileLocator(BaseModel):
-    """Represents a locator for a text file entity within a workspace."""
-
-    id: TextFileID = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for this file entity")
+class TextFile(BaseModel, frozen=True):
+    """Represents a collected text file within a workspace."""
 
     path: Annotated[
         TextFilePath,
         Field(description="Path relative to the workspace root"),
-        BeforeValidator(lambda v: Path(v) if not Path(v).is_absolute() else ValueError("Path must be relative")),
     ]
 
-    timestamp: float = Field(..., description="Last modification time of the file (epoch seconds)")
-
-    def absolute_path(self, workspace_root: Path) -> Path:
-        """Return the absolute path within the workspace."""
-        return workspace_root / self.path
+    modified_at: float = Field(..., description="Last modification time of the file (epoch seconds)")
+    body: str = Field(..., description="The content of the file")
 
     @classmethod
-    def from_path(cls, abs_path: str | Path, workspace: str | Path) -> Self:
+    def from_path(cls, abs_path: str | Path, workspace: Path) -> Self:
+        abs_path = Path(abs_path)
+        body = abs_path.read_text(encoding="utf8")
         relative = Path(abs_path).relative_to(workspace)
-        return cls(timestamp=Path(abs_path).stat().st_mtime, path=relative)
-
-
-EntryType = Annotated[
-    Literal["All", "Summary"],
-    Field(description="Specifies the type of the entry: 'All' means full text, 'Summary' means a condensed version"),
-]
-
-
-class TextFileContent(BaseModel):
-    """One instance of `text` file."""
-
-    id: Annotated[TextFileID, Field(description="Unique identifier for this file entity")]
-
-    entry: Annotated[EntryType, Field(description="Specifies the type of this entry (full text or summary)")]
-
-    body: Annotated[
-        str, Field(description="The actual text content of this instance, either full or summarized depending on `entry`")
-    ]
-
-    @classmethod
-    def from_locator(cls, locator: TextFileLocator, workspace: str | Path) -> Self:
-        path = Path(workspace) / locator.path
-        return cls(id=locator.id, body=path.read_text(encoding="utf8"), entry="All")
-
-
-class TextFileCollection(BaseModel):
-    locators: Annotated[
-        Mapping[str, TextFileLocator], Field(description="Mapping of locators for the text files in this collection.")
-    ]
-
-    contents: Annotated[Mapping[str, TextFileContent], Field(description="Mapping of id to TextFileContent.")]
+        return cls(modified_at=abs_path.stat().st_mtime, path=relative, body=body)
 
     @property
-    def structured_text(self) -> StructuredText:
-        """Returns a structured representation of all instances suitable for LLM consumption.
-
-        Includes:
-        - Locator info (id, path, timestamp)
-        - Entry info (id, entry_type, body)
-        """
-        lines = ["===Tag Description==="]
-
-        # Locator の説明を追加
-        lines.append("* Locator info:")
-        lines.append(f"  - id: {TextFileLocator.model_fields['id'].description}")
-        lines.append(f"  - path: {TextFileLocator.model_fields['path'].description}")
-        lines.append(f"  - timestamp: {TextFileLocator.model_fields['timestamp'].description}")
-        lines.append("  - readable_timestamp: human-readable timestamp")
-
-        # EntryType の説明
-        entry_desc = TextFileContent.model_fields["entry"].description
-        lines.append(f"* entry_type: {entry_desc}")
-
-        # Body の説明
-        lines.append(f"* body: {TextFileContent.model_fields['body'].description}\n")
-        lines.append("  - body is wrapped between <<<BEGIN>>> and <<<END>>>  \n")
-
-        lines.append("===Instances===")
-        for instance_id, instance in self.contents.items():
-            locator = self.locators.get(instance_id)
-            path_info = locator.path.as_posix() if locator else "UNKNOWN_PATH"
-            timestamp_info = locator.timestamp if locator else 0.0
-            readable_ts = datetime.fromtimestamp(timestamp_info).isoformat() if locator else "UNKNOWN_TIME"
-
-            lines.append(
-                f"<entry id={instance_id} entry_type={instance.entry} "
-                f"path={path_info} timestamp={timestamp_info} readable_timestamp={readable_ts}>"
-            )
-            lines.append("<<<BEGIN>>>")
-            lines.append(instance.body)
-            lines.append("<<<END>>>")
-            lines.append("</entry>\n")  # entry間に1行空行を入れる
-
+    def structured_text(self) -> str:
+        lines = []
+        lines.append(f"<entry path={self.path.as_posix()} modified_at={self.modified_at}>")
+        lines.append("<<<BEGIN>>>")
+        lines.append(self.body)
+        lines.append("<<<END>>>")
+        lines.append("</entry>\n")
         return "\n".join(lines)
 
+
+class FileMeta(BaseModel, frozen=True):
+    """Represents a collected file meta within a workspace."""
+
+    path: Annotated[
+        TextFilePath,
+        Field(description="Path relative to the workspace root"),
+    ]
+
+    modified_at: float = Field(..., description="Last modification time of the file (epoch seconds)")
+    size: int = Field(..., description="Byte size of the text")
+
+    @classmethod
+    def from_path(cls, abs_path: str | Path, workspace: Path) -> Self:
+        abs_path = Path(abs_path)
+        relative = Path(abs_path).relative_to(workspace)
+        stat = abs_path.stat()
+        return cls(modified_at=stat.st_mtime, path=relative, size=stat.st_size)
+
     @property
-    def instances(self) -> Sequence[TextFileInstance]:
-        ids = self.locators.keys()
-
-        return [TextFileInstance(id=id_, locator=self.locators[id_], content=self.contents[id_]) for id_ in ids]
-
-
-class TextFileInstance(BaseModel):
-    """Represents a single bundle data item linking a locator and an instance."""
-
-    id: Annotated[TextFileID, Field(description="Unique identifier for this bundle data model")]
-
-    locator: Annotated[TextFileLocator, Field(description="Locator object for the text file")]
-
-    content: Annotated[TextFileContent, Field(description="Content of the text (full or summary)")]
+    def structured_text(self) -> str:
+        lines = []
+        lines.append(f"<entry path={self.path.as_posix()} modified_at={self.modified_at} size={self.size} />")
+        return "\n".join(lines)
 
 
-class TextFileBundle(BaseModel, frozen=True):
-    """Container holding multiple text files under a common root."""
+class TextFilesMaterial(BaseModel, frozen=True):
+    files: Annotated[
+        Sequence[TextFile | FileMeta],
+        Field(description="Files under the workspace"),
+    ]
 
-    collection: Annotated[TextFileCollection, Field(description="Collection of Texts")]
-    description: Annotated[str, Field(description="Explanation about the collection.")] = "Collection of textfiles."
+    @property
+    def tree(self) -> str:
+        return self._make_tree()
 
     @property
     def text_material_data(self) -> TextMaterialData:
-        structured_text = self.collection.structured_text
-        description = self.description
+        structured_text = self._make_structured_text(with_tree=True)
+        description = "Collection of text files"
         return TextMaterialData(content=structured_text, description=description)
 
     @property
     def model_material_data(self) -> ModelMaterialData:
-        # Note: `TextFileBundleData` requires a memory space of
-        # text data.
-        # If we would like to use the big data,
-        # `chunk` or `iter` iteration is necessary regarding `data`.
-        return ModelMaterialData(description=self.description, instances=self.collection.instances)
+        return ModelMaterialData(description="Collection of text files", instances=self.files)
+
+    def _make_structured_text(self, with_tree: bool = False) -> str:
+        lines = []
+        if with_tree:
+            lines.extend(
+                [
+                    "===Tree (Path Overview)===",
+                    self._make_tree(),
+                    "",
+                ]
+            )
+        lines += ["===Tag Description==="]
+        lines.append("* Tag info:")
+        lines.append("  - path: Relative path to the workspace")
+        lines.append("  - modified_at: Last modification time of the file (epoch seconds)")
+        lines.append("  - size: File size in bytes (FileMeta only)")
+        lines.append("* entry:")
+        lines.append("  - TextFile entries include the file body.")
+        lines.append("  - FileMeta entries include metadata only; the body is not loaded.")
+        lines.append("* body: The actual content of the file")
+        lines.append("  - Present only for TextFile entries.")
+        lines.append("  - body is wrapped between <<<BEGIN>>> and <<<END>>>")
+        lines.append("\n")
+
+        lines += ["===Instances==="]
+        for f in self.files:
+            lines.append(f.structured_text)
+        return "\n".join(lines)
+
+    def _make_tree(self) -> str:
+        tree: dict = {}
+
+        for file in self.files:
+            current = tree
+
+            for part in file.path.parts:
+                current = current.setdefault(part, {})
+
+        lines: list[str] = []
+
+        def render(node: dict, prefix: str = "") -> None:
+            entries = sorted(node.items())
+
+            for index, (name, children) in enumerate(entries):
+                is_last = index == len(entries) - 1
+                branch = "└── " if is_last else "├── "
+                lines.append(f"{prefix}{branch}{name}")
+
+                if children:
+                    child_prefix = prefix + ("    " if is_last else "│   ")
+                    render(children, child_prefix)
+
+        render(tree)
+        return "\n".join(lines)
 
 
-class TextFileBundleQuery(BaseModel, frozen=True):
-    """Currently, no-queries, however, we can set these parameters later."""
+class TextFilesMaterialQuery(BaseModel, frozen=True):
+    pivot: Path = Field(
+        default=Path("."),
+        description="Collection root path of the material. It is either absolute path or relative path to the workspace",
+    )
+    max_depth: int | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum directory depth relative to the collection root.",
+    )
+
+    only_meta: bool = Field(default=False, description="If `True`, file bodies are not loaded.")
+
+    filename_patterns: tuple[str, ...] = Field(
+        default=(),
+        description="Glob patterns of filenames to include. If empty, all files are included.",
+    )
+
+    excludes: tuple[str, ...] = Field(
+        default=(),
+        description="Glob patterns of paths to exclude.",
+    )
