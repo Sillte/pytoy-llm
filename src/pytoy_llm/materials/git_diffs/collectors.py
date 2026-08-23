@@ -202,7 +202,7 @@ class GitDiffCollector:
         return DiffMaterial(root_location=self.root_location, file_diffs=file_diffs)
 
     @property
-    def bundle(self) -> DiffMaterial:
+    def material(self) -> DiffMaterial:
         return self.get_bundle(GitDiffMaterialQuery(from_rev="head", to_rev="working-tree"))
 
 

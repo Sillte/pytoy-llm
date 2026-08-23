@@ -2,7 +2,7 @@ import time
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Literal, assert_never
+from typing import Annotated, Any, Literal, Self, assert_never
 from uuid import uuid4
 
 from pydantic import BaseModel, BeforeValidator, Field
@@ -154,3 +154,7 @@ class DiffMaterial(BaseModel, frozen=True):
 class GitDiffMaterialQuery(BaseModel, frozen=True):
     from_rev: Literal["index", "head"] | str = "head"
     to_rev: Literal["working-tree", "index"] | str | None = "working-tree"
+
+    @classmethod
+    def from_any(cls, from_rev: str = "head", to_rev: str = "working-tree") -> Self:
+        return cls(from_rev=from_rev, to_rev=to_rev)

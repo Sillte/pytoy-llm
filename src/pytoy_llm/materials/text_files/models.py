@@ -166,7 +166,7 @@ class TextFilesMaterialQuery(BaseModel, frozen=True):
     def from_any(
         cls,
         collection_root: Path,
-        max_depth: int | None,
+        max_depth: int | None = None,
         only_meta: bool = True,
         patterns: str | Sequence[str] = (),
         excludes: str | Sequence[str] = (),
