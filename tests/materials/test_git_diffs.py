@@ -76,7 +76,7 @@ def test_git_diff_collector(mock_repo_cls):
 
     collector = GitDiffCollector(repo_path=".")
     query = GitDiffMaterialQuery(from_rev="abc", to_rev="def")
-    diff_container = collector.get_bundle(query)
+    diff_container = collector.get_material(query)
 
     assert diff_container.root_location == collector.root_location
     assert len(diff_container.file_diffs) == 1

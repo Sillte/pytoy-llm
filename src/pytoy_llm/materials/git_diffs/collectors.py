@@ -156,7 +156,7 @@ class GitDiffCollector:
 
         self.operation_creator = FileOperationCreator()
 
-    def get_bundle(self, query: GitDiffMaterialQuery) -> DiffMaterial:
+    def get_material(self, query: GitDiffMaterialQuery) -> DiffMaterial:
         from_rev = query.from_rev
         to_rev = query.to_rev
 
@@ -203,7 +203,7 @@ class GitDiffCollector:
 
     @property
     def material(self) -> DiffMaterial:
-        return self.get_bundle(GitDiffMaterialQuery(from_rev="head", to_rev="working-tree"))
+        return self.get_material(GitDiffMaterialQuery(from_rev="head", to_rev="working-tree"))
 
 
 if __name__ == "__main__":
