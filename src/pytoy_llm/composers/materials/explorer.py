@@ -15,15 +15,9 @@ class MaterialDataExplorerTaskComposer:
         self._invocation_composer = InvocationComposer(self._system_prompt_spec)
 
         usage = MaterialUsage(
-            usage=(
-                "Use this material as evidence and cross-reference it with other "
-                "materials where relevant. Do not treat unsupported interpretations "
-                "as facts."
-            )
+            usage=("Use this material as evidence and cross-reference it with other materials where relevant.")
         )
-        self._sections = [
-            MaterialSection(name=f"DataType {i}", usage=usage, data=m_data) for i, m_data in enumerate(self._materials)
-        ]
+        self._sections = [MaterialSection(name=f"{i}", usage=usage, data=m_data) for i, m_data in enumerate(self._materials)]
         self._supplementary_sections = MaterialSection.build_supplementary_sections(self._sections)
 
     def compose_system_prompt(self) -> str:
@@ -41,14 +35,14 @@ class MaterialDataExplorerTaskComposer:
         return SystemPromptSpec.from_any(
             name="Explore Materials",
             intent=(
-                "Examine the provided materials and identify useful findings, "
+                "Examine the provided materials and identify findings, "
                 "patterns, relationships, anomalies, and implications supported "
                 "by the materials."
             ),
             rules=[
                 "Base findings on the provided materials.",
                 "Distinguish observations from interpretations.",
-                "Do not invent facts that are not supported by the materials.",
+                "Do not present unsupported claims as facts.",
                 "Prefer specific findings over generic summaries.",
                 "When evidence is insufficient, state the uncertainty explicitly.",
             ],

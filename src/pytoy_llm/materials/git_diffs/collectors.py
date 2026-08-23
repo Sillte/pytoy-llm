@@ -7,13 +7,13 @@ from git import Diff, DiffIndex, Repo
 
 from pytoy_llm.materials.git_diffs.models import (
     AtomicChange,
-    DiffBundle,
+    DiffMaterial,
     FileAdd,
     FileDelete,
     FileDiff,
     FileModify,
     FileOperation,
-    GitDiffBundleQuery,
+    GitDiffMaterialQuery,
     LineRange,
 )
 
@@ -156,7 +156,7 @@ class GitDiffCollector:
 
         self.operation_creator = FileOperationCreator()
 
-    def get_bundle(self, query: GitDiffBundleQuery) -> DiffBundle:
+    def get_bundle(self, query: GitDiffMaterialQuery) -> DiffMaterial:
         from_rev = query.from_rev
         to_rev = query.to_rev
 
@@ -179,7 +179,7 @@ class GitDiffCollector:
             timestamp_provider = lambda _: float(timestamp)
         return self._create_bundle_from_ops(diffs, timestamp_provider)
 
-    def _create_bundle_from_ops(self, diffs: Any, timestamp_provider: Callable[[Path], float]) -> DiffBundle:
+    def _create_bundle_from_ops(self, diffs: Any, timestamp_provider: Callable[[Path], float]) -> DiffMaterial:
         def _relative_location(operation: FileOperation) -> tuple[str, ...] | None:
             try:
                 return (self.workspace / operation.path).relative_to(self.root_folder).parts
@@ -199,11 +199,11 @@ class GitDiffCollector:
             for op in ops
             if ((location := _relative_location(op)) is not None)
         ]
-        return DiffBundle(root_location=self.root_location, file_diffs=file_diffs)
+        return DiffMaterial(root_location=self.root_location, file_diffs=file_diffs)
 
     @property
-    def bundle(self) -> DiffBundle:
-        return self.get_bundle(GitDiffBundleQuery(from_rev="head", to_rev="working-tree"))
+    def bundle(self) -> DiffMaterial:
+        return self.get_bundle(GitDiffMaterialQuery(from_rev="head", to_rev="working-tree"))
 
 
 if __name__ == "__main__":

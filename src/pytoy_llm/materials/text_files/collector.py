@@ -30,10 +30,10 @@ class TextFilesCollector:
 
     @property
     def material(self) -> TextFilesMaterial:
-        return self.get_material(query=TextFilesMaterialQuery(pivot=self.workspace))
+        return self.get_material(query=TextFilesMaterialQuery(collection_root=self.workspace))
 
     def get_material(self, query: TextFilesMaterialQuery) -> TextFilesMaterial:
-        pivot_path = query.pivot
+        pivot_path = query.collection_root
         if not pivot_path.is_dir():
             pivot_path = pivot_path.parent
 
@@ -48,27 +48,19 @@ class TextFilesCollector:
             raise ValueError(msg)
 
         gatherer = PathGatherer(default_excludes=self._default_excludes)
-        patterns = self._to_patterns(query.filename_patterns)
-        file_paths = gatherer.gather(root, max_depth=query.max_depth, patterns=patterns, excludes=query.excludes, target="file")
+        file_paths = gatherer.gather(
+            root, max_depth=query.max_depth, patterns=query.patterns, excludes=query.excludes, target="file"
+        )
         if query.only_meta:
             text_files = [FileMeta.from_path(path, self.workspace) for path in file_paths]
         else:
             text_files = [TextFile.from_path(path, self.workspace) for path in file_paths]
         return TextFilesMaterial(files=text_files)
 
-    def _to_patterns(self, filename_patterns: tuple[str, ...]) -> tuple[str, ...]:
-        def _to_pattern(filename_pattern: str):
-            for char in ("/", "\\"):
-                if char in filename_pattern:
-                    raise ValueError(f"`filename_pattern` cannot include `{char}`")
-            return [filename_pattern]
-
-        return tuple(sum((_to_pattern(filename_pattern) for filename_pattern in filename_patterns), []))
-
 
 if __name__ == "__main__":
     collector = TextFilesCollector.from_inferred_workspace(__file__)
-    query = TextFilesMaterialQuery(pivot=(Path(__file__)), max_depth=1, only_meta=True)
+    query = TextFilesMaterialQuery(collection_root=(Path(__file__)), max_depth=1, only_meta=True)
 
     print(collector.get_material(query))
     print(collector.get_material(query).text_material_data.content)

@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated, Self, Sequence
 
 from pydantic import Field
 
 from pytoy_llm.foundation.paths import PathGatherer, PathTree
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import DirectoryInfo, FileInfo, WorkspaceAccess
-from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, MaxResults, WorkspacePath
 
 DEFAULT_EXCLUDE_NAMES = [".venv", "node_modules", ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "__pycache__"]
 
@@ -35,13 +35,14 @@ class WorkspaceDiscovery:
     def tools(
         self,
     ):
-        return [self.find_paths, self.tree]
+        return [self.find_paths, self.tree, self.recent_files]
 
     def find_paths(
         self,
         collection_root: WorkspacePath,
         patterns: Annotated[
-            tuple[GlobPattern, ...], Field(description="Glob pattern matched against paths relative to `collection_root`.")
+            GlobPattern | Sequence[GlobPattern],
+            Field(description="Glob pattern matched against paths relative to `collection_root`."),
         ] = ("*",),
     ) -> list[FileInfo | DirectoryInfo] | ToolError:
         """
@@ -56,7 +57,7 @@ class WorkspaceDiscovery:
                 Returned paths are relative to the workspace root.
 
             patterns:
-                Tuple of glob pattern matched against paths relative to `collection_root`.
+                Glob pattern or glob patterns matched against paths relative to `collection_root`.
 
         Returns:
             A list of `FileInfo` and `DirectoryInfo` objects matching the pattern.
@@ -66,13 +67,12 @@ class WorkspaceDiscovery:
             - The search traverses the collection root recursively.
             - File contents are never read or included.
         """
+        if isinstance(patterns, str):
+            patterns = [patterns]
 
-        try:
-            root = self.access.resolve(collection_root)
-            if isinstance(root, ToolError):
-                return root
-        except Exception as e:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"Invalid `{collection_root=}`; {e}")
+        root = self.access.resolve(collection_root)
+        if isinstance(root, ToolError):
+            return root
 
         try:
             paths = PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="all", patterns=patterns)
@@ -137,3 +137,47 @@ class WorkspaceDiscovery:
             return ToolError(kind=ToolErrorKind.UNKNOWN, msg=f"`{collection_root=}` is invalid in `PathTree`; {e}")
 
         return tree.render(include_root=False)
+
+    def recent_files(
+        self,
+        collection_root: WorkspacePath = ".",
+        max_results: MaxResults = 10,
+    ) -> list[FileInfo] | ToolError:
+        """
+        Find recently modified files within the workspace.
+
+        Use this tool to identify files that have been modified most recently,
+        especially when investigating recent work or deciding where to inspect first.
+
+        FileInfos are sorted by last modification time in descending order.
+
+        Args:
+            collection_root:
+                Directory relative to the workspace root from which the search starts.
+
+            max_results:
+                Maximum number of files to return.
+
+        Returns:
+            FileInfo objects sorted from newest to oldest by modification time.
+        """
+
+        root = self.access.resolve(collection_root)
+        if isinstance(root, ToolError):
+            return root
+
+        try:
+            paths = PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="file")
+        except ValueError as e:
+            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
+        file_infos = sorted(
+            (FileInfo.from_absolute_path(path, self.workspace) for path in paths),
+            key=lambda file_info: file_info.modified,
+            reverse=True,
+        )
+        return file_infos[:max_results]
+
+
+if __name__ == "__main__":
+    explorer = WorkspaceDiscovery.from_any(Path("../../../../"))
+    print(explorer.tree("."))

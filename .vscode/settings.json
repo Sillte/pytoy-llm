@@ -25,7 +25,4 @@
         "**/.ruff_cache": true,
         "**/.egg-info": true
     },
-    "python.analysis.exclude": [
-        "**/__pycache__"
-    ]
 }

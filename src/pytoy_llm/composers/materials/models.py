@@ -22,10 +22,11 @@ class MaterialUsage(BaseModel, frozen=True):
 
 
 def build_material_sections(material_sections: Sequence[MaterialSection]) -> SupplementarySections:
-    description = """Supplementary Section consists of `MATERIAL`. 
-`Task Usage` describes how to utilize the information for solving Task.
-`Data` describes the data itself and its meta information.  
-``
+    description = """The supplementary sections provide materials for this task.
+
+Each material section contains:
+- `Task Usage`: guidance for using the material.
+- `Data`: the material and its associated metadata.
     """.strip()
     return SupplementarySections(sections=material_sections, description=description)
 

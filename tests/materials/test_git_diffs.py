@@ -7,7 +7,7 @@ from pytoy_llm.materials.git_diffs.collectors import (
     FileModifyCreator,
     GitDiffCollector,
 )
-from pytoy_llm.materials.git_diffs.models import FileAdd, FileDelete, FileModify, GitDiffBundleQuery
+from pytoy_llm.materials.git_diffs.models import FileAdd, FileDelete, FileModify, GitDiffMaterialQuery
 
 
 # --- FileAddCreator テスト ---
@@ -23,6 +23,7 @@ def test_file_add_creator():
     assert result.path == Path("foo.txt")
     assert result.lines == ["line1", "line2"]
 
+
 # --- FileDeleteCreator テスト ---
 def test_file_delete_creator():
     mock_diff = MagicMock()
@@ -36,14 +37,11 @@ def test_file_delete_creator():
     assert result.path == Path("foo.txt")
     assert result.old_lines == ["line1", "line2"]
 
+
 # --- FileModifyCreator テスト ---
 def test_file_modify_creator():
     mock_diff = MagicMock()
-    mock_diff.diff = (
-        b"@@ -1,2 +1,2 @@\n"
-        b"-old1\n+new1\n"
-        b"-old2\n+new2\n"
-    )
+    mock_diff.diff = b"@@ -1,2 +1,2 @@\n-old1\n+new1\n-old2\n+new2\n"
     mock_diff.a_path = "foo.txt"
     mock_diff.b_path = "foo.txt"
 
@@ -58,6 +56,7 @@ def test_file_modify_creator():
     assert ac.new_lines == ["new1", "new2"]
     assert ac.range.start == 0
     assert ac.range.end == 2
+
 
 # --- GitDiffCollector テスト ---
 @patch("pytoy_llm.materials.git_diffs.collectors.Repo")
@@ -76,7 +75,7 @@ def test_git_diff_collector(mock_repo_cls):
     mock_repo.git_dir = "."
 
     collector = GitDiffCollector(repo_path=".")
-    query = GitDiffBundleQuery(from_rev="abc", to_rev="def")
+    query = GitDiffMaterialQuery(from_rev="abc", to_rev="def")
     diff_container = collector.get_bundle(query)
 
     assert diff_container.root_location == collector.root_location

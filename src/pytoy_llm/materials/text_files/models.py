@@ -132,7 +132,15 @@ class TextFilesMaterial(BaseModel, frozen=True):
 
 
 class TextFilesMaterialQuery(BaseModel, frozen=True):
-    pivot: Path = Field(
+    """
+
+    Note: -Specification of glob patterns-
+    - `patterns` uses `pathlib.PurePath.match` semantics.
+    - `patterns` filters collected target paths at addition.
+    - `excludes` prevents excluded paths from being traversed or returned.
+    """
+
+    collection_root: Path = Field(
         default=Path("."),
         description="Collection root path of the material. It is either absolute path or relative path to the workspace",
     )
@@ -144,12 +152,33 @@ class TextFilesMaterialQuery(BaseModel, frozen=True):
 
     only_meta: bool = Field(default=False, description="If `True`, file bodies are not loaded.")
 
-    filename_patterns: tuple[str, ...] = Field(
+    patterns: Sequence[str] = Field(
         default=(),
         description="Glob patterns of filenames to include. If empty, all files are included.",
     )
 
-    excludes: tuple[str, ...] = Field(
+    excludes: Sequence[str] = Field(
         default=(),
         description="Glob patterns of paths to exclude.",
     )
+
+    @classmethod
+    def from_any(
+        cls,
+        collection_root: Path,
+        max_depth: int | None,
+        only_meta: bool = True,
+        patterns: str | Sequence[str] = (),
+        excludes: str | Sequence[str] = (),
+    ) -> Self:
+        if isinstance(patterns, str):
+            patterns = [
+                patterns,
+            ]
+        if isinstance(excludes, str):
+            excludes = [
+                excludes,
+            ]
+        return cls(
+            collection_root=collection_root, max_depth=max_depth, only_meta=only_meta, patterns=patterns, excludes=excludes
+        )

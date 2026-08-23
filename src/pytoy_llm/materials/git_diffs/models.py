@@ -116,7 +116,7 @@ class FileDiff(BaseModel, frozen=True):
         return f"<diff>\n{header}\n{body}\n</diff>"
 
 
-class DiffBundle(BaseModel, frozen=True):
+class DiffMaterial(BaseModel, frozen=True):
     """Bundle for multiple file diffs, with a root location context."""
 
     root_location: Annotated[Sequence[str], Field(description="Workspace-relative root location for this diff set")]
@@ -151,6 +151,6 @@ class DiffBundle(BaseModel, frozen=True):
         return ModelMaterialData(description=description, instances=self.file_diffs)
 
 
-class GitDiffBundleQuery(BaseModel, frozen=True):
+class GitDiffMaterialQuery(BaseModel, frozen=True):
     from_rev: Literal["index", "head"] | str = "head"
     to_rev: Literal["working-tree", "index"] | str | None = "working-tree"
