@@ -42,7 +42,7 @@ class WorkspaceInspection:
         large files bounded. If the file is longer than `max_lines`, the
         result is `FilePartContent`, not the complete file.
 
-        Set `max_lines=None` to request the entire file.
+        Set `max_lines` to be `null` to request the entire file.
 
         Use `read_file_range` when you need a specific line range rather
         than the beginning of the file.
