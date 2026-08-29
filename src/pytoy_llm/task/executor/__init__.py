@@ -7,7 +7,7 @@ from pytoy_llm.task.models.task_response import TaskResponse
 
 
 class TaskExecutor:
-    def execute[T: BaseModel | str](
+    def execute[T](
         self, request: TaskRequest[T], event_sink: EventSinkProtocol | None = None
     ) -> TaskResponse[T]:
         request_id = request.id
