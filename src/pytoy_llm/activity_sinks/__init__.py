@@ -5,48 +5,48 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from pytoy_llm.models.events.llm_events import LLMEvent
+from pytoy_llm.models.activities.llm_activities import LLMActivity
 
-from .protocol import EventSinkProtocol
-
-
-def to_json_serializable(event: LLMEvent) -> Any:
-    if isinstance(event, BaseModel):
-        return event.model_dump_json()
-    return str(event)
+from .protocol import ActivitySinkProtocol
 
 
-class LoggerEventSink(EventSinkProtocol):
+def to_json_serializable(activity: LLMActivity) -> Any:
+    if isinstance(activity, BaseModel):
+        return activity.model_dump_json()
+    return str(activity)
+
+
+class LoggerActivitySink(ActivitySinkProtocol):
     def __init__(self, logger: logging.Logger | None = None):
         self.logger = logger or logging.getLogger(__name__)
 
-    def emit(self, event: LLMEvent) -> None:
-        self.logger.info(event.model_dump_json())
+    def emit(self, activity: LLMActivity) -> None:
+        self.logger.info(activity.model_dump_json())
 
 
-class QueueEventSink(EventSinkProtocol):
+class QueueActivitySink(ActivitySinkProtocol):
     def __init__(self, queue: Queue) -> None:
         self._queue = queue
 
-    def emit(self, event: LLMEvent) -> None:
+    def emit(self, activity: LLMActivity) -> None:
         try:
-            self._queue.put(event, timeout=0.1)
+            self._queue.put(activity, timeout=0.1)
         except Exception:
             ...
 
 
-class NullEventSink(EventSinkProtocol):
-    def emit(self, event: LLMEvent) -> None:
+class NullActivitySink(ActivitySinkProtocol):
+    def emit(self, activity: LLMActivity) -> None:
         pass
 
 
-class PrintEventSink(EventSinkProtocol):
-    def emit(self, event: LLMEvent) -> None:
-        print(str(event), flush=True)
+class PrintActivitySink(ActivitySinkProtocol):
+    def emit(self, activity: LLMActivity) -> None:
+        print(str(activity), flush=True)
 
 
 
-class FileEventSink(EventSinkProtocol):
+class FileActivitySink(ActivitySinkProtocol):
     def __init__(
         self,
         path: Path | str,
@@ -65,6 +65,6 @@ class FileEventSink(EventSinkProtocol):
         if mode == "overwrite":
             self.path.write_text("", encoding=self.encoding)
 
-    def emit(self, event: LLMEvent) -> None:
+    def emit(self, activity: LLMActivity) -> None:
         with open(self.path, mode="a", encoding=self.encoding) as f:
-            f.write(f"{str(event)}\n")
+            f.write(f"{str(activity)}\n")

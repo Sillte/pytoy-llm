@@ -39,13 +39,18 @@ where = ["src"]
 
 
 [tool.ruff]
+fix = true
 line-length = 128
-target-version = "py312"
 
 [tool.ruff.lint]
+
 select = ["E", "F", "I"]
 ignore = [
+    "E501", # Exclude specific rule: Line too long
     "E731",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
 
 

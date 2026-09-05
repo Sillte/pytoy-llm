@@ -25,4 +25,7 @@
         "**/.ruff_cache": true,
         "**/.egg-info": true
     },
+    "chat.tools.terminal.autoApprove": {
+        "uv": true
+    },
 }

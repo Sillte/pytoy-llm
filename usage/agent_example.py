@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from pytoy_llm.event_sinks import PrintEventSink
+from pytoy_llm.activity_sinks import PrintActivitySink
 from pytoy_llm.models import UsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage
 from pytoy_llm.task import TaskExecutor, TaskRequest
@@ -276,6 +276,6 @@ request = TaskRequest(
 )
 
 
-response = TaskExecutor().execute(request, event_sink=PrintEventSink())
+response = TaskExecutor().execute(request, activity_sink=PrintActivitySink())
 
 print(response.output)

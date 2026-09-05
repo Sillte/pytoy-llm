@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
+from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import DEFAULT_NAME
-from pytoy_llm.event_sinks.protocol import EventSinkProtocol
 from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
 from pytoy_llm.models import LLMMessagesLike
 from pytoy_llm.models.agent_metas import UsageLimit
@@ -17,11 +17,11 @@ class LLMFacade:
         self,
         connection: str | Connection | None = DEFAULT_NAME,
         llm_param: LLMParam | None = None,
-        event_sink: EventSinkProtocol | None = None,
+        activity_sink: ActivitySinkProtocol | None = None,
     ) -> None:
         self.connection: str | Connection | None = connection
         self.llm_param: LLMParam | None = llm_param
-        self.event_sink = event_sink
+        self.activity_sink = activity_sink
 
     def _resolve_connection(self) -> str | Connection:
         return self.connection or DEFAULT_NAME
@@ -31,7 +31,7 @@ class LLMFacade:
         messages: LLMMessagesLike,
         output_type: type[T],
     ) -> T:
-        client = PytoyLiteLLMClient(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
+        client = PytoyLiteLLMClient(self._resolve_connection(), llm_param=self.llm_param, activity_sink=self.activity_sink)
         return client.completion(messages, output_type=output_type)
 
     def completion_with_result[T: BaseModel | str](
@@ -39,7 +39,7 @@ class LLMFacade:
         messages: LLMMessagesLike,
         output_type: type[T],
     ) -> LLMResult[T]:
-        client = PytoyLiteLLMClient(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
+        client = PytoyLiteLLMClient(self._resolve_connection(), llm_param=self.llm_param, activity_sink=self.activity_sink)
         return client.completion_with_result(messages, output_type=output_type)
 
     def run[T: BaseModel | str](
@@ -50,13 +50,13 @@ class LLMFacade:
         usage_limit: UsageLimit | None = None,
     ) -> T:
         """Alias of `run_agent` for better readability."""
-        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
+        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, activity_sink=self.activity_sink)
         return agent.run(messages, output_type=output_type, tools=tools)
 
     def run_with_result[T: BaseModel | str](
         self, messages: LLMMessagesLike, output_type: type[T], tools: LLMToolsLike = (), usage_limit: UsageLimit | None = None
     ) -> LLMResult[T]:
-        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, event_sink=self.event_sink)
+        agent = PytoyPydanticAIAgent(self._resolve_connection(), llm_param=self.llm_param, activity_sink=self.activity_sink)
         return agent.run_with_result(messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
 
 

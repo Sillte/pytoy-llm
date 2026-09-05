@@ -4,9 +4,9 @@ from typing import cast
 from litellm import ModelResponse
 from pydantic import BaseModel
 
+from pytoy_llm.activity_sinks import NullActivitySink
+from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import ConnectionConfiguration
-from pytoy_llm.event_sinks import NullEventSink
-from pytoy_llm.event_sinks.protocol import EventSinkProtocol
 from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConverter
 from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
 from pytoy_llm.models.connections import Connection
@@ -26,7 +26,7 @@ class PytoyLiteLLMClient:
         self,
         connection: str | Connection,
         llm_param: LLMParam | None = None,
-        event_sink: EventSinkProtocol | None = None,
+        activity_sink: ActivitySinkProtocol | None = None,
     ) -> None:
 
         if isinstance(connection, str):
@@ -35,7 +35,7 @@ class PytoyLiteLLMClient:
 
         self._connection: Connection = connection
         self._llm_param = llm_param
-        self._event_sink = event_sink
+        self._activity_sink = activity_sink
 
     @property
     def connection(self) -> Connection:
@@ -86,9 +86,9 @@ class PytoyLiteLLMClient:
         kwargs = LLMParamConverter().to_litellm_kwargs(self._llm_param)
 
         handler = LiteLLMEventHandler()
-        event_sink = self._event_sink or NullEventSink()
+        activity_sink = self._activity_sink or NullActivitySink()
 
-        with handler.register(event_sink) as metadata:
+        with handler.register(activity_sink) as metadata:
             response = litellm_completion(
                 model=self.connection.model,
                 messages=raw_messages,

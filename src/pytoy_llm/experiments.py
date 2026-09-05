@@ -5,9 +5,9 @@ from typing import Literal
 from pydantic import BaseModel
 
 from pytoy_llm import completion
+from pytoy_llm.composer.models import OutputSpec, SystemPromptSpec
+from pytoy_llm.composer.system_prompt_composer import SystemPromptComposer
 from pytoy_llm.composers.materials.models import MaterialSection, MaterialUsage, build_material_sections
-from pytoy_llm.composers.models import OutputSpec, SystemPromptSpec
-from pytoy_llm.composers.system_prompt_composer import SystemPromptComposer
 from pytoy_llm.materials.basemodels import BaseModelBundle
 from pytoy_llm.materials.models import (
     TextMaterialData,

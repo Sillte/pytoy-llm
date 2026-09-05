@@ -11,8 +11,8 @@ from pydantic_ai import (
     UserPromptPart,
 )
 
+from pytoy_llm.activity_sinks import ActivitySinkProtocol, NullActivitySink
 from pytoy_llm.connection_configuration import ConnectionConfiguration
-from pytoy_llm.event_sinks import EventSinkProtocol, NullEventSink
 from pytoy_llm.models import (
     LLMMessagesLike,
 )
@@ -50,14 +50,14 @@ class CurrentModelRequestPair:
 
 class PytoyPydanticAIAgent:
     def __init__(
-        self, connection: str | Connection, llm_param: LLMParam | None = None, event_sink: EventSinkProtocol | None = None
+        self, connection: str | Connection, llm_param: LLMParam | None = None, activity_sink: ActivitySinkProtocol | None = None
     ) -> None:
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
         llm_param = llm_param or connection.llm_param or LLMParam()
         self._connection = connection
         self._llm_param = llm_param
-        self._event_sink = event_sink
+        self._activity_sink = activity_sink
 
     def _make_agent(self, system_prompt: str | None | tuple, tools: LLMToolsLike) -> Agent:
         system_prompt = system_prompt or tuple()
@@ -90,8 +90,8 @@ class PytoyPydanticAIAgent:
         message_history, current_message = model_messages[:-1], model_messages[-1]
         pair = CurrentModelRequestPair.from_model_message(current_message)
         agent = self._make_agent(system_prompt=pair.system_prompt, tools=tools)
-        event_sink = self._event_sink or NullEventSink()
-        event_handler = EventHandler(event_sink)
+        activity_sink = self._activity_sink or NullActivitySink()
+        event_handler = EventHandler(activity_sink)
         event_handler.emit_request(messages)
         result = agent.run_sync(
             user_prompt=pair.user_prompt,

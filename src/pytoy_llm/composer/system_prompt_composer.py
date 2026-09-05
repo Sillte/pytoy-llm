@@ -150,9 +150,9 @@ if __name__ == "__main__":
     from pytoy_llm.materials.text_files import TextFilesCollector
 
     collector = TextFilesCollector(
-        __file__,
+        workspace=__file__,
     )
-    bundle = collector.bundle
-    composer = MaterialDataExplorerTaskComposer([bundle.text_material_data])
+    material = collector.material
+    composer = MaterialDataExplorerTaskComposer([material.text_material_data])
     section_text = composer.compose_system_prompt()
     print(section_text)

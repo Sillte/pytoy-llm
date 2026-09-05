@@ -3,7 +3,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from pytoy_llm import run
-from pytoy_llm.event_sinks import PrintEventSink
+from pytoy_llm.activity_sinks import PrintActivitySink
 
 
 def dice(value: int) -> int:
@@ -25,6 +25,6 @@ print(
         "Could you please throw a dice, setting the value 1.",
         output_type=A,
         tools=[dice],
-        event_sink=PrintEventSink(),
+        activity_sink=PrintActivitySink(),
     ),
 )

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Self
 
-from pytoy_llm.event_sinks import EventSinkProtocol
+from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.invocation_specs import (
@@ -27,7 +27,7 @@ class TaskSpec[T]:
             raise ValueError("Empty invocation specs is not allowed.")
 
     def run(
-        self, task_input: Any, context_state: TaskContextState, event_sink: EventSinkProtocol | None = None
+        self, task_input: Any, context_state: TaskContextState, activity_sink: ActivitySinkProtocol | None = None
     ) -> TaskResult[T]:
         llm_param = None
         connection = None
@@ -36,7 +36,7 @@ class TaskSpec[T]:
             connection=connection,
             llm_messages=context_state.llm_messages,
             state=context_state.state,
-            event_sink=event_sink,
+            activity_sink=activity_sink,
         )
 
         traces = []

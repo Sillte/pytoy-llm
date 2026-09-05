@@ -6,19 +6,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from pytoy_llm.models.llm_metas import LLMTokens
 
 
-class LLMMinimumEvent(BaseModel, frozen=True):
+class LLMMinimumActivity(BaseModel, frozen=True):
     model_config = ConfigDict(extra="allow")
-    timestamp: Annotated[float, Field(description="Timestamp of the event in seconds since epoch.")] = Field(
+    timestamp: Annotated[float, Field(description="Timestamp of the activity in seconds since epoch.")] = Field(
         default_factory=time.time
     )
     message: Annotated[str, Field(description="Short Message for the reason")] = ""
     extra: Annotated[Any, Field(description="Something which should be mentioned.")] = ""
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "minimum_event"
+    activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "minimum_activity"
 
 
-class ToolCallEvent(BaseModel, frozen=True):
+class ToolCallActivity(BaseModel, frozen=True):
     model_config = ConfigDict(extra="allow")
-    timestamp: Annotated[float, Field(description="Timestamp of the event in seconds since epoch.")] = Field(
+    timestamp: Annotated[float, Field(description="Timestamp of the activity in seconds since epoch.")] = Field(
         default_factory=time.time
     )
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
@@ -26,12 +26,12 @@ class ToolCallEvent(BaseModel, frozen=True):
     tool_name: Annotated[str | None, Field(description="The name of tool")] = None
     args: Annotated[Any, Field(description="The arguments of the call")] = {}
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "tool_call_event"
+    activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "tool_call_activity"
 
 
-class ToolResultEvent(BaseModel, frozen=True):
+class ToolResultActivity(BaseModel, frozen=True):
     model_config = ConfigDict(extra="allow")
-    timestamp: Annotated[float, Field(description="Timestamp of the event in seconds since epoch.")] = Field(
+    timestamp: Annotated[float, Field(description="Timestamp of the activity in seconds since epoch.")] = Field(
         default_factory=time.time
     )
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
@@ -39,12 +39,12 @@ class ToolResultEvent(BaseModel, frozen=True):
     tool_name: Annotated[str | None, Field(description="The name of tool")] = None
     result: Annotated[Any, Field(description="The result of the call")] = None
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "tool_result_event"
+    activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "tool_result_activity"
 
 
-class LLMRequestEvent(BaseModel, frozen=True):
+class LLMRequestActivity(BaseModel, frozen=True):
     model_config = ConfigDict(extra="allow")
-    timestamp: Annotated[float, Field(description="Timestamp of the event in seconds since epoch.")] = Field(
+    timestamp: Annotated[float, Field(description="Timestamp of the activity in seconds since epoch.")] = Field(
         default_factory=time.time
     )
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
@@ -53,29 +53,36 @@ class LLMRequestEvent(BaseModel, frozen=True):
     timeout: Annotated[float | None, Field(description="Timeout")] = None
     model: Annotated[str | None, Field(description="Name of model")] = None
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "request_event"
+    activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "request_activity"
 
 
-class LLMThinkingEvent(BaseModel, frozen=True):
+class LLMThinkingActivity(BaseModel, frozen=True):
     model_config = ConfigDict(extra="allow")
-    timestamp: Annotated[float, Field(description="Timestamp of the event in seconds since epoch.")] = Field(
+    timestamp: Annotated[float, Field(description="Timestamp of the activity in seconds since epoch.")] = Field(
         default_factory=time.time
     )
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
     content: Annotated[str | None, Field(description="Content of thinking")] = None
 
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "thinking_event"
+    activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "thinking_activity"
 
 
-class LLMResponseEvent(BaseModel, frozen=True):
+class LLMResponseActivity(BaseModel, frozen=True):
     model_config = ConfigDict(extra="allow")
-    timestamp: Annotated[float, Field(description="Timestamp of the event in seconds since epoch.")] = Field(
+    timestamp: Annotated[float, Field(description="Timestamp of the activity in seconds since epoch.")] = Field(
         default_factory=time.time
     )
     response: Annotated[str, Field(description="Messages from the LLM.")]
     tokens: Annotated[LLMTokens | None, Field(description="Used tokens")] = None
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
-    event_type: Annotated[str, Field(description="Event type of the event.")] = "response_event"
+    activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "response_activity"
 
 
-type LLMEvent = LLMMinimumEvent | LLMRequestEvent | LLMResponseEvent | ToolResultEvent | ToolCallEvent | LLMThinkingEvent
+type LLMActivity = (
+    LLMMinimumActivity
+    | LLMRequestActivity
+    | LLMResponseActivity
+    | ToolResultActivity
+    | ToolCallActivity
+    | LLMThinkingActivity
+)
