@@ -45,13 +45,9 @@ class PrintActivitySink(ActivitySinkProtocol):
         print(str(activity), flush=True)
 
 
-
 class FileActivitySink(ActivitySinkProtocol):
     def __init__(
-        self,
-        path: Path | str,
-        mode: Literal["append", "overwrite", "a", "w"] = "append",
-        encoding: str = "utf-8"
+        self, path: Path | str, mode: Literal["append", "overwrite", "a", "w"] = "append", encoding: str = "utf-8"
     ) -> None:
         path = Path(path)
         if mode == "w":

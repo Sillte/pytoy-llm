@@ -79,10 +79,5 @@ class LLMResponseActivity(BaseModel, frozen=True):
 
 
 type LLMActivity = (
-    LLMMinimumActivity
-    | LLMRequestActivity
-    | LLMResponseActivity
-    | ToolResultActivity
-    | ToolCallActivity
-    | LLMThinkingActivity
+    LLMMinimumActivity | LLMRequestActivity | LLMResponseActivity | ToolResultActivity | ToolCallActivity | LLMThinkingActivity
 )
