@@ -4,7 +4,7 @@ from pathlib import Path
 from pytoy_llm.activity_sinks import PrintActivitySink
 from pytoy_llm.models import UsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage
-from pytoy_llm.task import TaskExecutor, TaskRequest
+from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
 )
@@ -276,6 +276,6 @@ request = TaskRequest(
 )
 
 
-response = TaskExecutor().execute(request, activity_sink=PrintActivitySink())
+response = TaskSyncExecutor().execute(request, activity_sink=PrintActivitySink())
 
 print(response.output)

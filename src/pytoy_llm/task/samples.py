@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from pytoy_llm.models.llm_messages import LLMMessage
-from pytoy_llm.task import TaskExecutor, TaskRequest
+from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
     FunctionInvocationSpec,
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         spec=task_spec,
         input=log_input,
     )
-    response = TaskExecutor().execute(request)
+    response = TaskSyncExecutor().execute(request)
     print(response.output)
 
     print("invocation_records", response.result.traces)

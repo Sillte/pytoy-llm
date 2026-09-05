@@ -8,6 +8,7 @@ from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models import LLMMessagesLike
+from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
@@ -43,10 +44,11 @@ def run[T: BaseModel | str](
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
     activity_sink: ActivitySinkProtocol | None = None,
+    usage_limit: UsageLimit | None = None,
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
-    result = facade.run(messages, output_type=output_type, tools=tools)
+    result = facade.run(messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
     return result
 
 

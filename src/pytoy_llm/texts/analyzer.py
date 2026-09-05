@@ -1,9 +1,8 @@
 from pydantic import BaseModel, Field
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.composer.invocation_composer import InvocationComposer
 from pytoy_llm.composer.models import SystemPromptSpec
-from pytoy_llm.task import TaskExecutor, TaskRequest
+from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import TaskSpec
 from pytoy_llm.texts.models import TextOutcomeModel, TextRealizationModel
 
@@ -70,9 +69,6 @@ class TextAnalysisModel(BaseModel, frozen=True):
 
 
 class TextAnalyzer:
-    def __init__(self, activity_sink: None | ActivitySinkProtocol = None) -> None:
-        self._activity_sink = activity_sink
-
     def analyze(self, text: str) -> TextAnalysisModel:
         prompt_spec = SystemPromptSpec.from_any(
             name="TextAnalyzer",
@@ -83,7 +79,7 @@ class TextAnalyzer:
         composer = InvocationComposer(system_prompt_spec=prompt_spec)
         llm_spec = composer.compose_llm_invocation_spec()
         request = TaskRequest(spec=TaskSpec.from_single_spec(meta="TextAnalyzer", invocation_spec=llm_spec), input=text)
-        response = TaskExecutor().execute(request, activity_sink=self._activity_sink)
+        response = TaskSyncExecutor().execute(request)
         return response.output
 
 

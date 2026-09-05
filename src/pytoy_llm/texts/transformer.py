@@ -2,10 +2,9 @@ from typing import Self
 
 from pydantic import BaseModel, Field
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.composer.invocation_composer import InvocationComposer
 from pytoy_llm.composer.models import OutputSpec, SystemPromptSpec
-from pytoy_llm.task import TaskExecutor, TaskRequest
+from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import TaskSpec
 from pytoy_llm.texts.analyzer import TextAnalysisModel, TextAnalyzer
 from pytoy_llm.texts.models import TextOutcomeModel, TextRealizationModel
@@ -208,9 +207,6 @@ class TextTransformRequest(BaseModel, frozen=True):
 
 
 class TextTransformer:
-    def __init__(self, activity_sink: None | ActivitySinkProtocol = None) -> None:
-        self._activity_sink = activity_sink
-
     def transform(self, text: str, transform_rule: BaseTransformRule | str, instruction: str) -> str:
         analyzer = TextAnalyzer()
         analysis = analyzer.analyze(text)
@@ -245,7 +241,7 @@ class TextTransformer:
         task_spec = TaskSpec.from_single_spec(llm_spec, meta="TextTransform")
         request = TaskRequest(spec=task_spec, input=transform_request.model_dump_json(indent=2))
 
-        response = TaskExecutor().execute(request, activity_sink=self._activity_sink)
+        response = TaskSyncExecutor().execute(request)
         return response.output
 
 

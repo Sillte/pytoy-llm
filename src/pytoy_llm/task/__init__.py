@@ -1,5 +1,5 @@
-from pytoy_llm.task.executor import TaskExecutor
 from pytoy_llm.task.models.task_request import TaskRequest
 from pytoy_llm.task.models.task_response import TaskResponse
+from pytoy_llm.task.sync_executor import TaskSyncExecutor
 
-__all__ = ["TaskExecutor", "TaskRequest", "TaskResponse"]
+__all__ = ["TaskSyncExecutor", "TaskRequest", "TaskResponse"]
