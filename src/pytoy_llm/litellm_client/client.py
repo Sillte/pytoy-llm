@@ -4,7 +4,6 @@ from typing import cast
 from litellm import ModelResponse
 from pydantic import BaseModel
 
-from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConverter
 from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
@@ -26,7 +25,6 @@ class PytoyLiteLLMClient:
         self,
         connection: str | Connection,
         llm_param: LLMParam | None = None,
-        activity_sink: ActivitySinkProtocol | None = None,
         event_emitters: LLMEventEmitters | None = None,
     ) -> None:
 
@@ -37,8 +35,6 @@ class PytoyLiteLLMClient:
         self._connection: Connection = connection
         self._llm_param = llm_param
         self._event_emitters = event_emitters or LLMEventEmitters()
-        if activity_sink is not None:
-            self._event_emitters.on_activity.subscribe(activity_sink.emit)
 
     @property
     def connection(self) -> Connection:

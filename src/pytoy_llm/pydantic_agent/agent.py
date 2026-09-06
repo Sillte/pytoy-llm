@@ -11,7 +11,6 @@ from pydantic_ai import (
     UserPromptPart,
 )
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import (
     LLMMessagesLike,
@@ -54,7 +53,6 @@ class PytoyPydanticAIAgent:
         self,
         connection: str | Connection,
         llm_param: LLMParam | None = None,
-        activity_sink: ActivitySinkProtocol | None = None,
         event_emitters: LLMEventEmitters | None = None,
     ) -> None:
         if isinstance(connection, str):
@@ -63,8 +61,6 @@ class PytoyPydanticAIAgent:
         self._connection = connection
         self._llm_param = llm_param
         self._event_emitters = event_emitters or LLMEventEmitters()
-        if activity_sink is not None:
-            self._event_emitters.on_activity.subscribe(activity_sink.emit)
 
     def _make_agent(self, system_prompt: str | None | tuple, tools: LLMToolsLike) -> Agent:
         system_prompt = system_prompt or tuple()

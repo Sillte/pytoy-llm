@@ -9,55 +9,49 @@ import litellm
 from litellm.integrations.custom_logger import CustomLogger
 from pydantic import ValidationError
 
-from pytoy_llm.activity_sinks import NullActivitySink
-from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
+from pytoy_llm.models import LLMEventEmitters, LLMTokens
 from pytoy_llm.models.activities.llm_activities import LLMMinimumActivity, LLMRequestActivity, LLMResponseActivity
-from pytoy_llm.models.llm_metas import LLMTokens
 
 
-class ActivitySinkRepository:
+class EventEmittersRepository:
     def __init__(self) -> None:
-        self._activity_sinks: dict[str, ActivitySinkProtocol] = {}
+        self._emitters: dict[str, LLMEventEmitters] = {}
         self._lock = threading.RLock()
         self._ttl_seconds: float = 0.2
 
     @contextmanager
     def register(
         self,
-        activity_sink: ActivitySinkProtocol,
+        event_emitters: LLMEventEmitters,
     ) -> Generator[dict[str, str]]:
-        sink_id = str(uuid4())
+        emitters_id = str(uuid4())
 
         with self._lock:
-            self._activity_sinks[sink_id] = activity_sink
+            self._emitters[emitters_id] = event_emitters
 
         def _remove(sink_id: str) -> None:
             with self._lock:
-                self._activity_sinks.pop(sink_id, None)
+                self._emitters.pop(sink_id, None)
 
-        # NOTE: Since `litellm.callbacks` are global, this delay is important.
+        # NOTE: Since `litellm.callbacks` are global, this delay of deletion is crucial.
         try:
-            yield {"event_sink_id": sink_id}
+            yield {"emitters_id": emitters_id}
         finally:
-            # In case of `NullEventSink`, it is not necessary to wait.
-            if isinstance(activity_sink, NullActivitySink):
-                _remove(sink_id)
-            else:
-                timer = threading.Timer(
-                    self._ttl_seconds,
-                    _remove,
-                    args=(sink_id,),
-                )
-                timer.daemon = True
-                timer.start()
+            timer = threading.Timer(
+                self._ttl_seconds,
+                _remove,
+                args=(emitters_id,),
+            )
+            timer.daemon = True
+            timer.start()
 
     def get(
         self,
         metadata: dict[str, Any],
-    ) -> ActivitySinkProtocol | None:
-        sink_id = metadata.get("activity_sink_id", "")
+    ) -> LLMEventEmitters | None:
+        emitter_id = metadata.get("emitters_id", "")
         with self._lock:
-            return self._activity_sinks.get(sink_id)
+            return self._emitters.get(emitter_id)
 
 
 class LiteLLMEventHandler(CustomLogger):
@@ -78,7 +72,7 @@ class LiteLLMEventHandler(CustomLogger):
         if hasattr(self, "_initialized"):
             return
         super().__init__()
-        self.sink_repository = ActivitySinkRepository()
+        self.emitters_repository = EventEmittersRepository()
 
         # NOTE: Add this handle to `litellm.callbacks`. This is a global callback, so it will be called for every request.
 
@@ -94,18 +88,18 @@ class LiteLLMEventHandler(CustomLogger):
 
         self._initialized = True
 
-    def _activity_sink(self, **kwargs) -> ActivitySinkProtocol | None:
+    def _event_emitters(self, **kwargs) -> LLMEventEmitters | None:
         metadata = kwargs.get("litellm_params", {}).get("metadata", {})
-        return self.sink_repository.get(metadata)
+        return self.emitters_repository.get(metadata)
 
     @contextmanager
-    def register(self, activity_sink: ActivitySinkProtocol) -> Generator[dict[str, str]]:
-        with self.sink_repository.register(activity_sink) as metadata:
+    def register(self, event_emitters: LLMEventEmitters) -> Generator[dict[str, str]]:
+        with self.emitters_repository.register(event_emitters) as metadata:
             yield metadata
 
     def log_pre_api_call(self, model, messages, kwargs, **_):
-        sink = self._activity_sink(**kwargs)
-        if sink is None:
+        emitters = self._event_emitters(**kwargs)
+        if emitters is None:
             return
         try:
             trace_id, call_id = kwargs.get("litellm_trace_id"), kwargs.get("litellm_call_id")
@@ -120,27 +114,27 @@ class LiteLLMEventHandler(CustomLogger):
             )
         except ValidationError as e:
             activity = LLMMinimumActivity(activity_type="pre_api_call", message=f"Failed to create LLMRequestActivity: {e}")
-        sink.emit(activity)
+        emitters.emit_activity(activity)
 
     def log_post_api_call(self, kwargs, response_obj, start_time, end_time, **_):
-        sink = self._activity_sink(**kwargs)
-        if sink is None:
+        emitters = self._event_emitters(**kwargs)
+        if emitters is None:
             return
-        sink.emit(LLMMinimumActivity(activity_type="post_api_call"))
+        emitters.emit_activity(LLMMinimumActivity(activity_type="post_api_call"))
 
     def log_success_event(self, kwargs, response_obj, start_time, end_time, **_):
-        sink = self._activity_sink(**kwargs)
-        if sink is None:
+        emitters = self._event_emitters(**kwargs)
+        if emitters is None:
             return
         activity = self._to_response_activity(response_obj)
-        sink.emit(activity)
+        emitters.emit_activity(activity)
 
     def log_failure_event(self, kwargs, response_obj, start_time, end_time, **_):
-        sink = self._activity_sink(**kwargs)
-        if sink is None:
+        emitters = self._event_emitters(**kwargs)
+        if emitters is None:
             return
         activity = self._to_response_activity(response_obj)
-        sink.emit(activity)
+        emitters.emit_activity(activity)
 
     def _to_response_activity(self, response_obj) -> LLMResponseActivity | LLMMinimumActivity:
         try:

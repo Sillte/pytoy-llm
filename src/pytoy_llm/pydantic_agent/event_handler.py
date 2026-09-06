@@ -17,7 +17,7 @@ from pydantic_ai import (
     ToolCallPart,
 )
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol
+from pytoy_llm.models import LLMEventEmitters, LLMMessage
 from pytoy_llm.models.activities.llm_activities import (
     LLMActivity,
     LLMMinimumActivity,
@@ -27,19 +27,18 @@ from pytoy_llm.models.activities.llm_activities import (
     ToolCallActivity,
     ToolResultActivity,
 )
-from pytoy_llm.models.llm_messages import LLMMessage
 
 
 class EventHandler:
-    def __init__(self, activity_sink: ActivitySinkProtocol) -> None:
+    def __init__(self, event_emitters: LLMEventEmitters) -> None:
         self._trace_id = str(uuid4())
-        self._event_adapter = EventAdapter(self._trace_id)
-        self._activity_sink = activity_sink
+        self._event_adapter = ActivityAdapter(self._trace_id)
+        self._event_emitters = event_emitters
 
     def emit_request(self, llm_messages: Sequence[LLMMessage]) -> None:
         messages = [elem.model_dump() for elem in llm_messages]
         activity = LLMRequestActivity(trace_id=self._trace_id, messages=messages)
-        self._activity_sink.emit(activity)
+        self._event_emitters.emit_activity(activity)
 
     async def event_stream_handler(self, ctx: RunContext, event_stream: AsyncIterable[AgentStreamEvent]) -> None:
         async for event in event_stream:
@@ -48,21 +47,21 @@ class EventHandler:
     async def handle_event(self, stream_event: AgentStreamEvent) -> None:
         match stream_event:
             case FunctionToolCallEvent():
-                event = self._event_adapter.from_tool_call_event(stream_event)
+                activity = self._event_adapter.from_tool_call_event(stream_event)
             case FunctionToolResultEvent():
-                event = self._event_adapter.from_tool_result_event(stream_event)
+                activity = self._event_adapter.from_tool_result_event(stream_event)
             case PartEndEvent():
-                event = self._event_adapter.from_part_end_event(stream_event)
+                activity = self._event_adapter.from_part_end_event(stream_event)
             case PartDeltaEvent() | PartStartEvent() | FinalResultEvent() | OutputToolCallEvent() | OutputToolResultEvent():
-                event = None
+                activity = None
             case _:
-                event = LLMMinimumActivity(activity_type="unknown_activity", message=f"{stream_event.__class__.__name__}")
+                activity = LLMMinimumActivity(activity_type="unknown_activity", message=f"{stream_event.__class__.__name__}")
 
-        if event:
-            self._activity_sink.emit(event)
+        if activity:
+            self._event_emitters.emit_activity(activity)
 
 
-class EventAdapter:
+class ActivityAdapter:
     def __init__(self, trace_id: str) -> None:
         self._trace_id = trace_id
 
