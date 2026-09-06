@@ -63,7 +63,7 @@ class TaskExecution[T]:
 
     @property
     def on_activity(self):
-        return self.events.on_activity.event
+        return self.events.activity_emitter.event
 
     def dispose(self):
         self.exit_emitter.dispose()

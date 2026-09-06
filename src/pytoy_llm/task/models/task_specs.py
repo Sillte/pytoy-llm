@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from typing import Any, Self
 
 from pytoy_llm.activity_sinks import ActivitySinkProtocol
+from pytoy_llm.models import LLMEventEmitters
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
-from pytoy_llm.task.models.context import ExecutionContext, ExecutionEvents, TaskContextState
+from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.exceptions import InvocationException
 from pytoy_llm.task.models.invocation_specs import (
     InvocationSpec,
@@ -33,7 +34,7 @@ class TaskSpec[T]:
         task_input: Any,
         context_state: TaskContextState,
         activity_sink: ActivitySinkProtocol | None = None,
-        events: ExecutionEvents | None = None,
+        emitters: LLMEventEmitters | None = None,
     ) -> Outcome[TaskResult[T], InvocationException]:
         llm_param = None
         connection = None
@@ -43,7 +44,7 @@ class TaskSpec[T]:
             llm_messages=context_state.llm_messages,
             state=context_state.state,
             activity_sink=activity_sink,
-            events=events or ExecutionEvents(),
+            emitters=emitters or LLMEventEmitters(),
         )
 
         traces = []

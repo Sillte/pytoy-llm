@@ -38,7 +38,7 @@ class PytoyLiteLLMClient:
         self._llm_param = llm_param
         self._event_emitters = event_emitters or LLMEventEmitters()
         if activity_sink is not None:
-            self._event_emitters.activity.subscribe(activity_sink.emit)
+            self._event_emitters.on_activity.subscribe(activity_sink.emit)
 
     @property
     def connection(self) -> Connection:

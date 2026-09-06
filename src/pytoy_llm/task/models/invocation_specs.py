@@ -42,9 +42,9 @@ class FunctionInvocationSpec[T]:
 
     def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult:
         starttime = time.time()
-        execution_context.events.on_activity.fire(ToolCallActivity(tool_name="FunctionInvocationSpec", args=input))
+        execution_context.emitters.activity_emitter.fire(ToolCallActivity(tool_name="FunctionInvocationSpec", args=input))
         output = self.invocator(input, execution_context)
-        execution_context.events.on_activity.fire(ToolResultActivity(tool_name="FunctionInvocationSpec", result=output))
+        execution_context.emitters.activity_emitter.fire(ToolResultActivity(tool_name="FunctionInvocationSpec", result=output))
 
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
         trace = InvocationTrace(input=input, output=output, info=info)
@@ -102,7 +102,9 @@ class SelectedInvocationSpec[T]:
     def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult[T]:
         starttime = time.time()
         first_result = self.spec_selector.invoke(input, execution_context)
-        execution_context.events.on_activity.fire(ToolCallActivity(tool_name="SelectedInvocationSpec", args=first_result))
+        execution_context.emitters.activity_emitter.fire(
+            ToolCallActivity(tool_name="SelectedInvocationSpec", args=first_result)
+        )
         spec_output = first_result.output
         second_result = spec_output.invoke(input, execution_context)
         info = InvocationInfo(started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta)
@@ -129,7 +131,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
             input_messages = self.create_messages(input, execution_context)  # type: ignore
         connection = self.connection or execution_context.connection
         llm_param = self.llm_param or execution_context.llm_param
-        llm_facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=execution_context.events)
+        llm_facade = LLMFacade(connection=connection, llm_param=llm_param, event_emitters=execution_context.emitters)
         result = llm_facade.completion_with_result(input_messages, output_type=self.output_type)
         output = result.output
 
@@ -160,7 +162,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
             input_messages = self.create_messages(input, execution_context)  # type: ignore
         connection = self.connection or execution_context.connection
         llm_param = self.llm_param or execution_context.llm_param
-        llm_facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=execution_context.events)
+        llm_facade = LLMFacade(connection=connection, llm_param=llm_param, event_emitters=execution_context.emitters)
         result = llm_facade.run_with_result(
             input_messages, output_type=self.output_type, tools=self.tools, usage_limit=self.usage_limit
         )

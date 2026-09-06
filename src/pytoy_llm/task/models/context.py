@@ -25,7 +25,7 @@ class ExecutionContext:
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
     activity_sink: ActivitySinkProtocol | None = None
-    events: LLMEventEmitters = field(default_factory=LLMEventEmitters)
+    emitters: LLMEventEmitters = field(default_factory=LLMEventEmitters)
 
 
 @dataclass(frozen=True)
