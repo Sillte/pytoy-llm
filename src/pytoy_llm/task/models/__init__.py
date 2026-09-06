@@ -7,8 +7,8 @@ from pytoy_llm.task.models.invocation_specs import (
     SelectedInvocationSpec,
 )
 from pytoy_llm.task.models.metas import InvocationSpecMeta, TaskSpecMeta
+from pytoy_llm.task.models.task_exit import TaskExit
 from pytoy_llm.task.models.task_request import TaskRequest
-from pytoy_llm.task.models.task_response import TaskResponse
 from pytoy_llm.task.models.task_results import TaskResult
 from pytoy_llm.task.models.task_specs import TaskSpec
 
@@ -23,7 +23,7 @@ __all__ = [
     "InvocationSpecMeta",
     "TaskSpecMeta",
     "TaskRequest",
-    "TaskResponse",
+    "TaskExit",
     "TaskResult",
     "TaskSpec",
     "TaskRunState",

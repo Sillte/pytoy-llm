@@ -5,11 +5,13 @@ from typing import Any, Self
 from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
+from pytoy_llm.task.models.exceptions import InvocationException
 from pytoy_llm.task.models.invocation_specs import (
     InvocationSpec,
 )
 from pytoy_llm.task.models.metas import TaskSpecMeta
 from pytoy_llm.task.models.task_results import TaskResult
+from pytoy_llm.task.shared.outcome import Error, Outcome, Success
 
 
 @dataclass(frozen=True)
@@ -28,7 +30,7 @@ class TaskSpec[T]:
 
     def run(
         self, task_input: Any, context_state: TaskContextState, activity_sink: ActivitySinkProtocol | None = None
-    ) -> TaskResult[T]:
+    ) -> Outcome[TaskResult[T], InvocationException]:
         llm_param = None
         connection = None
         execution_context = ExecutionContext(
@@ -43,7 +45,11 @@ class TaskSpec[T]:
 
         invocation_input = task_input
         for invocation_spec in self.invocation_specs:
-            invocation_result = invocation_spec.invoke(invocation_input, execution_context)
+            try:
+                invocation_result = invocation_spec.invoke(invocation_input, execution_context)
+            except Exception as exc:
+                return Error(exception=InvocationException(context=execution_context, invocation_exception=exc))
+
             if invocation_result.runtime_patch:
                 execution_context = invocation_result.runtime_patch.apply(execution_context)
             if invocation_result.context_patch:
@@ -52,12 +58,13 @@ class TaskSpec[T]:
                 traces.append(invocation_result.trace)
             invocation_input = invocation_result.output
 
-        return TaskResult(
+        result = TaskResult(
             task_name=self.meta.name,
             output=invocation_result.output,
             traces=traces,
             context_state=TaskContextState.from_execution_context(execution_context),
         )
+        return Success(result)
 
     @property
     def name(self) -> str:
