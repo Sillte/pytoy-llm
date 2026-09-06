@@ -1,5 +1,5 @@
 import time
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -76,6 +76,10 @@ class LLMResponseActivity(BaseModel, frozen=True):
     tokens: Annotated[LLMTokens | None, Field(description="Used tokens")] = None
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
     activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = "response_activity"
+
+
+class LLMActivitySink(Protocol):
+    def emit(self, activity: "LLMActivity") -> None: ...
 
 
 type LLMActivity = (

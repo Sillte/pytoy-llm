@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 
-from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
 from pytoy_llm.models import LLMMessagesLike
+from pytoy_llm.models.activities import LLMActivitySink
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
@@ -18,7 +18,7 @@ class LLMFacade:
         self,
         connection: str | Connection | None = DEFAULT_NAME,
         llm_param: LLMParam | None = None,
-        activity_sink: ActivitySinkProtocol | None = None,
+        activity_sink: LLMActivitySink | None = None,
         event_emitters: LLMEventEmitters | None = None,
     ) -> None:
         self.connection: str | Connection | None = connection

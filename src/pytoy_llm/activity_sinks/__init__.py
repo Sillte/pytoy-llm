@@ -5,9 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from pytoy_llm.models.activities.llm_activities import LLMActivity
-
-from .protocol import ActivitySinkProtocol
+from pytoy_llm.models.activities import LLMActivity, LLMActivitySink
 
 
 def to_json_serializable(activity: LLMActivity) -> Any:
@@ -16,7 +14,7 @@ def to_json_serializable(activity: LLMActivity) -> Any:
     return str(activity)
 
 
-class LoggerActivitySink(ActivitySinkProtocol):
+class LoggerActivitySink(LLMActivitySink):
     def __init__(self, logger: logging.Logger | None = None):
         self.logger = logger or logging.getLogger(__name__)
 
@@ -24,7 +22,7 @@ class LoggerActivitySink(ActivitySinkProtocol):
         self.logger.info(activity.model_dump_json())
 
 
-class QueueActivitySink(ActivitySinkProtocol):
+class QueueActivitySink(LLMActivitySink):
     def __init__(self, queue: Queue) -> None:
         self._queue = queue
 
@@ -35,17 +33,17 @@ class QueueActivitySink(ActivitySinkProtocol):
             ...
 
 
-class NullActivitySink(ActivitySinkProtocol):
+class NullActivitySink(LLMActivitySink):
     def emit(self, activity: LLMActivity) -> None:
         pass
 
 
-class PrintActivitySink(ActivitySinkProtocol):
+class PrintActivitySink(LLMActivitySink):
     def emit(self, activity: LLMActivity) -> None:
         print(str(activity), flush=True)
 
 
-class FileActivitySink(ActivitySinkProtocol):
+class FileActivitySink(LLMActivitySink):
     def __init__(
         self, path: Path | str, mode: Literal["append", "overwrite", "a", "w"] = "append", encoding: str = "utf-8"
     ) -> None:

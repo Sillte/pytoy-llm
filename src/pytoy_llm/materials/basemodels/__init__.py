@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from pytoy_llm.materials.models import ModelMaterialData, TextMaterialData
 
 
-class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
+class BaseModelMaterial[T: BaseModel](BaseModel, frozen=True):
     """Container holding multiple `pydantic.BaseModel`"""
 
     data: Sequence[T]
@@ -18,7 +18,7 @@ class BaseModelBundle[T: BaseModel](BaseModel, frozen=True):
 
     @property
     def model_material_data(self) -> ModelMaterialData:
-        # Note: `TextFileBundleData` requires a memory space of
+        # Note: This requires a memory space of
         # text data.
         # If we would like to use the big data,
         # `chunk` or `iter` iteration is necessary regarding `data`.

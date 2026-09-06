@@ -2,8 +2,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Self
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.models import LLMEventEmitters
+from pytoy_llm.models.activities import LLMActivitySink
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.exceptions import InvocationException
@@ -33,7 +33,7 @@ class TaskSpec[T]:
         self,
         task_input: Any,
         context_state: TaskContextState,
-        activity_sink: ActivitySinkProtocol | None = None,
+        activity_sink: LLMActivitySink | None = None,
         emitters: LLMEventEmitters | None = None,
     ) -> Outcome[TaskResult[T], InvocationException]:
         llm_param = None

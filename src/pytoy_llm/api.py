@@ -4,10 +4,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models import LLMMessagesLike
+from pytoy_llm.models.activities import LLMActivitySink
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_metas import LLMParam
@@ -30,7 +30,7 @@ def completion[T: BaseModel | str](
     output_type: type[T] = str,  # type: ignore
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
-    activity_sink: ActivitySinkProtocol | None = None,
+    activity_sink: LLMActivitySink | None = None,
 ) -> T:
     """Execute the `litellm.completion`."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
@@ -43,7 +43,7 @@ def run[T: BaseModel | str](
     tools: LLMToolsLike = tuple(),
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
-    activity_sink: ActivitySinkProtocol | None = None,
+    activity_sink: LLMActivitySink | None = None,
     usage_limit: UsageLimit | None = None,
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""

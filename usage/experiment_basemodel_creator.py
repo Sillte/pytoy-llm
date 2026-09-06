@@ -8,7 +8,7 @@ from pytoy_llm import completion
 from pytoy_llm.composer.models import OutputSpec, SystemPromptSpec
 from pytoy_llm.composer.system_prompt_composer import SystemPromptComposer
 from pytoy_llm.composers.materials.models import MaterialSection, MaterialUsage, build_material_sections
-from pytoy_llm.materials.basemodels import BaseModelBundle
+from pytoy_llm.materials.basemodels import BaseModelMaterial
 from pytoy_llm.materials.models import (
     TextMaterialData,
 )
@@ -47,7 +47,7 @@ def make_system_prompt[T: BaseModel](
 
     sections: list[MaterialSection] = []
 
-    bundle = BaseModelBundle(data=instances)
+    bundle = BaseModelMaterial(data=instances)
 
     usage = MaterialUsage(
         usage="\n".join(
@@ -59,7 +59,7 @@ def make_system_prompt[T: BaseModel](
             ]
         ),
     )
-    sections.append(MaterialSection(name="BaseModelBundle", usage=usage, data=bundle.model_material_data))
+    sections.append(MaterialSection(name="BaseModelMaterial", usage=usage, data=bundle.model_material_data))
 
     # Decide output instruction
     if output_mode == "python_code":

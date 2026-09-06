@@ -1,5 +1,6 @@
 from .llm_activities import (
     LLMActivity,
+    LLMActivitySink,
     LLMMinimumActivity,
     LLMRequestActivity,
     LLMResponseActivity,
@@ -10,6 +11,7 @@ from .llm_activities import (
 
 __all__ = [
     "LLMActivity",
+    "LLMActivitySink",
     "LLMMinimumActivity",
     "LLMRequestActivity",
     "LLMResponseActivity",

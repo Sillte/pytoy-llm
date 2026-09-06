@@ -6,7 +6,7 @@ from typing import Annotated, Any, MutableMapping, Self
 
 from pydantic import BaseModel, Field, field_validator
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol
+from pytoy_llm.models.activities import LLMActivitySink
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
@@ -24,7 +24,7 @@ class ExecutionContext:
     connection: Connection | str | None
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
-    activity_sink: ActivitySinkProtocol | None = None
+    activity_sink: LLMActivitySink | None = None
     emitters: LLMEventEmitters = field(default_factory=LLMEventEmitters)
 
 
