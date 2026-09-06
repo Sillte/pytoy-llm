@@ -19,6 +19,7 @@ def test_inspection_reads_files_and_ranges(tmp_path: Path) -> None:
 
 
 def test_inspection_rejects_outside_paths_and_directories(tmp_path: Path) -> None:
+    (tmp_path.parent / "secret.txt").write_text("top secret\n", encoding="utf-8")
     (tmp_path / "folder").mkdir()
     explorer = WorkspaceExplorer(tmp_path)
 

@@ -1,54 +1,39 @@
-**This library is prototypical and not sufficiently tested.**
-
-
 # pytoy-llm
 
-A thin, stateless LLM CLI wrapper designed for editor integrations  
-(Vim / Neovim).
+This project is currently a personal project rather than a public release.
+For now, it focuses on exploring software architecture, with a particular focus on integration with Vim plugin.
 
-This library is primarily used by [`vim-pytoy`](https://github.com/Sillte/vim-pytoy).
- 
-`pytoy-llm` provides a **minimal, provider-agnostic boundary** around LLM
-completion APIs using [`litellm`](https://github.com/BerriAI/litellm),
-with strong emphasis on:
+## Principles
 
-- Stateless execution
-- Typed contracts (via Pydantic, partially implemented)
+- Stateless LLM usage
+    - Structured system prompt construction
+    - Typed contracts
+    - Thin wrappers around LiteLLM and PydanticAI
+
+- Task mechanism with state management
+    - Session management
+    - Event-driven activity logs
+
+This library is primarily intended to be used by [`vim-pytoy`](https://github.com/Sillte/vim-pytoy).
 
 ---
 
-## Design Philosophy
+## Usage
 
-`pytoy-llm` intentionally avoids being smart.
+### Configuration
 
-It does **not**:
-- Manage conversation state
-- Store chat history
+First, run the following script to generate a connection file:
 
-Instead, it acts as a **pure execution boundary**:
-
-> “Given messages and a connection, return a completion.”
-
-All state, orchestration, and higher-level logic are expected to live
-**outside** this CLI — for example, in a Vim plugin or a Python library.
-
-This design keeps the tool:
-- Predictable
-- Easy to audit
-- Easy to replace or extend
-
-### Usages
-
-#### Configuration setting
-
-First, execute the following script to generate a connection file.
 ```python
 from pytoy_llm import initialize_configuration
+
 path = initialize_configuration("first_connect")
-print("ConnectionFile:", path) 
+print("Connection file:", path)
 ```
-You will see the path to a configuration file like the following.
-Please fill your API info and model you want to use there.  
+
+The script will print the path to a configuration file like the following.
+Fill in your API information and the model you want to use.
+
 ```json
 {
     "model": "",
@@ -57,7 +42,8 @@ Please fill your API info and model you want to use there.
 }
 ```
 
-Example: 
+For example:
+
 ```json
 {
     "model": "gemini/gemini-2.5-flash",
@@ -66,18 +52,39 @@ Example:
 }
 ```
 
-#### `litellm.completion`.
+### `completion` — Stateless usage
 
-The simplest usage:
+The simplest usage is:
 
-- Input: `str`
-- Output: `str`
+* Input: `str`
+* Output: `str`
 
-```
+```python
 from pytoy_llm import completion
-output = completion("Hello, there.", output_type="str", connection="first_connect")
+
+output = completion(
+    "Hello, there.",
+    output_type="str",
+    connection="first_connect",
+)
 ```
 
-More advanced output formats (e.g. Pydantic models) are supported and documented...
+### `Task` — Stateful usage
 
-(To be continue...)
+For examples, refer to the [`usage`](./usage) folder.
+
+---
+
+## Security Notice
+
+**Security consideration:** Tools may expose workspace contents to an LLM.
+When using `LLMToolsLike`, carefully review which tools are enabled and what data they can access.
+
+The `pytoy_llm/tools` package includes tools that can be made available to LLMs.
+
+### `WorkspaceExplorer`
+
+* The workspace corresponds to the root of the package.
+* This tool only gathers files and folders under the specified workspace.
+* The gathered contents may be sent to the LLM.
+
