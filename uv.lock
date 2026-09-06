@@ -2236,19 +2236,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pydantic-ai-litellm"
-version = "0.2.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "litellm" },
-    { name = "pydantic-ai-slim" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/11/f9/7594913c5f410579d3186b467abed5030845120e71b480ddb66a0e4e2e3d/pydantic_ai_litellm-0.2.8.tar.gz", hash = "sha256:06338018ad9ded6befa366a46997c1bf4d4742f780cfb23a7ff72adec8604a15", size = 178423, upload_time = "2026-07-14T23:10:49.922Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/42/458123d67f238463c6d3fa176799bee981a08cfc15b1c47e77d4c99394f2/pydantic_ai_litellm-0.2.8-py3-none-any.whl", hash = "sha256:c02311dd99632b48766a11038bc391b0f15c50f771c342404b5a62af6065aa5d", size = 9242, upload_time = "2026-07-14T23:10:48.548Z" },
-]
-
-[[package]]
 name = "pydantic-ai-slim"
 version = "2.31.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2513,7 +2500,6 @@ dependencies = [
     { name = "orjson" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
-    { name = "pydantic-ai-litellm" },
     { name = "typer" },
     { name = "typing-extensions" },
 ]
@@ -2534,7 +2520,6 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.9" },
     { name = "pydantic", specifier = ">=2.5" },
     { name = "pydantic-ai", specifier = ">=2.15.0" },
-    { name = "pydantic-ai-litellm", specifier = ">=0.2.3" },
     { name = "typer", specifier = ">=0.12" },
     { name = "typing-extensions", specifier = ">=4.10" },
 ]

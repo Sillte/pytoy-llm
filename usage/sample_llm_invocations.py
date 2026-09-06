@@ -139,4 +139,4 @@ if __name__ == "__main__":
     response = TaskSyncExecutor().execute(request)
     print(response.output)
 
-    print("invocation_records", response.outcome.traces)
+    print("invocation_records", response.result.traces)

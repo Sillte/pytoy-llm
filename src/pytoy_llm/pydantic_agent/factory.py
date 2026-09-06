@@ -47,7 +47,4 @@ class PydanticAIModelFactory:
 
             return OpenAIChatModel(sub_name, provider=provider, settings=model_settings, profile=thinking_override)
         else:
-            assert base_url, "for fool proof."
-            from pydantic_ai_litellm import LiteLLMModel
-
-            return LiteLLMModel(model_name=model_name, api_key=api_key, api_base=base_url, settings=model_settings)
+            raise ValueError(f"Only `openai/` or `gemini/` models are accepted, `{parts[0]}` is not accepted.")
