@@ -16,7 +16,7 @@ class Disposable:
         self._dispose()
 
 
-type Subscribe[T] = Callable[[Listener[T]], "Disposable"]
+type Subscribe[T] = Callable[[Listener[T]], Disposable]
 
 
 class EventProtocol[T](Protocol):
@@ -55,16 +55,15 @@ class Event[T]:
         return self._subscribe(listener)
 
     def __call__(self, listener: Listener[T]) -> Disposable:
-        # For decorator.
         return self.subscribe(listener)
 
-    def once(self) -> Event:
-        from pytoy_llm.task.shared.event import utils
+    def once(self) -> Event[T]:
+        from pytoy_llm.shared.event import utils
 
         return utils.once(self)
 
     def map[R](self, transform: Callable[[T], R]) -> Event[R]:
-        from pytoy_llm.task.shared.event import utils
+        from pytoy_llm.shared.event import utils
 
         return utils.map_event(self, transform)
 
@@ -87,7 +86,7 @@ class Event[T]:
     ) -> Event[T]: ...
 
     def filter(self, predicate: Callable[[T], bool]) -> Event[Any]:
-        from pytoy_llm.task.shared.event import utils
+        from pytoy_llm.shared.event import utils
 
         return utils.filter(self, predicate)
 
@@ -100,8 +99,7 @@ class EventEmitter[T]:
     def _subscribe(self, listener: Listener[T]) -> Disposable:
         self._listeners.append(listener)
 
-        def dispose():
-            # For idempotency,
+        def dispose() -> None:
             try:
                 self._listeners.remove(listener)
             except (ValueError, RuntimeError):

@@ -11,13 +11,14 @@ from pydantic_ai import (
     UserPromptPart,
 )
 
-from pytoy_llm.activity_sinks import ActivitySinkProtocol, NullActivitySink
+from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import (
     LLMMessagesLike,
 )
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike, from_llm_tools_like
@@ -50,14 +51,20 @@ class CurrentModelRequestPair:
 
 class PytoyPydanticAIAgent:
     def __init__(
-        self, connection: str | Connection, llm_param: LLMParam | None = None, activity_sink: ActivitySinkProtocol | None = None
+        self,
+        connection: str | Connection,
+        llm_param: LLMParam | None = None,
+        activity_sink: ActivitySinkProtocol | None = None,
+        event_emitters: LLMEventEmitters | None = None,
     ) -> None:
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
         llm_param = llm_param or connection.llm_param or LLMParam()
         self._connection = connection
         self._llm_param = llm_param
-        self._activity_sink = activity_sink
+        self._event_emitters = event_emitters or LLMEventEmitters()
+        if activity_sink is not None:
+            self._event_emitters.activity.subscribe(activity_sink.emit)
 
     def _make_agent(self, system_prompt: str | None | tuple, tools: LLMToolsLike) -> Agent:
         system_prompt = system_prompt or tuple()
@@ -90,8 +97,7 @@ class PytoyPydanticAIAgent:
         message_history, current_message = model_messages[:-1], model_messages[-1]
         pair = CurrentModelRequestPair.from_model_message(current_message)
         agent = self._make_agent(system_prompt=pair.system_prompt, tools=tools)
-        activity_sink = self._activity_sink or NullActivitySink()
-        event_handler = EventHandler(activity_sink)
+        event_handler = EventHandler(self._event_emitters)
         event_handler.emit_request(messages)
         result = agent.run_sync(
             user_prompt=pair.user_prompt,

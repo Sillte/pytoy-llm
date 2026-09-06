@@ -20,6 +20,9 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("httpx").setLevel(logging.DEBUG)
 logging.getLogger("httpcore").setLevel(logging.DEBUG)
 
+explorer = WorkspaceExplorer(Path("../"))
+print("WORKSPACE-EXPLOREER", explorer.workspace)
+
 analysis_agent = AgentInvocationSpec(
     meta=InvocationSpecMeta(
         name="AnalyzeProject",
@@ -255,7 +258,7 @@ Why python is too slow, especially in this repository?
 """,
         )
     ],
-    tools=[WorkspaceExplorer(Path("../"))],
+    tools=[explorer.tools],
     usage_limit=UsageLimit(max_total_tokens=2000000, max_requests=50),
 )
 

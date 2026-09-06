@@ -4,12 +4,12 @@ from typing import cast
 from litellm import ModelResponse
 from pydantic import BaseModel
 
-from pytoy_llm.activity_sinks import NullActivitySink
 from pytoy_llm.activity_sinks.protocol import ActivitySinkProtocol
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConverter
 from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
 from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
 
@@ -27,6 +27,7 @@ class PytoyLiteLLMClient:
         connection: str | Connection,
         llm_param: LLMParam | None = None,
         activity_sink: ActivitySinkProtocol | None = None,
+        event_emitters: LLMEventEmitters | None = None,
     ) -> None:
 
         if isinstance(connection, str):
@@ -35,7 +36,9 @@ class PytoyLiteLLMClient:
 
         self._connection: Connection = connection
         self._llm_param = llm_param
-        self._activity_sink = activity_sink
+        self._event_emitters = event_emitters or LLMEventEmitters()
+        if activity_sink is not None:
+            self._event_emitters.activity.subscribe(activity_sink.emit)
 
     @property
     def connection(self) -> Connection:
@@ -86,9 +89,9 @@ class PytoyLiteLLMClient:
         kwargs = LLMParamConverter().to_litellm_kwargs(self._llm_param)
 
         handler = LiteLLMEventHandler()
-        activity_sink = self._activity_sink or NullActivitySink()
+        event_emitters = self._event_emitters
 
-        with handler.register(activity_sink) as metadata:
+        with handler.register(event_emitters) as metadata:
             response = litellm_completion(
                 model=self.connection.model,
                 messages=raw_messages,

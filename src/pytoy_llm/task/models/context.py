@@ -8,10 +8,14 @@ from pydantic import BaseModel, Field, field_validator
 
 from pytoy_llm.activity_sinks import ActivitySinkProtocol
 from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
 
 type TaskRunState = MutableMapping[str, Any]
+
+
+ExecutionEvents = LLMEventEmitters
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,7 @@ class ExecutionContext:
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
     activity_sink: ActivitySinkProtocol | None = None
+    events: LLMEventEmitters = field(default_factory=LLMEventEmitters)
 
 
 @dataclass(frozen=True)

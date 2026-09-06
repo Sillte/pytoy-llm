@@ -1,7 +1,8 @@
 from typing import Self, Sequence
 
+from pytoy_llm.models.activities.llm_activities import LLMActivity
+from pytoy_llm.shared.event import Event
 from pytoy_llm.task.global_context import GlobalContext
-from pytoy_llm.task.shared.event import Event
 
 from .factory import TaskExecutionFactory
 from .manager import TaskExecutionManager
@@ -62,3 +63,10 @@ class TaskExecutionHandler[T]:
         if execution is None:
             raise ValueError(f"`execution` does not exist; {self._id=}")
         return execution.on_exit
+
+    @property
+    def on_activity(self) -> Event[LLMActivity]:
+        execution = self._manager.get(self._id)
+        if execution is None:
+            raise ValueError(f"`execution` does not exist; {self._id=}")
+        return execution.on_activity

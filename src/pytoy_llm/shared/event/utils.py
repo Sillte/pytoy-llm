@@ -58,8 +58,6 @@ def filter[T](event: Event[T], predicator: Callable[[T], bool]) -> Event[Any]:
         def wrapper(value: T) -> None:
             if predicator(value):
                 listener(value)
-            else:
-                ...
 
         disposable = event.subscribe(wrapper)
         return Disposable(lambda: disposable.dispose())
