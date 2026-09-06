@@ -52,6 +52,15 @@ MaxResults = Annotated[
     ),
 ]
 
+MaxBytes = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=10_000_000,
+        description="Maximum number of bytes to read from one file.",
+    ),
+]
+
 MaxDepth = Annotated[
     int,
     Field(

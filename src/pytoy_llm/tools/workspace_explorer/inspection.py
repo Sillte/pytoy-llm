@@ -3,7 +3,7 @@ from typing import Self, Sequence
 
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import FileContent, FilePartContent, WorkspaceAccess
-from pytoy_llm.tools.workspace_explorer.semantic_types import LineNumber, WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import LineNumber, MaxBytes, WorkspacePath
 
 
 class WorkspaceInspection:
@@ -34,6 +34,7 @@ class WorkspaceInspection:
         self,
         path: WorkspacePath,
         max_lines: int | None = 20,
+        max_bytes: MaxBytes | None = 1_000_000,
     ) -> FilePartContent | FileContent | ToolError:
         """
         Read the beginning of a text file, or the entire file when requested.
@@ -77,6 +78,10 @@ class WorkspaceInspection:
                 msg="`max_lines` must be greater than or equal to 1.",
                 retry=False,
             )
+        if max_bytes is not None and max_bytes < 1:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg="`max_bytes` must be greater than or equal to 1.", retry=False
+            )
 
         abs_path = self.access.resolve(path)
         if isinstance(abs_path, ToolError):
@@ -87,6 +92,14 @@ class WorkspaceInspection:
                 return ToolError(
                     kind=ToolErrorKind.NOT_FOUND,
                     msg=f"{path=} does not exist.",
+                    retry=False,
+                )
+            if not abs_path.is_file():
+                return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False)
+            if max_bytes is not None and abs_path.stat().st_size > max_bytes:
+                return ToolError(
+                    kind=ToolErrorKind.RESOURCE_LIMIT,
+                    msg=f"{path=} exceeds the {max_bytes} byte limit.",
                     retry=False,
                 )
             if max_lines is None:
@@ -128,6 +141,7 @@ class WorkspaceInspection:
         self,
         paths: Sequence[WorkspacePath],
         max_lines: int | None = 10,
+        max_bytes: MaxBytes | None = 1_000_000,
     ) -> list[FileContent | FilePartContent] | ToolError:
         """
         Read the beginning of multiple text files, or the entire files when requested.
@@ -168,6 +182,10 @@ class WorkspaceInspection:
                 msg="`max_lines` must be greater than or equal to 1.",
                 retry=False,
             )
+        if max_bytes is not None and max_bytes < 1:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg="`max_bytes` must be greater than or equal to 1.", retry=False
+            )
 
         results: list[FileContent | FilePartContent] = []
 
@@ -175,6 +193,7 @@ class WorkspaceInspection:
             result = self.read_file(
                 path=path,
                 max_lines=max_lines,
+                max_bytes=max_bytes,
             )
 
             if isinstance(result, ToolError):
@@ -189,6 +208,7 @@ class WorkspaceInspection:
         path: WorkspacePath,
         start_line: LineNumber,
         end_line: LineNumber,
+        max_bytes: MaxBytes | None = 1_000_000,
     ) -> FilePartContent | ToolError:
         """
         Read a specific range of lines from a text file.
@@ -232,10 +252,24 @@ class WorkspaceInspection:
             )
         if start_line < 0:
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg="start_line must be a non-negative integer.")
+        if max_bytes is not None and max_bytes < 1:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg="`max_bytes` must be greater than or equal to 1.", retry=False
+            )
         abs_path = self.access.resolve(path)
         if isinstance(abs_path, ToolError):
             return abs_path
         try:
+            if not abs_path.exists():
+                return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=f"{path=} does not exist.", retry=False)
+            if not abs_path.is_file():
+                return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False)
+            if max_bytes is not None and abs_path.stat().st_size > max_bytes:
+                return ToolError(
+                    kind=ToolErrorKind.RESOURCE_LIMIT,
+                    msg=f"{path=} exceeds the {max_bytes} byte limit.",
+                    retry=False,
+                )
             content = abs_path.read_text(encoding="utf8")
             lines = content.splitlines(keepends=True)
 

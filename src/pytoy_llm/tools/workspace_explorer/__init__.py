@@ -37,7 +37,7 @@ class WorkspaceExplorer:
         excludes: Sequence[str] | None = None,
     ) -> None:
         self.workspace = workspace.resolve()
-        self.excludes = set(excludes or DEFAULT_EXCLUDE_NAMES)
+        self.excludes = set(DEFAULT_EXCLUDE_NAMES if excludes is None else excludes)
         self.access = WorkspaceAccess.from_any(workspace=workspace, excludes=frozenset(self.excludes))
         self.discovery = WorkspaceDiscovery(self.access)
         self.inspection = WorkspaceInspection(self.access)

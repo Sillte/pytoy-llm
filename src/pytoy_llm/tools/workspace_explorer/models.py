@@ -127,11 +127,15 @@ class WorkspaceAccess:
 
     @classmethod
     def from_any(cls, workspace: Path | str, excludes: frozenset[str] | None = None) -> Self:
-        excludes = excludes or DEFAULT_EXCLUDED_PATTERNS
+        if excludes is None:
+            excludes = DEFAULT_EXCLUDED_PATTERNS
         return cls(workspace=Path(workspace).resolve(), excludes=excludes)
 
     def resolve(self, path: WorkspacePath) -> Path | ToolError:
-        abs_path = self.workspace / path
+        abs_path = (self.workspace / path).resolve(strict=False)
         if not abs_path.is_relative_to(self.workspace):
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} is outside workspace", retry=False)
         return abs_path
+
+    def is_within_workspace(self, path: Path) -> bool:
+        return path.resolve(strict=False).is_relative_to(self.workspace)

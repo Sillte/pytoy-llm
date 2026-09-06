@@ -75,7 +75,13 @@ class WorkspaceDiscovery:
             return root
 
         try:
-            paths = PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="all", patterns=patterns)
+            paths = tuple(
+                path
+                for path in PathGatherer().gather(
+                    root=root, max_depth=None, excludes=self.excludes, target="all", patterns=patterns
+                )
+                if self.access.is_within_workspace(path)
+            )
         except ValueError as e:
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
 
@@ -121,7 +127,11 @@ class WorkspaceDiscovery:
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"Invalid `{collection_root=}`; {e}")
 
         try:
-            paths = PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="all")
+            paths = tuple(
+                path
+                for path in PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="all")
+                if self.access.is_within_workspace(path)
+            )
         except ValueError as e:
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
 
@@ -167,7 +177,11 @@ class WorkspaceDiscovery:
             return root
 
         try:
-            paths = PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="file")
+            paths = tuple(
+                path
+                for path in PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="file")
+                if self.access.is_within_workspace(path)
+            )
         except ValueError as e:
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
         file_infos = sorted(

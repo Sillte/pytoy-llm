@@ -8,7 +8,7 @@ from pydantic import Field
 from pytoy_llm.foundation.paths import PathGatherer
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import GrepMatch, GrepMatchContext, WorkspaceAccess
-from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, SearchPattern, WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, MaxBytes, MaxResults, SearchPattern, WorkspacePath
 
 
 class WorkspaceSearch:
@@ -63,6 +63,8 @@ class WorkspaceSearch:
                 description=("Number of lines to include before and after each match."),
             ),
         ] = 3,
+        max_results: MaxResults = 100,
+        max_file_bytes: MaxBytes = 1_000_000,
     ) -> Sequence[GrepMatchContext] | ToolError:
         """
         Search text contents of files within the workspace and return matching
@@ -113,6 +115,12 @@ class WorkspaceSearch:
             search_patterns = [search_patterns]
         if isinstance(file_patterns, str):
             file_patterns = [file_patterns]
+        if context_lines < 0 or max_results < 1 or max_file_bytes < 1:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg="context_lines must be non-negative, max_results and max_file_bytes must be positive.",
+                retry=False,
+            )
 
         root = self.access.resolve(collection_root)
         if isinstance(root, ToolError):
@@ -122,11 +130,15 @@ class WorkspaceSearch:
         if not root.is_dir():
             return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{root=}` must be a directory.", retry=None)
 
-        files = PathGatherer().gather(
-            root=root,
-            patterns=file_patterns,
-            excludes=self.access.excludes,
-            target="file",
+        files = tuple(
+            path
+            for path in PathGatherer().gather(
+                root=root,
+                patterns=file_patterns,
+                excludes=self.access.excludes,
+                target="file",
+            )
+            if self.access.is_within_workspace(path) and path.stat().st_size <= max_file_bytes
         )
         if regex:
             matches = self._grep_context_by_regex(
@@ -138,7 +150,7 @@ class WorkspaceSearch:
             matches = self._grep_context_by_text(search_patterns=search_patterns, files=files, case_sensitive=case_sensitive)
         if isinstance(matches, ToolError):
             return matches
-        return self.integrate_matches(matches, context_lines=context_lines)
+        return self.integrate_matches(matches[:max_results], context_lines=context_lines)
 
     def _grep_context_by_regex(
         self,
