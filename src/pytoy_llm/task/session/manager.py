@@ -18,13 +18,15 @@ class TaskSessionManager:
         query = query or TaskSessionQuery()
         with self._lock:
             sessions = list(self._sessions.values())
+        if query.kind:
+            sessions = [session for session in sessions if session.kind == query.kind]
         if query.status:
             sessions = [session for session in sessions if session.status in query.status]
-        if query.execution_status:
+        if query.task_status:
             sessions = [
                 session
                 for session in sessions
-                if any(record.status in query.execution_status for record in session.records.values())
+                if any(record.status in query.task_status for record in session.records.values())
             ]
         return sessions
 

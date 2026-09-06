@@ -4,7 +4,17 @@ import pytest
 
 from pytoy_llm.task.execution.manager import TaskExecutionManager
 from pytoy_llm.task.models import ContextPatch, FunctionInvocationSpec, InvocationResult, TaskRequest
-from pytoy_llm.task.session import TaskSessionHandler, TaskSessionManager
+from pytoy_llm.task.session import TaskSessionHandler, TaskSessionManager, TaskSessionQuery, TaskSessionRequest
+
+
+def create_session(
+    session_manager: TaskSessionManager,
+    execution_manager: TaskExecutionManager,
+    *,
+    kind: str | None = None,
+) -> TaskSessionHandler:
+    request = TaskSessionRequest.from_any(kind=kind) if kind is not None else TaskSessionRequest.from_any()
+    return TaskSessionHandler.create(request=request, manager=session_manager, execution_manager=execution_manager)
 
 
 def wait_for_exit(session, task_id: str) -> None:
@@ -16,7 +26,7 @@ def wait_for_exit(session, task_id: str) -> None:
 def test_session_propagates_context_between_task_executions() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()
-    session = TaskSessionHandler.create(manager=session_manager, execution_manager=execution_manager)
+    session = create_session(session_manager, execution_manager)
 
     def remember(value: str, _context) -> InvocationResult[str]:
         return InvocationResult(output=value, context_patch=ContextPatch(state={"remembered": value}))
@@ -42,7 +52,7 @@ def test_session_propagates_context_between_task_executions() -> None:
 def test_failed_task_returns_session_to_idle_and_can_be_retried() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()
-    session = TaskSessionHandler.create(manager=session_manager, execution_manager=execution_manager)
+    session = create_session(session_manager, execution_manager)
     attempts = 0
 
     def fail_once(value: str, _context) -> str:
@@ -68,7 +78,7 @@ def test_failed_task_returns_session_to_idle_and_can_be_retried() -> None:
 def test_completed_session_rejects_new_tasks_and_emits_session_exit() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()
-    session = TaskSessionHandler.create(manager=session_manager, execution_manager=execution_manager)
+    session = create_session(session_manager, execution_manager)
     exited: list[str] = []
     session.on_session_exit.subscribe(exited.append)
 
@@ -81,7 +91,7 @@ def test_completed_session_rejects_new_tasks_and_emits_session_exit() -> None:
 def test_terminate_removes_session_and_clears_retained_resources() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()
-    session = TaskSessionHandler.create(manager=session_manager, execution_manager=execution_manager)
+    session = create_session(session_manager, execution_manager)
 
     task = session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(lambda value: value), "value"))
     wait_for_exit(session, task.id)
@@ -94,7 +104,7 @@ def test_terminate_removes_session_and_clears_retained_resources() -> None:
 def test_terminate_does_not_accept_late_task_callbacks() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()
-    session = TaskSessionHandler.create(manager=session_manager, execution_manager=execution_manager)
+    session = create_session(session_manager, execution_manager)
     started = Event()
     release = Event()
 
@@ -117,8 +127,10 @@ def test_terminate_does_not_accept_late_task_callbacks() -> None:
 def test_session_manager_queries_registered_sessions() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()
-    session = TaskSessionHandler.create(manager=session_manager, execution_manager=execution_manager)
+    session = create_session(session_manager, execution_manager, kind="conversation")
 
     selected = TaskSessionHandler.query(manager=session_manager)
 
     assert [item.id for item in selected] == [session.id]
+    selected_by_kind = session_manager.select(TaskSessionQuery.from_any(kind="conversation"))
+    assert [item.id for item in selected_by_kind] == [session.id]

@@ -1,15 +1,17 @@
-import uuid
 from dataclasses import dataclass, field
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Self, Sequence, cast
 
 from pytoy_llm.models.llm_activities import LLMActivity
 from pytoy_llm.shared.event import Event, EventEmitter
 from pytoy_llm.task.execution.models import TaskExecutionStatus
-from pytoy_llm.task.models import TaskRequest
+from pytoy_llm.task.models import TaskContextState, TaskRequest
 from pytoy_llm.task.models.exceptions import TaskExecutionException
 
 type TaskSessionID = str
 type TaskSessionStatus = Literal["idle", "running", "completed"]
+
+
+DEFAULT_KIND = "$default"
 
 
 @dataclass(frozen=True)
@@ -24,12 +26,12 @@ class TaskRecord:
 
 @dataclass(frozen=True)
 class TaskSessionRequest:
-    id: TaskSessionID = field(default_factory=lambda: str(uuid.uuid4()))
+    kind: str = DEFAULT_KIND
+    context_state: TaskContextState | None = None
 
-
-@dataclass(frozen=True)
-class TaskSessionContext:
-    pass
+    @classmethod
+    def from_any(cls, kind: str = DEFAULT_KIND, context_state: TaskContextState | None = None):
+        return cls(kind=kind, context_state=context_state)
 
 
 @dataclass(frozen=True)
@@ -61,5 +63,28 @@ class TaskSessionEvent:
 
 @dataclass(frozen=True)
 class TaskSessionQuery:
-    status: Sequence[TaskSessionStatus] | None = None
-    execution_status: Sequence[TaskExecutionStatus] | None = None
+    kind: str | None = None
+    status: tuple[TaskSessionStatus, ...] | None = None
+    task_status: tuple[TaskExecutionStatus, ...] | None = None
+
+    @classmethod
+    def from_any(
+        cls,
+        kind: str | None = None,
+        status: Sequence[TaskSessionStatus] | TaskSessionStatus | None = None,
+        task_status: Sequence[TaskExecutionStatus] | TaskExecutionStatus | None = None,
+    ) -> Self:
+        def _normalize[T](value: Sequence[T] | T | None) -> tuple[T, ...] | None:
+            if value is None:
+                return None
+
+            if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+                return tuple(value)
+
+            return cast(tuple[T, ...], (value,))
+
+        return cls(
+            kind=kind,
+            status=_normalize(status),
+            task_status=_normalize(task_status),
+        )

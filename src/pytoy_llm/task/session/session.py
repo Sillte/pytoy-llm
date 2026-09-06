@@ -14,7 +14,7 @@ from pytoy_llm.task.execution.models import TaskExecutionHooks, TaskExecutionID
 from pytoy_llm.task.models import TaskContextState, TaskRequest
 from pytoy_llm.task.shared.outcome import is_success
 
-from .models import TaskRecord, TaskSessionEvent, TaskSessionID, TaskSessionStatus
+from .models import DEFAULT_KIND, TaskRecord, TaskSessionEvent, TaskSessionID, TaskSessionStatus
 
 
 @dataclass
@@ -25,6 +25,7 @@ class TaskSession:
 
     status: TaskSessionStatus = "idle"
     timestamp: float = field(default_factory=time.time)
+    kind: str = DEFAULT_KIND
 
     id: TaskSessionID = field(default_factory=lambda: str(uuid.uuid4()))
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
@@ -35,11 +36,11 @@ class TaskSession:
     def from_any(
         cls,
         context_state: TaskContextState | None = None,
-        id: TaskSessionID | None = None,
+        kind: str = DEFAULT_KIND,
     ) -> Self:
         return cls(
             context_state=context_state or TaskContextState(),
-            id=id or str(uuid.uuid4()),
+            kind=kind,
         )
 
     def submit(self, request: TaskRequest, *, execution_manager: TaskExecutionManager) -> TaskExecutionHandler:

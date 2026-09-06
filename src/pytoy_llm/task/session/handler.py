@@ -9,36 +9,44 @@ from pytoy_llm.task.global_context import GlobalContext
 from pytoy_llm.task.models import TaskContextState, TaskRequest
 
 from .manager import TaskSessionManager
-from .models import TaskRecord, TaskSessionID, TaskSessionQuery, TaskSessionStatus
+from .models import TaskRecord, TaskSessionID, TaskSessionQuery, TaskSessionRequest, TaskSessionStatus
 from .session import TaskSession
 
 
 class TaskSessionHandler:
-    def __init__(self, id: TaskSessionID, *, manager: TaskSessionManager) -> None:
+    def __init__(self, id: TaskSessionID, *, manager: TaskSessionManager, execution_manager: TaskExecutionManager) -> None:
         self._id = id
         self._manager = manager
-        self._execution_manager = GlobalContext.get().execution_manager
+        self._execution_manager = execution_manager
 
     @classmethod
     def create(
         cls,
+        request: TaskSessionRequest | None = None,
         *,
-        context_state: TaskContextState | None = None,
         manager: TaskSessionManager | None = None,
         execution_manager: TaskExecutionManager | None = None,
     ) -> Self:
         manager = manager or GlobalContext.get().session_manager
         execution_manager = execution_manager or GlobalContext.get().execution_manager
-        session = TaskSession.from_any(context_state=context_state)
+
+        request = request or TaskSessionRequest.from_any()
+        session = TaskSession.from_any(context_state=request.context_state, kind=request.kind)
         manager.register(session)
-        handler = cls(id=session.id, manager=manager)
-        handler._execution_manager = execution_manager
+        handler = cls(id=session.id, manager=manager, execution_manager=execution_manager)
         return handler
 
     @classmethod
-    def query(cls, query: TaskSessionQuery | None = None, *, manager: TaskSessionManager | None = None) -> Sequence[Self]:
+    def query(
+        cls,
+        query: TaskSessionQuery | None = None,
+        *,
+        manager: TaskSessionManager | None = None,
+        execution_manager: TaskExecutionManager | None = None,
+    ) -> Sequence[Self]:
         manager = manager or GlobalContext.get().session_manager
-        return [cls(id=session.id, manager=manager) for session in manager.select(query)]
+        execution_manager = execution_manager or GlobalContext.get().execution_manager
+        return [cls(id=session.id, manager=manager, execution_manager=execution_manager) for session in manager.select(query)]
 
     @property
     def id(self) -> TaskSessionID:
