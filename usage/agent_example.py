@@ -273,9 +273,8 @@ task_spec = TaskSpec.from_specs(
 request = TaskRequest(
     spec=task_spec,
     input="./",
+    activity_sink=PrintActivitySink(),
 )
 
-
-response = TaskSyncExecutor().execute(request, activity_sink=PrintActivitySink())
-
-print(response.output)
+exit = TaskSyncExecutor().execute(request)
+print(exit.output)
