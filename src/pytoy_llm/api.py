@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
 from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models import LLMMessagesLike
-from pytoy_llm.models.activities import LLMActivitySink
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_activities import LLMActivitySink
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
 

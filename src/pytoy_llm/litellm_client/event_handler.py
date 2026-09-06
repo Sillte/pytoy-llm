@@ -10,7 +10,7 @@ from litellm.integrations.custom_logger import CustomLogger
 from pydantic import ValidationError
 
 from pytoy_llm.models import LLMEventEmitters, LLMTokens
-from pytoy_llm.models.activities.llm_activities import LLMMinimumActivity, LLMRequestActivity, LLMResponseActivity
+from pytoy_llm.models.llm_activities.llm_activities import LLMMinimumActivity, LLMRequestActivity, LLMResponseActivity
 
 
 class EventEmittersRepository:

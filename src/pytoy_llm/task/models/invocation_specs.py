@@ -10,9 +10,9 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel
 
 from pytoy_llm.llm_facade import LLMFacade
-from pytoy_llm.models.activities.llm_activities import ToolCallActivity, ToolResultActivity
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
+from pytoy_llm.models.llm_activities.llm_activities import ToolCallActivity, ToolResultActivity
 from pytoy_llm.models.llm_messages import LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike

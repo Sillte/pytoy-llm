@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from pytoy_llm.models.activities import LLMActivity, LLMActivitySink
+from pytoy_llm.models.llm_activities import LLMActivity, LLMActivitySink
 
 
 def to_json_serializable(activity: LLMActivity) -> Any:

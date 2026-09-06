@@ -18,7 +18,7 @@ from pydantic_ai import (
 )
 
 from pytoy_llm.models import LLMEventEmitters, LLMMessage
-from pytoy_llm.models.activities.llm_activities import (
+from pytoy_llm.models.llm_activities.llm_activities import (
     LLMActivity,
     LLMMinimumActivity,
     LLMRequestActivity,

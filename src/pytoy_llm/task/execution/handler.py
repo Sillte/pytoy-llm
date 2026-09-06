@@ -1,6 +1,6 @@
 from typing import Self, Sequence
 
-from pytoy_llm.models.activities.llm_activities import LLMActivity
+from pytoy_llm.models.llm_activities.llm_activities import LLMActivity
 from pytoy_llm.shared.event import Event
 from pytoy_llm.task.global_context import GlobalContext
 

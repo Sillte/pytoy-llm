@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Any, Self
 
 from pytoy_llm.models import LLMEventEmitters
-from pytoy_llm.models.activities import LLMActivitySink
+from pytoy_llm.models.llm_activities import LLMActivitySink
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.exceptions import InvocationException

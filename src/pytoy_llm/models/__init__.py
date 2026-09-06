@@ -4,3 +4,4 @@ from pytoy_llm.models.llm_events import LLMEventEmitters  # noqa
 from pytoy_llm.models.agent_metas import UsageLimit  # noqa
 from pytoy_llm.models.llm_tools import LLMToolsLike  # noqa
 from pytoy_llm.models.parts import OpaquePart, Part, Role, PartAdapter  # noqa
+from pytoy_llm.models.llm_activities import LLMActivity

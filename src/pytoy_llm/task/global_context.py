@@ -21,3 +21,9 @@ class GlobalContext:
         from pytoy_llm.task.execution.manager import TaskExecutionManager
 
         return TaskExecutionManager()
+
+    @cached_property
+    def session_manager(self):
+        from pytoy_llm.task.session.manager import TaskSessionManager
+
+        return TaskSessionManager()
