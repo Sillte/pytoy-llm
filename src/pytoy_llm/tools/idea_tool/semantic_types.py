@@ -5,7 +5,10 @@ from pydantic import Field, JsonValue
 IdeaSpacePath = Annotated[
     str,
     Field(
-        description=("Path relative to `IdeaspaceRoot`. "),
+        description=(
+            "Path inside the configured IdeaSpace. "
+            "in this value. `.` means the IdeaSpace root itself."
+        ),
         examples=[".", "./knowledge", "./history/note.md"],
     ),
 ]

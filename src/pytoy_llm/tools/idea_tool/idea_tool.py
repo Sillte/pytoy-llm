@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Self, Sequence
 
 from pytoy_llm.idea import DiskFileWriter, IdeaGraph, IdeaNote, IdeaSpace
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
 
 from .models import IdeaNoteLinkModel, IdeaNoteModel, LocalLinkModel, RemoteLinkModel
 from .semantic_types import IdeaNoteBody, IdeaNoteMetadata, IdeaSpaceDepth, IdeaSpacePath
@@ -13,6 +14,12 @@ class IdeaTool:
         self._idea_space = idea_space
         self._idea_graph = IdeaGraph(self._idea_space)
         self._file_writer = DiskFileWriter()
+        self._workspace_explorer = WorkspaceExplorer(idea_space.root)
+
+    @classmethod
+    def from_any(cls, idea_space_root: Path | str, workspace_root: Path | str) -> Self:
+        idea_space = IdeaSpace.from_path(path=Path(idea_space_root), root=Path(workspace_root))
+        return cls(idea_space=idea_space)
 
     @property
     def workspace_root(self) -> Path:
@@ -29,6 +36,7 @@ class IdeaTool:
             self.get_note_paths,
             self.get_note,
             self.write_note,
+            *self._workspace_explorer.tools,
         ]
 
     def get_subspaces(
