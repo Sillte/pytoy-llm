@@ -8,7 +8,10 @@ from yamlrocks import YAMLRocksDocument
 
 
 class YamlRockWrapper:
-    def __init__(self, yaml_rock: YAMLRocksDocument) -> None:
+    def __init__(self, yaml_rock: YAMLRocksDocument | None = None) -> None:
+        yaml_rock = yaml_rock or cast(
+            YAMLRocksDocument, yamlrocks.loads("{}", option=yamlrocks.OPT_ROUND_TRIP)
+        )
         self._yaml_rock = yaml_rock
 
     @classmethod
@@ -36,6 +39,10 @@ class YamlRockWrapper:
 
     def __len__(self) -> int:
         return len(self._yaml_rock)
+
+    def clear(self) -> None:
+        for key in tuple(self._yaml_rock.keys()):
+            del self._yaml_rock[key]
 
     def keys(self) -> Iterable[str]:
         return self._yaml_rock.keys()

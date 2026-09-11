@@ -32,7 +32,7 @@ class IdeaSpace:
             path = (root / path).resolve() if not path.is_absolute() else path.resolve()
 
         if not path.is_relative_to(root):
-            raise ValueError(f"Space must be inside root: path={path}, root={root}")
+            raise PermissionError(f"Space must be inside root: path={path}, root={root}")
 
         self._root = root
         self._relative_path = path.relative_to(root)

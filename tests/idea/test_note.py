@@ -25,3 +25,10 @@ def test_note_extracts_link_sources_with_source_ranges() -> None:
     assert len(note.link_sources) == 2
     assert note.link_sources[0].start == TextPosition(0, 4)
     assert note.link_sources[0].text_range.end.col > note.link_sources[0].start.col
+
+
+def test_note_metadata_can_be_added_when_frontmatter_is_absent() -> None:
+    note = IdeaNote("Body", Path("note.md"), root=Path("."))
+    note.metadata["id"] = "example"
+
+    assert "id: example" in note.text

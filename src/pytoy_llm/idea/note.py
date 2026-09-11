@@ -1,11 +1,14 @@
 from dataclasses import dataclass
-from functools import cached_property
 from pathlib import Path
 from typing import Self, Sequence
 
 from pytoy_llm.idea.domain.links import LinkSource, LinkSourceExtractor
 from pytoy_llm.idea.domain.metadata import MetaDataProtocol
-from pytoy_llm.idea.domain.readers import DiskFileReader, FileReaderProtocol
+from pytoy_llm.idea.domain.readers import (
+    DiskFileReader,
+    FileReaderProtocol,
+)
+from pytoy_llm.idea.domain.writers import DiskFileWriter, FileWriterProtocol
 from pytoy_llm.idea.infra.yamlrock_wrapper import YamlRockWrapper
 from pytoy_llm.idea.link_extractors.naive_source_extractors import (
     NaiveLinkSourceExtractor,
@@ -76,6 +79,23 @@ def interpret(text: str) -> Interpretation:
     return Interpretation(metadata=None, body=text, body_start_line=0)
 
 
+def _to_text(metadata: MetaDataProtocol, body: str) -> str:
+    """
+    Serialize the IdeaNote.
+    The output is normalized as:
+        ---
+        YAML
+        ---
+        Markdown body
+    """
+
+    if len(metadata) == 0:
+        return body
+
+    yaml_text = metadata.to_text().rstrip("\r\n")
+    return f"---\n{yaml_text}\n---\n{body}"
+
+
 class IdeaNote:
     """
     A single note represented by:
@@ -119,12 +139,11 @@ class IdeaNote:
         link_source_extractor = link_source_extractor or NaiveLinkSourceExtractor()
 
         if not path.is_relative_to(root):
-            raise ValueError(f"Path must be inside root: path={path}, root={root}")
-        self._text = text
+            raise PermissionError(f"Path must be inside root: path={path}, root={root}")
         self._relative_path = path.relative_to(root)
         self._root = root
         interpreted_result = interpret(text)
-        self._metadata = interpreted_result.metadata
+        self._metadata = interpreted_result.metadata or YamlRockWrapper()
         self._body = interpreted_result.body
         self._body_start_line = interpreted_result.body_start_line
         self._link_source_extractor = link_source_extractor
@@ -132,7 +151,7 @@ class IdeaNote:
     @classmethod
     def from_path(
         cls,
-        path: Path,
+        file_path: Path,
         root: Path | None = None,
         *,
         link_source_extractor: LinkSourceExtractor | None = None,
@@ -142,9 +161,28 @@ class IdeaNote:
         Parse an IdeaNote from the original document.
         """
         file_reader = file_reader or DiskFileReader()
-        text = file_reader.read(path)
-        root = root or path.parent
-        return cls(text=text, path=path, root=root, link_source_extractor=link_source_extractor)
+        text = file_reader.read(file_path)
+        root = root or file_path.parent
+        return cls(
+            text=text, path=file_path, root=root, link_source_extractor=link_source_extractor
+        )
+
+    @classmethod
+    def create(
+        cls,
+        file_path: Path,
+        body: str,
+        metadata: MetaDataProtocol | None = None,
+        root: Path | None = None,
+        *,
+        link_source_extractor: LinkSourceExtractor | None = None,
+    ) -> Self:
+        metadata = metadata or YamlRockWrapper()
+        text = _to_text(metadata, body)
+        root = root or file_path.parent
+        return cls(
+            text=text, path=file_path, root=root, link_source_extractor=link_source_extractor
+        )
 
     @property
     def path(self) -> str:
@@ -160,7 +198,7 @@ class IdeaNote:
 
     @property
     def text(self) -> str:
-        return self._text
+        return self.to_text()
 
     @property
     def body(self) -> str:
@@ -172,8 +210,11 @@ class IdeaNote:
         return self._body_start_line
 
     @property
-    def metadata(self) -> MetaDataProtocol | None:
+    def metadata(self) -> MetaDataProtocol:
         return self._metadata
+
+    def set_body(self, body: str) -> None:
+        self._body = body
 
     def to_text(self) -> str:
         """
@@ -184,15 +225,14 @@ class IdeaNote:
             ---
             Markdown body
         """
+        return _to_text(self._metadata, self._body)
 
-        if self._metadata is None:
-            return self._body
+    def write(self, file_writer: FileWriterProtocol | None = None) -> None:
+        """Write the serialized note to :attr:`file_path`."""
+        file_writer = file_writer or DiskFileWriter()
+        file_writer.write(self.to_text(), self.file_path)
 
-        yaml_text = self._metadata.to_text().rstrip("\r\n")
-
-        return f"---\n{yaml_text}\n---\n{self._body}"
-
-    @cached_property
+    @property
     def link_sources(self) -> Sequence[LinkSource]:
         """Source links contained in the original text."""
 

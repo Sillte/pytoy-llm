@@ -5,7 +5,9 @@ from pydantic import Field
 WorkspacePath = Annotated[
     str,
     Field(
-        description=("Path relative to the workspace root. The path must never escape the workspace."),
+        description=(
+            "Path relative to the workspace root. The path must never escape the workspace."
+        ),
         examples=["./", "src", "src/pytoy_llm/api.py"],
     ),
 ]

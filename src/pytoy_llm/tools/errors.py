@@ -9,6 +9,7 @@ class ToolErrorKind(str, Enum):
     PERMISSION_DENIED = "permission_denied"
     RESOURCE_LIMIT = "resource_limit"
     PARSE_ERROR = "parse_error"
+    IO_ERROR = "io_error"
     UNKNOWN = "unknown"
 
 
@@ -20,7 +21,9 @@ class ToolError(BaseModel, frozen=True):
     before deciding the next action.
     """
 
-    kind: ToolErrorKind = Field(description=("Machine-readable category of this error."), default=ToolErrorKind.UNKNOWN)
+    kind: ToolErrorKind = Field(
+        description=("Machine-readable category of this error."), default=ToolErrorKind.UNKNOWN
+    )
     msg: str = Field(description=("Human-readable explanation of what happened."))
 
     retry: bool | None = Field(
@@ -32,4 +35,6 @@ class ToolError(BaseModel, frozen=True):
             "None means the tool cannot determine this."
         ),
     )
-    suggestion: str | None = Field(default=None, description=("Optional guidance for the next action by tool, if any."))
+    suggestion: str | None = Field(
+        default=None, description=("Optional guidance for the next action by tool, if any.")
+    )
