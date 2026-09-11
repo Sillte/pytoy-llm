@@ -70,7 +70,7 @@ type Location = LineLocation | AnchorLocation
 
 @dataclass(frozen=True)
 class ResolvedLocalLink:
-    path: Path
+    file_path: Path
     location: Location
     link_source: LinkSource
     source_path: Path
@@ -78,25 +78,28 @@ class ResolvedLocalLink:
     @classmethod
     def from_any(
         cls,
-        path: Path,
+        file_path: Path,
         location: Location,
         link_source: LinkSource,
         source_path: Path,
         *,
         root: Path,
     ) -> Self:
-        path = path.resolve()
+        file_path = file_path.resolve()
         root = root.resolve()
         source_path = source_path.resolve()
-        if path.is_relative_to(root):
+        if file_path.is_relative_to(root):
             return cls(
-                path=path, location=location, link_source=link_source, source_path=source_path
+                file_path=file_path,
+                location=location,
+                link_source=link_source,
+                source_path=source_path,
             )
-        raise ValueError(f"Given `{path=}` is outside of `{root=}`")
+        raise ValueError(f"Given `{file_path=}` is outside of `{root=}`")
 
     @property
     def target_uri(self) -> str:
-        return self.path.resolve().as_uri()
+        return self.file_path.resolve().as_uri()
 
 
 @dataclass(frozen=True)
