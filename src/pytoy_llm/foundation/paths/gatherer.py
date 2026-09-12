@@ -6,7 +6,17 @@ from pathlib import Path
 from typing import Literal
 
 DEFAULT_EXCLUDED_PATTERNS = frozenset(
-    {".venv", "venv", "node_modules", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".nox", "**/*.egg-info/**"}
+    {
+        ".venv",
+        "venv",
+        "node_modules",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        ".nox",
+        "**/*.egg-info/**",
+    }
 )
 
 
@@ -65,12 +75,16 @@ class PathGatherer:
             dirs[:] = [
                 directory
                 for directory in dirs
-                if not self._is_excluded((current / directory).relative_to(root), excludes, max_depth)
+                if not self._is_excluded(
+                    (current / directory).relative_to(root), excludes, max_depth
+                )
             ]
 
             # path exclusion
             def is_path_target(relative_path: Path) -> bool:
-                return not self._matches_exclude(relative_path, excludes) and _is_pattern_matched(relative_path)
+                return not self._matches_exclude(relative_path, excludes) and _is_pattern_matched(
+                    relative_path
+                )
 
             # file path
             if target == "file" or target == "all":
@@ -80,11 +94,15 @@ class PathGatherer:
             # directory path
             if target in {"all", "directory"}:
                 directory_paths = [current / directory for directory in dirs]
-                paths += [path for path in directory_paths if is_path_target(path.relative_to(root))]
+                paths += [
+                    path for path in directory_paths if is_path_target(path.relative_to(root))
+                ]
 
         return tuple(paths)
 
-    def _is_excluded(self, relative_path: Path, excludes: frozenset[str], max_depth: int | None) -> bool:
+    def _is_excluded(
+        self, relative_path: Path, excludes: frozenset[str], max_depth: int | None
+    ) -> bool:
         return (
             self._is_always_excluded(relative_path)
             or self._matches_exclude(relative_path, excludes)

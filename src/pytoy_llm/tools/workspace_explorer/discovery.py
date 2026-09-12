@@ -8,7 +8,15 @@ from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import DirectoryInfo, FileInfo, WorkspaceAccess
 from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, MaxResults, WorkspacePath
 
-DEFAULT_EXCLUDE_NAMES = [".venv", "node_modules", ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "__pycache__"]
+DEFAULT_EXCLUDE_PATTERNS = [
+    ".venv",
+    "node_modules",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+]
 
 
 class WorkspaceDiscovery:
@@ -78,12 +86,18 @@ class WorkspaceDiscovery:
             paths = tuple(
                 path
                 for path in PathGatherer().gather(
-                    root=root, max_depth=None, excludes=self.excludes, target="all", patterns=patterns
+                    root=root,
+                    max_depth=None,
+                    excludes=self.excludes,
+                    target="all",
+                    patterns=patterns,
                 )
                 if self.access.is_within_workspace(path)
             )
         except ValueError as e:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}"
+            )
 
         def to_model(path: Path) -> FileInfo | DirectoryInfo:
             if path.is_dir():
@@ -124,16 +138,22 @@ class WorkspaceDiscovery:
             if isinstance(root, ToolError):
                 return root
         except Exception as e:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"Invalid `{collection_root=}`; {e}")
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"Invalid `{collection_root=}`; {e}"
+            )
 
         try:
             paths = tuple(
                 path
-                for path in PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="all")
+                for path in PathGatherer().gather(
+                    root=root, max_depth=None, excludes=self.excludes, target="all"
+                )
                 if self.access.is_within_workspace(path)
             )
         except ValueError as e:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}"
+            )
 
         if not paths:
             if root == self.workspace:
@@ -144,7 +164,10 @@ class WorkspaceDiscovery:
         try:
             tree = PathTree.from_paths(paths, root_path=self.workspace)
         except ValueError as e:
-            return ToolError(kind=ToolErrorKind.UNKNOWN, msg=f"`{collection_root=}` is invalid in `PathTree`; {e}")
+            return ToolError(
+                kind=ToolErrorKind.UNKNOWN,
+                msg=f"`{collection_root=}` is invalid in `PathTree`; {e}",
+            )
 
         return tree.render(include_root=False)
 
@@ -179,11 +202,15 @@ class WorkspaceDiscovery:
         try:
             paths = tuple(
                 path
-                for path in PathGatherer().gather(root=root, max_depth=None, excludes=self.excludes, target="file")
+                for path in PathGatherer().gather(
+                    root=root, max_depth=None, excludes=self.excludes, target="file"
+                )
                 if self.access.is_within_workspace(path)
             )
         except ValueError as e:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}")
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}"
+            )
         file_infos = sorted(
             (FileInfo.from_absolute_path(path, self.workspace) for path in paths),
             key=lambda file_info: file_info.modified,

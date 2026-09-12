@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Self, Sequence
 
+from .domain.exceptions import OutsidePathError
 from .domain.readers import DiskFileReader, FileReaderProtocol
 from .note import IdeaNote
 
@@ -32,7 +33,7 @@ class IdeaSpace:
             path = (root / path).resolve() if not path.is_absolute() else path.resolve()
 
         if not path.is_relative_to(root):
-            raise PermissionError(f"Space must be inside root: path={path}, root={root}")
+            raise OutsidePathError(f"Space must be inside root: path={path}, root={root}")
 
         self._root = root
         self._relative_path = path.relative_to(root)
@@ -56,6 +57,21 @@ class IdeaSpace:
         return cls(
             path=path, root=Path(root), file_reader=file_reader, note_predicator=note_predicator
         )
+
+    def resolve(self, path: str | Path) -> Path:
+        """Return the absolte path (file_path).
+
+        Raises `OutsidePathError` if the given path is outside of `IdeaSpace`.
+        """
+        path = Path(path)
+        if path.is_absolute():
+            path = path.resolve()
+        else:
+            path = (self._root / path).resolve()
+
+        if not path.is_relative_to(self._root):
+            raise OutsidePathError(f"`{path}` is outside of `IdeaSpace`.")
+        return path
 
     @property
     def path(self) -> str:

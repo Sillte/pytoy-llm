@@ -1,3 +1,4 @@
+from .domain.exceptions import OutsidePathError
 from .domain.links import (
     AnchorLocation,
     IdeaLink,
@@ -20,6 +21,7 @@ __all__ = [
     "IdeaNote",
     "IdeaSpace",
     "DiskFileWriter",
+    "OutsidePathError",
     "FileWriterProtocol",
     "LineLocation",
     "LinkReachabilityChecker",

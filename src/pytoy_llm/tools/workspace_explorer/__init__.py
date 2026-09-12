@@ -2,7 +2,7 @@ import fnmatch
 import os
 import re
 from pathlib import Path
-from typing import Annotated, Callable, Sequence
+from typing import Annotated, Callable, Final, Self, Sequence
 
 from pydantic import Field
 
@@ -14,7 +14,24 @@ from pytoy_llm.tools.workspace_explorer.models import (
 )
 from pytoy_llm.tools.workspace_explorer.search import WorkspaceSearch
 
-DEFAULT_EXCLUDE_NAMES = [".venv", "node_modules", ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "__pycache__"]
+DEFAULT_EXCLUDE_PATTERNS = [
+    ".venv",
+    "node_modules",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".nox",
+    "*.egg-info",
+]
 
 
 class WorkspaceExplorer:
@@ -31,17 +48,25 @@ class WorkspaceExplorer:
     Common generated directories are excluded by default.
     """
 
-    def __init__(
-        self,
-        workspace: Path,
-        excludes: Sequence[str] | None = None,
-    ) -> None:
-        self.workspace = workspace.resolve()
-        self.excludes = set(DEFAULT_EXCLUDE_NAMES if excludes is None else excludes)
-        self.access = WorkspaceAccess.from_any(workspace=workspace, excludes=frozenset(self.excludes))
+    DEFAULT_EXCLUDE_PATTERNS: Final[frozenset[str]] = frozenset(DEFAULT_EXCLUDE_PATTERNS)
+
+    def __init__(self, access: WorkspaceAccess) -> None:
+        self.access = access
+
         self.discovery = WorkspaceDiscovery(self.access)
         self.inspection = WorkspaceInspection(self.access)
         self.search = WorkspaceSearch(self.access)
+
+    @classmethod
+    def from_any(
+        cls,
+        workspace: Path | str,
+        excludes: set[str] | frozenset[str] | Sequence[str] | None = None,
+    ) -> Self:
+        excludes = frozenset(cls.DEFAULT_EXCLUDE_PATTERNS if excludes is None else excludes)
+        workspace = Path(workspace).resolve()
+        access = WorkspaceAccess.from_any(workspace=workspace, excludes=excludes)
+        return cls(access=access)
 
     @property
     def tools(self) -> Sequence[Callable]:

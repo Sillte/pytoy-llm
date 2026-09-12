@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Callable, Self, Sequence
 
-from pytoy_llm.idea import DiskFileWriter, IdeaGraph, IdeaNote, IdeaSpace
+from pytoy_llm.idea import DiskFileWriter, IdeaGraph, IdeaNote, IdeaSpace, OutsidePathError
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
 
@@ -10,16 +10,34 @@ from .semantic_types import IdeaNoteBody, IdeaNoteMetadata, IdeaSpaceDepth, Idea
 
 
 class IdeaTool:
-    def __init__(self, idea_space: IdeaSpace) -> None:
+    def __init__(self, idea_space: IdeaSpace, workspace_explorer: WorkspaceExplorer) -> None:
         self._idea_space = idea_space
         self._idea_graph = IdeaGraph(self._idea_space)
         self._file_writer = DiskFileWriter()
-        self._workspace_explorer = WorkspaceExplorer(idea_space.root)
+        self._workspace_explorer = workspace_explorer
 
     @classmethod
     def from_any(cls, idea_space_root: Path | str, workspace_root: Path | str) -> Self:
-        idea_space = IdeaSpace.from_path(path=Path(idea_space_root), root=Path(workspace_root))
-        return cls(idea_space=idea_space)
+        idea_space_root = Path(idea_space_root).resolve()
+        workspace_root = Path(workspace_root).resolve()
+
+        idea_space = IdeaSpace.from_path(path=idea_space_root, root=idea_space_root)
+
+        exclude_patterns = set(WorkspaceExplorer.DEFAULT_EXCLUDE_PATTERNS)
+
+        if idea_space_root.is_relative_to(workspace_root):
+            relative_path = idea_space_root.relative_to(workspace_root)
+            exclude_patterns.add(relative_path.as_posix())
+
+        workspace_explorer = WorkspaceExplorer.from_any(
+            workspace=workspace_root,
+            excludes=exclude_patterns,
+        )
+
+        return cls(
+            idea_space=idea_space,
+            workspace_explorer=workspace_explorer,
+        )
 
     @property
     def workspace_root(self) -> Path:
@@ -48,7 +66,7 @@ class IdeaTool:
         try:
             sub_space = IdeaSpace.from_path(path, root=self.workspace_root)
             result_spaces = sub_space.get_subspaces(depth=depth)
-        except PermissionError as e:
+        except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
         except OSError as e:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
@@ -67,7 +85,7 @@ class IdeaTool:
         try:
             sub_space = IdeaSpace.from_path(path, root=self.workspace_root)
             result_notes = sub_space.get_notes(depth=depth)
-        except PermissionError as e:
+        except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
         except OSError as e:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
@@ -89,7 +107,7 @@ class IdeaTool:
                 msg=str(e),
                 retry=False,
             )
-        except PermissionError as e:
+        except OutsidePathError as e:
             return ToolError(
                 kind=ToolErrorKind.PERMISSION_DENIED,
                 msg=str(e),
