@@ -8,7 +8,13 @@ from pydantic import Field
 from pytoy_llm.foundation.paths import PathGatherer
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import GrepMatch, GrepMatchContext, WorkspaceAccess
-from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, MaxBytes, MaxResults, SearchPattern, WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import (
+    GlobPattern,
+    MaxBytes,
+    MaxResults,
+    SearchPattern,
+    WorkspacePath,
+)
 
 
 class WorkspaceSearch:
@@ -126,20 +132,38 @@ class WorkspaceSearch:
         if isinstance(root, ToolError):
             return root
         if not root.exists():
-            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=f"`{root=}` does not exist.", retry=None)
-        if not root.is_dir():
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{root=}` must be a directory.", retry=None)
-
-        files = tuple(
-            path
-            for path in PathGatherer().gather(
-                root=root,
-                patterns=file_patterns,
-                excludes=self.access.excludes,
-                target="file",
+            return ToolError(
+                kind=ToolErrorKind.NOT_FOUND, msg=f"`{root=}` does not exist.", retry=None
             )
-            if self.access.is_within_workspace(path) and path.stat().st_size <= max_file_bytes
-        )
+        if not root.is_dir():
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg=f"`{root=}` must be a directory.",
+                retry=None,
+            )
+
+        try:
+            files = tuple(
+                path
+                for path in PathGatherer().gather(
+                    root=root,
+                    patterns=file_patterns,
+                    excludes=self.access.excludes,
+                    target="file",
+                )
+                if self.access.is_within_workspace(path) and path.stat().st_size <= max_file_bytes
+            )
+        except PermissionError as exc:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=f"Could not inspect files under `{collection_root}`: {exc}",
+                retry=False,
+            )
+        except OSError as exc:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=f"Could not inspect files under `{collection_root}`: {exc}",
+            )
         if regex:
             matches = self._grep_context_by_regex(
                 search_patterns=search_patterns,
@@ -147,7 +171,9 @@ class WorkspaceSearch:
                 case_sensitive=case_sensitive,
             )
         else:
-            matches = self._grep_context_by_text(search_patterns=search_patterns, files=files, case_sensitive=case_sensitive)
+            matches = self._grep_context_by_text(
+                search_patterns=search_patterns, files=files, case_sensitive=case_sensitive
+            )
         if isinstance(matches, ToolError):
             return matches
         return self.integrate_matches(matches[:max_results], context_lines=context_lines)
@@ -155,7 +181,8 @@ class WorkspaceSearch:
     def _grep_context_by_regex(
         self,
         search_patterns: Annotated[
-            Sequence[SearchPattern], Field(description="Search patterns are combined with OR semantics.")
+            Sequence[SearchPattern],
+            Field(description="Search patterns are combined with OR semantics."),
         ],
         files: Sequence[Path],
         case_sensitive: Annotated[
@@ -174,10 +201,14 @@ class WorkspaceSearch:
                 retry=False,
             )
         return tuple(
-            itertools.chain.from_iterable((self._get_matched_by_regex(file_path, compilations) for file_path in files))
+            itertools.chain.from_iterable(
+                (self._get_matched_by_regex(file_path, compilations) for file_path in files)
+            )
         )
 
-    def _get_matched_by_regex(self, file_path: Path, patterns: Sequence[re.Pattern[str]]) -> Sequence[GrepMatch]:
+    def _get_matched_by_regex(
+        self, file_path: Path, patterns: Sequence[re.Pattern[str]]
+    ) -> Sequence[GrepMatch]:
         """
         file_path: The abolute path
         """
@@ -215,7 +246,9 @@ class WorkspaceSearch:
 
         return tuple(
             itertools.chain.from_iterable(
-                self._get_matched_by_text(file_path, patterns=search_patterns, case_sensitive=case_sensitive)
+                self._get_matched_by_text(
+                    file_path, patterns=search_patterns, case_sensitive=case_sensitive
+                )
                 for file_path in files
             )
         )
@@ -253,7 +286,9 @@ class WorkspaceSearch:
                     break
         return results
 
-    def integrate_matches(self, matches: Sequence[GrepMatch], context_lines: int) -> Sequence[GrepMatchContext] | ToolError:
+    def integrate_matches(
+        self, matches: Sequence[GrepMatch], context_lines: int
+    ) -> Sequence[GrepMatchContext] | ToolError:
         matches_by_path = {}
         for match in matches:
             matches_by_path.setdefault(match.path, []).append(match)
@@ -269,7 +304,9 @@ class WorkspaceSearch:
         return contexts
 
 
-def _build_context(file_path: Path, matches: Sequence[GrepMatch], context_lines: int) -> Sequence[GrepMatchContext] | ToolError:
+def _build_context(
+    file_path: Path, matches: Sequence[GrepMatch], context_lines: int
+) -> Sequence[GrepMatchContext] | ToolError:
     if not matches:
         return []
 
@@ -280,7 +317,10 @@ def _build_context(file_path: Path, matches: Sequence[GrepMatch], context_lines:
         content = file_path.read_text(encoding="utf8")
         lines = content.splitlines(keepends=True)
     except OSError:
-        return ToolError(kind=ToolErrorKind.RESOURCE_LIMIT, msg="Resource usage is high. Please restrict the scope of search.")
+        return ToolError(
+            kind=ToolErrorKind.RESOURCE_LIMIT,
+            msg="Resource usage is high. Please restrict the scope of search.",
+        )
     # `start_line`, `end_line`, list[GrepMatch]
     ranges: list[tuple[int, int, list[GrepMatch]]] = []
     contexts: list[GrepMatchContext] = []

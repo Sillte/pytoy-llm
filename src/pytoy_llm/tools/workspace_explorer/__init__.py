@@ -57,6 +57,10 @@ class WorkspaceExplorer:
         self.inspection = WorkspaceInspection(self.access)
         self.search = WorkspaceSearch(self.access)
 
+    @property
+    def workspace(self) -> Path:
+        return self.access.workspace
+
     @classmethod
     def from_any(
         cls,

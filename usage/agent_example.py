@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("httpx").setLevel(logging.DEBUG)
 logging.getLogger("httpcore").setLevel(logging.DEBUG)
 
-explorer = WorkspaceExplorer(Path("../"))
+explorer = WorkspaceExplorer.from_any(Path("../"))
 print("WORKSPACE-EXPLOREER", explorer.workspace)
 
 analysis_agent = AgentInvocationSpec(

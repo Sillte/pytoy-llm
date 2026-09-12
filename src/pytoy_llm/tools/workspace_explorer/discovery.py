@@ -98,13 +98,35 @@ class WorkspaceDiscovery:
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}"
             )
+        except PermissionError as e:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=f"Could not inspect `{collection_root}`: {e}",
+                retry=False,
+            )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR, msg=f"Could not inspect `{collection_root}`: {e}"
+            )
 
         def to_model(path: Path) -> FileInfo | DirectoryInfo:
             if path.is_dir():
                 return DirectoryInfo.from_absolute_path(path, self.workspace)
             return FileInfo.from_absolute_path(path, self.workspace)
 
-        return [to_model(path) for path in paths]
+        try:
+            return [to_model(path) for path in paths]
+        except PermissionError as e:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=f"Could not read metadata under `{collection_root}`: {e}",
+                retry=False,
+            )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=f"Could not read metadata under `{collection_root}`: {e}",
+            )
 
     def tree(
         self,
@@ -154,12 +176,29 @@ class WorkspaceDiscovery:
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}"
             )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=f"Could not inspect `{collection_root}`: {e}",
+                retry=True,
+            )
 
         if not paths:
             if root == self.workspace:
                 return ""
-            tree = PathTree.from_paths([root], root_path=self.workspace)
-            return tree.render(include_root=True)
+            try:
+                tree = PathTree.from_paths([root], root_path=self.workspace)
+                return tree.render(include_root=True)
+            except PermissionError as e:
+                return ToolError(
+                    kind=ToolErrorKind.PERMISSION_DENIED,
+                    msg=f"Could not read `{collection_root}`: {e}",
+                    retry=False,
+                )
+            except OSError as e:
+                return ToolError(
+                    kind=ToolErrorKind.IO_ERROR, msg=f"Could not read `{collection_root}`: {e}"
+                )
 
         try:
             tree = PathTree.from_paths(paths, root_path=self.workspace)
@@ -167,6 +206,16 @@ class WorkspaceDiscovery:
             return ToolError(
                 kind=ToolErrorKind.UNKNOWN,
                 msg=f"`{collection_root=}` is invalid in `PathTree`; {e}",
+            )
+        except PermissionError as e:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=f"Could not read `{collection_root}`: {e}",
+                retry=False,
+            )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR, msg=f"Could not read `{collection_root}`: {e}"
             )
 
         return tree.render(include_root=False)
@@ -211,11 +260,33 @@ class WorkspaceDiscovery:
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"`{collection_root=}` is invalid; {e}"
             )
-        file_infos = sorted(
-            (FileInfo.from_absolute_path(path, self.workspace) for path in paths),
-            key=lambda file_info: file_info.modified,
-            reverse=True,
-        )
+        except PermissionError as e:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=f"Could not inspect `{collection_root}`: {e}",
+                retry=False,
+            )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR, msg=f"Could not inspect `{collection_root}`: {e}"
+            )
+        try:
+            file_infos = sorted(
+                (FileInfo.from_absolute_path(path, self.workspace) for path in paths),
+                key=lambda file_info: file_info.modified,
+                reverse=True,
+            )
+        except PermissionError as e:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=f"Could not read file metadata under `{collection_root}`: {e}",
+                retry=False,
+            )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=f"Could not read file metadata under `{collection_root}`: {e}",
+            )
         return file_infos[:max_results]
 
 
