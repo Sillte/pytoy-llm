@@ -6,7 +6,13 @@ from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
 
 from .models import IdeaNoteLinkModel, IdeaNoteModel, LocalLinkModel, RemoteLinkModel
-from .semantic_types import IdeaNoteBody, IdeaNoteMetadata, IdeaSpaceDepth, IdeaSpacePath
+from .semantic_types import (
+    IdeaNoteBody,
+    IdeaNoteMetadata,
+    IdeaSpaceDepth,
+    IdeaSpacePath,
+    IdeaSpacePivot,
+)
 
 
 class IdeaTool:
@@ -58,7 +64,7 @@ class IdeaTool:
         ]
 
     def get_subspaces(
-        self, pivot: IdeaSpacePath = "./", depth: IdeaSpaceDepth = 0
+        self, pivot: IdeaSpacePivot = "./", depth: IdeaSpaceDepth = 0
     ) -> Sequence[IdeaSpacePath] | ToolError:
         """Get subspaces under a `pivot` in the IdeaSpace."""
         path = self._idea_space.folder_path / pivot
@@ -77,7 +83,7 @@ class IdeaTool:
         ]
 
     def get_note_paths(
-        self, pivot: IdeaSpacePath = "./", depth: IdeaSpaceDepth = 0
+        self, pivot: IdeaSpacePivot = "./", depth: IdeaSpaceDepth = 0
     ) -> Sequence[IdeaSpacePath] | ToolError:
         """Get path of `IdeaNote` under a `pivot` in the IdeaSpace."""
         path = self._idea_space.folder_path / pivot

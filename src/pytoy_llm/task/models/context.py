@@ -7,7 +7,6 @@ from typing import Annotated, Any, MutableMapping, Self
 from pydantic import BaseModel, Field, field_validator
 
 from pytoy_llm.models.connections import Connection
-from pytoy_llm.models.llm_activities import LLMActivitySink
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
 from pytoy_llm.models.llm_metas import LLMParam
@@ -24,7 +23,6 @@ class ExecutionContext:
     connection: Connection | str | None
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
-    activity_sink: LLMActivitySink | None = None
     emitters: LLMEventEmitters = field(default_factory=LLMEventEmitters)
 
 
@@ -57,7 +55,9 @@ class ContextPatch(BaseModel, frozen=True):
     llm_messages: Annotated[
         Sequence[LLMMessage] | None,
         Field(
-            description=("Overrides the LLM message history for this context. Applied after `RuntimeContextPatch`."),
+            description=(
+                "Overrides the LLM message history for this context. Applied after `RuntimeContextPatch`."
+            ),
         ),
     ] = None
 

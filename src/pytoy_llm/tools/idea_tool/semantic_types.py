@@ -5,11 +5,22 @@ from pydantic import Field, JsonValue
 IdeaSpacePath = Annotated[
     str,
     Field(
-        description=(
-            "Path inside the configured IdeaSpace. "
-            "in this value. `.` means the IdeaSpace root itself."
-        ),
+        description=("Path inside the configured IdeaSpace. `.` means the IdeaSpace root itself."),
         examples=[".", "./knowledge", "./history/note.md"],
+    ),
+]
+
+IdeaSpacePivot = Annotated[
+    IdeaSpacePath,
+    Field(
+        description=(
+            "Starting directory for this IdeaSpace search. "
+            "The path is relative to the IdeaSpace root. "
+            "Use '.' to search from the IdeaSpace root itself. "
+            "Use a subdirectory such as './architecture' "
+            "to restrict the search to that directory and its descendants."
+        ),
+        examples=[".", "./architecture", "./history"],
     ),
 ]
 
@@ -43,3 +54,11 @@ IdeaNoteMetadata = Annotated[
         ),
     ),
 ]
+
+if __name__ == "__main__":
+    from pydantic import BaseModel
+
+    class T(BaseModel):
+        pivot: IdeaSpacePivot
+
+    print(T.model_json_schema())

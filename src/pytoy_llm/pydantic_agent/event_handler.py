@@ -40,7 +40,9 @@ class EventHandler:
         activity = LLMRequestActivity(trace_id=self._trace_id, messages=messages)
         self._event_emitters.emit_activity(activity)
 
-    async def event_stream_handler(self, ctx: RunContext, event_stream: AsyncIterable[AgentStreamEvent]) -> None:
+    async def event_stream_handler(
+        self, ctx: RunContext, event_stream: AsyncIterable[AgentStreamEvent]
+    ) -> None:
         async for event in event_stream:
             await self.handle_event(event)
 
@@ -52,10 +54,18 @@ class EventHandler:
                 activity = self._event_adapter.from_tool_result_event(stream_event)
             case PartEndEvent():
                 activity = self._event_adapter.from_part_end_event(stream_event)
-            case PartDeltaEvent() | PartStartEvent() | FinalResultEvent() | OutputToolCallEvent() | OutputToolResultEvent():
+            case (
+                PartDeltaEvent()
+                | PartStartEvent()
+                | FinalResultEvent()
+                | OutputToolCallEvent()
+                | OutputToolResultEvent()
+            ):
                 activity = None
             case _:
-                activity = LLMMinimumActivity(activity_type="unknown_activity", message=f"{stream_event.__class__.__name__}")
+                activity = LLMMinimumActivity(
+                    activity_type="unknown_activity", message=f"{stream_event.__class__.__name__}"
+                )
 
         if activity:
             self._event_emitters.emit_activity(activity)
@@ -97,7 +107,9 @@ class ActivityAdapter:
 
             case ToolCallPart():
                 event = ToolCallActivity(
-                    trace_id=self._trace_id, call_id=stream_event.part.tool_call_id, args=stream_event.part.args
+                    trace_id=self._trace_id,
+                    call_id=stream_event.part.tool_call_id,
+                    args=stream_event.part.args,
                 )
 
             case _:

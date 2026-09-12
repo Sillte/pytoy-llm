@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from typing import Any, Self
 
 from pytoy_llm.models import LLMEventEmitters
-from pytoy_llm.models.llm_activities import LLMActivitySink
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.exceptions import InvocationException
@@ -33,7 +32,6 @@ class TaskSpec[T]:
         self,
         task_input: Any,
         context_state: TaskContextState,
-        activity_sink: LLMActivitySink | None = None,
         emitters: LLMEventEmitters | None = None,
     ) -> Outcome[TaskResult[T], InvocationException]:
         llm_param = None
@@ -43,7 +41,6 @@ class TaskSpec[T]:
             connection=connection,
             llm_messages=context_state.llm_messages,
             state=context_state.state,
-            activity_sink=activity_sink,
             emitters=emitters or LLMEventEmitters(),
         )
 
@@ -54,7 +51,11 @@ class TaskSpec[T]:
             try:
                 invocation_result = invocation_spec.invoke(invocation_input, execution_context)
             except Exception as exc:
-                return Error(exception=InvocationException(context=execution_context, invocation_exception=exc))
+                return Error(
+                    exception=InvocationException(
+                        context=execution_context, invocation_exception=exc
+                    )
+                )
 
             if invocation_result.runtime_patch:
                 execution_context = invocation_result.runtime_patch.apply(execution_context)
@@ -117,7 +118,9 @@ class TaskSpec[T]:
         )
 
     @classmethod
-    def _to_task_spec_meta(cls, meta: TaskSpecMeta | str | None, invocation_specs: Sequence[InvocationSpec]) -> TaskSpecMeta:
+    def _to_task_spec_meta(
+        cls, meta: TaskSpecMeta | str | None, invocation_specs: Sequence[InvocationSpec]
+    ) -> TaskSpecMeta:
         if isinstance(meta, str):
             meta = TaskSpecMeta(name=meta, intent=invocation_specs[-1].meta.intent)
         elif meta is None:

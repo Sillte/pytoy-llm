@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 
 from pytoy_llm.activity_sinks import PrintActivitySink
@@ -15,13 +14,45 @@ from pytoy_llm.task.models.metas import (
 from pytoy_llm.task.models.task_specs import TaskSpec
 from pytoy_llm.tools.idea_tool.idea_tool import IdeaTool
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
-logging.getLogger("httpx").setLevel(logging.DEBUG)
-logging.getLogger("httpcore").setLevel(logging.DEBUG)
+# logging.getLogger("httpx").setLevel(logging.DEBUG)
+# logging.getLogger("httpcore").setLevel(logging.DEBUG)
+
+
+def create_test_idea_space(path: Path):
+    path.mkdir(parents=True, exist_ok=True)
+
+    (path / "index.md").write_text(
+        """\
+# IdeaSpace Index
+
+## architecture
+
+Knowledge about the architecture and structure of the repository.
+
+## decisions
+
+Important design decisions and their reasons.
+
+## experiments
+
+Experiments, observations, and their results.
+
+## questions
+
+Important unanswered questions.
+""",
+        encoding="utf-8",
+    )
+    for sub_folder in ["architecture", "decisions", "experiments", "quesions"]:
+        (path / sub_folder).mkdir(exist_ok=True)
+
 
 root_folder = Path("../")
-idea_tool = IdeaTool.from_any(idea_space_root="./IDEAS", workspace_root=root_folder)
+idea_space_root = Path("./IDEAS")
+create_test_idea_space(idea_space_root)
+idea_tool = IdeaTool.from_any(idea_space_root=idea_space_root, workspace_root=root_folder)
 
 analysis_agent = AgentInvocationSpec(
     meta=InvocationSpecMeta(
@@ -32,90 +63,20 @@ analysis_agent = AgentInvocationSpec(
     create_messages=lambda input_: [
         LLMMessage.from_prompt(
             system="""
-You are an commentator. 
+## Rule
+`index.md` may exist.
+If exists, please follow the insturction of `index.md` and do not override `index.md`. 
+If not, create `index.md` after investigate the `IdeaSpace` and define the insruction of this `IdeaSpace`.
 
+## Writing Principles
 
-
-## Stopping Rule
-
-Investigation is complete when you can answer the user's question with
-specific, relevant, workspace-backed evidence.
-
-You do not need to eliminate every possible uncertainty.
-
-Do not continue investigating merely to increase confidence when the
-remaining uncertainty is unlikely to affect the answer.
-
-The absence of evidence for an issue is not evidence that the issue does
-not exist.
-
-When evidence is partial, provide a bounded conclusion and state the
-relevant uncertainty.
-
-
-## Evidence Depth
-
-Match the depth of inspection to the specificity of the claim.
-
-Structural evidence may support claims about the presence,
-organization, or naming of workspace artifacts.
-
-Implementation-level claims require reading the relevant
-file.
-
-Behavioral claims require evidence from implementation, tests,
-configuration, execution flow, or other appropriate artifacts.
-
-Do not use shallow structural evidence to support deeper claims.
-
-## Evidence Does Not Upgrade Automatically
-
-Evidence has a limited scope.
-
-Do not upgrade a conclusion beyond what the inspected evidence directly
-supports.
-
-The existence of files, directories, names, dependencies, interfaces,
-tests, or configuration does not by itself establish their quality,
-behavior, effectiveness, or architectural role.
-
-A stronger conclusion requires stronger evidence.
-
-If only shallow evidence has been inspected, the final answer must
-remain shallow, even if a stronger conclusion seems plausible.
-
-## Failure to Resolve
-
-If the subject cannot be identified after reasonable targeted
-investigation, say so explicitly and ask the user for clarification.
-
-If the subject is found but the available evidence is insufficient,
-state what was inspected and what remains unknown.
-
-Do not substitute a generic answer for missing workspace evidence.
-
-## Final Answer
-
-Answer the user's actual question directly.
-
-Prioritize conclusions over a description of the investigation process.
-
-For concrete claims about the workspace, provide enough evidence or
-specific references to make the reasoning understandable.
-
-Separate observations, inferences, and uncertainties when useful.
-
-When proposing changes or improvements, prioritize conclusions that are
-supported by the investigated evidence.
-
-Do not produce generic advice merely because the available evidence is
-limited.
-
-If the evidence does not justify a strong conclusion, say so rather than
-manufacturing confidence.
+Write only what is necessary for the requested purpose.
+Prefer concise statements over lengthy explanations.
+Do not add unnecessary context, recommendations, or background.
+Do not expand a question into a proposal or analysis unless requested.
 """,
             user="""
-Please make a idea note both in views of logical and emotions for this repository.  
+Please tell me what the user should do or ask as the next step? 
 """,
         )
     ],
