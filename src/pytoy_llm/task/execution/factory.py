@@ -32,7 +32,6 @@ class TaskExecutionFactory:
                 outcome = request.spec.run(
                     task_input=task_input,
                     context_state=context_state,
-                    activity_sink=request.activity_sink,
                     emitters=event_emitters,
                 )
             except Exception as e:
