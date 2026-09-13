@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from pytoy_llm.activity_sinks import PrintActivitySink
@@ -14,10 +15,10 @@ from pytoy_llm.task.models.metas import (
 from pytoy_llm.task.models.task_specs import TaskSpec
 from pytoy_llm.tools.idea_tool.idea_tool import IdeaTool
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
-# logging.getLogger("httpx").setLevel(logging.DEBUG)
-# logging.getLogger("httpcore").setLevel(logging.DEBUG)
+logging.getLogger("httpx").setLevel(logging.DEBUG)
+logging.getLogger("httpcore").setLevel(logging.DEBUG)
 
 
 def create_test_idea_space(path: Path):
@@ -25,31 +26,41 @@ def create_test_idea_space(path: Path):
 
     (path / "index.md").write_text(
         """\
-# IdeaSpace Index
+# IdeaSpace
 
-## architecture
+This IdeaSpace is intended to contain knowledge about this repository.
+It describes the repository, its design, implementation,
+experiments, and interactions with LLMs as a report from LLM and humans.
 
-Knowledge about the architecture and structure of the repository.
+The directory structure below describes how knowledge is
+organized in this IdeaSpace. It is not, by itself, a description
+of the repository's functionality.
 
-## decisions
+## Knowledge
 
-Important design decisions and their reasons.
+Reusable knowledge about the repository.
 
-## experiments
+## Sessions
 
-Experiments, observations, and their results.
+Short summaries of human-LLM interactions.
+These are historical records and should not be treated as
+the current state of the repository.
 
-## questions
+When summarizing the repository's functionality, inspect the
+repository itself using WorkspaceExplorer. Do not infer the
+repository's functionality only from this IdeaSpace.
 
-Important unanswered questions.
+When this interaction produces information useful for future
+work, create or update a Session under `./sessions`.
 """,
         encoding="utf-8",
     )
-    for sub_folder in ["architecture", "decisions", "experiments", "quesions"]:
+    for sub_folder in ["sessions", "knowledge"]:
         (path / sub_folder).mkdir(exist_ok=True)
 
 
-root_folder = Path("../")
+root_folder = Path("../").resolve()
+print("root_folder", root_folder)
 idea_space_root = Path("./IDEAS")
 create_test_idea_space(idea_space_root)
 idea_tool = IdeaTool.from_any(idea_space_root=idea_space_root, workspace_root=root_folder)
@@ -63,10 +74,6 @@ analysis_agent = AgentInvocationSpec(
     create_messages=lambda input_: [
         LLMMessage.from_prompt(
             system="""
-## Rule
-`index.md` may exist.
-If exists, please follow the insturction of `index.md` and do not override `index.md`. 
-If not, create `index.md` after investigate the `IdeaSpace` and define the insruction of this `IdeaSpace`.
 
 ## Writing Principles
 
@@ -76,7 +83,7 @@ Do not add unnecessary context, recommendations, or background.
 Do not expand a question into a proposal or analysis unless requested.
 """,
             user="""
-Please tell me what the user should do or ask as the next step? 
+現状、不具合の候補をいくつかあげてくれるかな？
 """,
         )
     ],

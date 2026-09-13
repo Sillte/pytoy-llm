@@ -8,6 +8,7 @@ from .llm_activities import (
     ToolCallActivity,
     ToolResultActivity,
 )
+from .llm_activity_records import LLMActivityLog
 
 __all__ = [
     "LLMActivity",
@@ -16,6 +17,7 @@ __all__ = [
     "LLMRequestActivity",
     "LLMResponseActivity",
     "LLMThinkingActivity",
+    "LLMActivityLog",
     "ToolCallActivity",
     "ToolResultActivity",
 ]

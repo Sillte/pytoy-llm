@@ -14,11 +14,11 @@ IdeaSpacePivot = Annotated[
     IdeaSpacePath,
     Field(
         description=(
-            "Starting directory for this IdeaSpace search. "
+            "Starting directory for an operation in this IdeaSpace. "
             "The path is relative to the IdeaSpace root. "
-            "Use '.' to search from the IdeaSpace root itself. "
+            "Use '.' to represent the IdeaSpace root itself. "
             "Use a subdirectory such as './architecture' "
-            "to restrict the search to that directory and its descendants."
+            "to restrict the operation to that directory and its descendants."
         ),
         examples=[".", "./architecture", "./history"],
     ),

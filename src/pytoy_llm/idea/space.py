@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Self, Sequence
+from typing import Callable, Final, Self, Sequence
 
 from .domain.exceptions import OutsidePathError
 from .domain.readers import DiskFileReader, FileReaderProtocol
@@ -13,6 +13,9 @@ def default_note_predicator(file_path: Path) -> bool:
 
 
 class IdeaSpace:
+    CONVENTION_CANDIDATES: Final[tuple[str, ...]] = (".convention.md", ".index.md", "index.md")
+    SPACE_META_NAME: Final[str] = ".space_meta"
+
     def __init__(
         self,
         path: Path | str,
@@ -59,7 +62,7 @@ class IdeaSpace:
         )
 
     def resolve(self, path: str | Path) -> Path:
-        """Return the absolte path (file_path).
+        """Return the absolute path (file_path).
 
         Raises `OutsidePathError` if the given path is outside of `IdeaSpace`.
         """
@@ -98,6 +101,19 @@ class IdeaSpace:
     def relative_parts(self) -> Sequence[str]:
         return self._relative_path.parts
 
+    @property
+    def convention(self) -> IdeaNote | None:
+        for cand in self.CONVENTION_CANDIDATES:
+            if (self.folder_path / cand).exists():
+                return IdeaNote.from_path(
+                    file_path=self.folder_path / cand, root=self.root, file_reader=self._file_reader
+                )
+        return None
+
+    @property
+    def space_meta_folder(self) -> Path:
+        return self.folder_path / self.SPACE_META_NAME
+
     def get_subspaces(self, depth: int | None = 0) -> Sequence["IdeaSpace"]:
         spaces: list[IdeaSpace] = []
 
@@ -107,6 +123,8 @@ class IdeaSpace:
 
             for child in path.iterdir():
                 if child.is_dir():
+                    if self._is_meta_folder(child):
+                        continue
                     spaces.append(
                         IdeaSpace(
                             path=child,
@@ -139,7 +157,8 @@ class IdeaSpace:
                             IdeaNote.from_path(child, root=self.root, file_reader=self._file_reader)
                         )
                 elif child.is_dir():
-                    visit(child, current_depth + 1)
+                    if not self._is_meta_folder(child):
+                        visit(child, current_depth + 1)
 
         visit(self.folder_path, 0)
 
@@ -147,3 +166,6 @@ class IdeaSpace:
 
     def _is_note_path(self, file_path: Path) -> bool:
         return self._note_predicator(file_path)
+
+    def _is_meta_folder(self, folder_path: Path) -> bool:
+        return folder_path.name == self.SPACE_META_NAME

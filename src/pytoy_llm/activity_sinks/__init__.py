@@ -1,11 +1,12 @@
 import logging
 from pathlib import Path
 from queue import Queue
-from typing import Any, Literal
+from threading import RLock
+from typing import Any, Literal, Sequence
 
 from pydantic import BaseModel
 
-from pytoy_llm.models.llm_activities import LLMActivity, LLMActivitySink
+from pytoy_llm.models.llm_activities import LLMActivity, LLMActivityLog, LLMActivitySink
 
 
 def to_json_serializable(activity: LLMActivity) -> Any:
@@ -40,12 +41,15 @@ class NullActivitySink(LLMActivitySink):
 
 class PrintActivitySink(LLMActivitySink):
     def emit(self, activity: LLMActivity) -> None:
-        print(str(activity), flush=True)
+        print(str(activity), str(activity.__class__.__name__), flush=True)
 
 
 class FileActivitySink(LLMActivitySink):
     def __init__(
-        self, path: Path | str, mode: Literal["append", "overwrite", "a", "w"] = "append", encoding: str = "utf-8"
+        self,
+        path: Path | str,
+        mode: Literal["append", "overwrite", "a", "w"] = "append",
+        encoding: str = "utf-8",
     ) -> None:
         path = Path(path)
         if mode == "w":
@@ -62,3 +66,31 @@ class FileActivitySink(LLMActivitySink):
     def emit(self, activity: LLMActivity) -> None:
         with open(self.path, mode="a", encoding=self.encoding) as f:
             f.write(f"{str(activity)}\n")
+
+
+class ActivityLogSink(LLMActivitySink):
+    def __init__(self) -> None:
+        self._activities: list[LLMActivity] = []
+        self._lock = RLock()  # If `async` calls the same `LogSink`...
+
+    def emit(self, activity: LLMActivity) -> None:
+        with self._lock:
+            self._activities.append(activity)
+
+    @property
+    def activities(self) -> Sequence[LLMActivity]:
+        with self._lock:
+            return tuple(self._activities)
+
+    @property
+    def log(self) -> LLMActivityLog:
+        return LLMActivityLog.from_activities(self.activities)
+
+
+class CompositeActivitySink(LLMActivitySink):
+    def __init__(self, sinks: Sequence[LLMActivitySink]) -> None:
+        self._sinks = tuple(sinks)
+
+    def emit(self, activity: LLMActivity) -> None:
+        for sink in self._sinks:
+            sink.emit(activity)

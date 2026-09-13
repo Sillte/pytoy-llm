@@ -76,6 +76,7 @@ class ActivityAdapter:
         self._trace_id = trace_id
 
     def from_tool_call_event(self, stream_event: FunctionToolCallEvent) -> ToolCallActivity:
+
         return ToolCallActivity(
             trace_id=self._trace_id,
             call_id=stream_event.tool_call_id,
@@ -91,7 +92,7 @@ class ActivityAdapter:
             result=stream_event.part.content,
         )
 
-    def from_part_end_event(self, stream_event: PartEndEvent) -> LLMActivity:
+    def from_part_end_event(self, stream_event: PartEndEvent) -> LLMActivity | None:
         match stream_event.part:
             case TextPart():
                 event = LLMResponseActivity(
@@ -109,6 +110,7 @@ class ActivityAdapter:
                 event = ToolCallActivity(
                     trace_id=self._trace_id,
                     call_id=stream_event.part.tool_call_id,
+                    tool_name=stream_event.part.tool_name,
                     args=stream_event.part.args,
                 )
 
