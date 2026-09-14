@@ -1,5 +1,12 @@
-from pytoy_llm.task.models.context import ContextPatch, ExecutionContext, ExecutionEvents, TaskContextState, TaskRunState
+from pytoy_llm.task.models.context import (
+    ContextPatch,
+    ExecutionContext,
+    ExecutionEvents,
+    TaskContextState,
+    TaskRunState,
+)
 from pytoy_llm.task.models.exceptions import TaskExecutionException
+from pytoy_llm.task.models.invocation_hooks import InvocationHooks
 from pytoy_llm.task.models.invocation_results import InvocationResult
 from pytoy_llm.task.models.invocation_specs import (
     AgentInvocationSpec,
@@ -19,6 +26,7 @@ __all__ = [
     "ExecutionEvents",
     "TaskContextState",
     "InvocationResult",
+    "InvocationHooks",
     "AgentInvocationSpec",
     "FunctionInvocationSpec",
     "LLMInvocationSpec",
