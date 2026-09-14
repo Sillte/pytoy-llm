@@ -23,7 +23,7 @@ logging.getLogger("httpcore").setLevel(logging.DEBUG)
 explorer = WorkspaceExplorer.from_any(Path("../"))
 print("WORKSPACE-EXPLOREER", explorer.workspace)
 
-analysis_agent = AgentInvocationSpec(
+analysis_agent = AgentInvocationSpec.from_any(
     meta=InvocationSpecMeta(
         name="AnalyzeProject",
         intent="Analyze source code architecture using available tools.",

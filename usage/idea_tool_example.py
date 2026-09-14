@@ -65,7 +65,7 @@ idea_space_root = Path("./IDEAS")
 create_test_idea_space(idea_space_root)
 idea_tool = IdeaTool.from_any(idea_space_root=idea_space_root, workspace_root=root_folder)
 
-analysis_agent = AgentInvocationSpec(
+analysis_agent = AgentInvocationSpec.from_any(
     meta=InvocationSpecMeta(
         name="CommentProject",
         intent="Make a comment under `IdeaSpace`.",

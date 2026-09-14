@@ -207,18 +207,18 @@ class ShortStoryIdeaSpaceHandler:
         self._idea_tool = IdeaTool.from_any(
             idea_space_root=self.folder_path, workspace_root=self.folder_path
         )
-        return AgentInvocationSpec(
-            meta=InvocationSpecMeta(
-                name="CommentProject",
-                intent="Make a comment under `IdeaSpace`.",
-            ),
-            output_type=str,
-            create_messages=lambda input_: [
+        return AgentInvocationSpec.from_any(
+            lambda input_: [
                 LLMMessage.from_prompt(
                     system=SYSTEM_PROMPT.strip(),
                     user=input_,
                 )
             ],
+            meta=InvocationSpecMeta(
+                name="CommentProject",
+                intent="Make a comment under `IdeaSpace`.",
+            ),
+            output_type=str,
             tools=[self._idea_tool.tools],
             usage_limit=usage_limit,
         )

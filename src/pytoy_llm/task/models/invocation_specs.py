@@ -138,30 +138,21 @@ class FunctionInvocationSpec[T]:
     @classmethod
     def from_any(
         cls,
-        arg: "FunctionInvocationSpec" | Callable[[Any], T] | Callable[[Any, ExecutionContext], T],
+        invocator: Callable[[Any], T] | Callable[[Any, ExecutionContext], T],
         *,
         meta: InvocationSpecMeta | None = None,
         hooks: InvocationHooks[T] | None = None,
     ) -> "FunctionInvocationSpec":
-        if isinstance(arg, FunctionInvocationSpec):
-            if meta or hooks is not None:
-                raise ValueError(
-                    "Configuration must not be provided when converting from InvocationSpec"
-                )
-            return arg
-
         if meta is None:
-            intent = arg.__doc__ or "an invocation function"
-            name = str(arg.__name__) if hasattr(arg, "__name__") else str(arg)
+            intent = invocator.__doc__ or "an invocation function"
+            name = str(invocator.__name__) if hasattr(invocator, "__name__") else str(invocator)
             meta = InvocationSpecMeta(name=name, intent=intent.strip())
 
-        if not callable(arg):
-            raise TypeError(f"{arg} is not callable")
-        sig = inspect.signature(arg)
+        sig = inspect.signature(invocator)
         params = list(sig.parameters.values())
 
         if len(params) == 1:
-            single_arg = cast(Callable[[Any], T], arg)
+            single_arg = cast(Callable[[Any], T], invocator)
 
             @wraps(single_arg)
             def wrapped_invocator(input_data: Any, _context: ExecutionContext) -> T:
@@ -169,8 +160,8 @@ class FunctionInvocationSpec[T]:
 
             return cls(invocator=wrapped_invocator, meta=meta, hooks=hooks or InvocationHooks())
         elif len(params) >= 2:
-            arg = cast(Callable[[Any, ExecutionContext], T], arg)
-            return cls(invocator=arg, meta=meta, hooks=hooks or InvocationHooks())
+            invocator = cast(Callable[[Any, ExecutionContext], T], invocator)
+            return cls(invocator=invocator, meta=meta, hooks=hooks or InvocationHooks())
         else:
             raise ValueError("Callable must have at least one argument (input)")
 
@@ -208,9 +199,7 @@ class SelectedInvocationSpec[T]:
 @dataclass(frozen=True)
 class LLMInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: (
-        Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike]
-    )
+    create_messages: Callable[[Any, ExecutionContext], LLMMessagesLike]
     llm_param: LLMParam | None = None
     connection: Connection | str | None = None
     meta: InvocationSpecMeta = field(
@@ -222,8 +211,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
     @classmethod
     def from_any(
         cls,
-        arg: "LLMInvocationSpec[T]"
-        | Callable[[Any], LLMMessagesLike]
+        create_messages: Callable[[Any], LLMMessagesLike]
         | Callable[[Any, ExecutionContext], LLMMessagesLike],
         *,
         output_type: type[T] | None = None,
@@ -232,34 +220,21 @@ class LLMInvocationSpec[T: BaseModel | str]:
         meta: InvocationSpecMeta | None = None,
         hooks: InvocationHooks[T] | None = None,
     ) -> "LLMInvocationSpec[T]":
-        if isinstance(arg, LLMInvocationSpec):
-            if any(
-                value is not None for value in (output_type, llm_param, connection, meta, hooks)
-            ):
-                raise ValueError(
-                    "Configuration must not be provided when converting from InvocationSpec"
-                )
-            return arg
         if output_type is None:
             raise TypeError("output_type must be provided when creating an LLMInvocationSpec")
-        if not callable(arg):
-            raise TypeError(f"{arg} is not callable")
         return cls(
             output_type=output_type,
-            create_messages=_normalize_message_creator(arg),
+            create_messages=_normalize_message_creator(create_messages),
             llm_param=llm_param,
             connection=connection,
-            meta=_to_invocation_meta(arg, meta),
+            meta=_to_invocation_meta(create_messages, meta),
             hooks=hooks or InvocationHooks(),
         )
 
     def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         def operation() -> InvocationResult[T]:
             starttime = time.time()
-            if len(inspect.signature(self.create_messages).parameters) == 1:
-                input_messages = self.create_messages(input)  # type:ignore
-            else:
-                input_messages = self.create_messages(input, execution_context)  # type: ignore
+            input_messages = self.create_messages(input, execution_context)
             connection = self.connection or execution_context.connection
             llm_param = self.llm_param or execution_context.llm_param
             llm_facade = LLMFacade(
@@ -287,9 +262,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
 @dataclass(frozen=True)
 class AgentInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: (
-        Callable[[Any, ExecutionContext], LLMMessagesLike] | Callable[[Any], LLMMessagesLike]
-    )
+    create_messages: Callable[[Any, ExecutionContext], LLMMessagesLike]
     tools: LLMToolsLike = field(default_factory=list)
     connection: Connection | str | None = None
     llm_param: LLMParam | None = None
@@ -304,8 +277,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
     @classmethod
     def from_any(
         cls,
-        arg: "AgentInvocationSpec[T]"
-        | Callable[[Any], LLMMessagesLike]
+        create_messages: Callable[[Any], LLMMessagesLike]
         | Callable[[Any, ExecutionContext], LLMMessagesLike],
         *,
         output_type: type[T] | None = None,
@@ -316,37 +288,23 @@ class AgentInvocationSpec[T: BaseModel | str]:
         meta: InvocationSpecMeta | None = None,
         hooks: InvocationHooks[T] | None = None,
     ) -> "AgentInvocationSpec[T]":
-        if isinstance(arg, AgentInvocationSpec):
-            if any(
-                value is not None
-                for value in (output_type, tools, connection, llm_param, usage_limit, meta, hooks)
-            ):
-                raise ValueError(
-                    "Configuration must not be provided when converting from InvocationSpec"
-                )
-            return arg
         if output_type is None:
             raise TypeError("output_type must be provided when creating an AgentInvocationSpec")
-        if not callable(arg):
-            raise TypeError(f"{arg} is not callable")
         return cls(
             output_type=output_type,
-            create_messages=_normalize_message_creator(arg),
+            create_messages=_normalize_message_creator(create_messages),
             tools=[] if tools is None else tools,
             connection=connection,
             llm_param=llm_param,
             usage_limit=usage_limit,
-            meta=_to_invocation_meta(arg, meta),
+            meta=_to_invocation_meta(create_messages, meta),
             hooks=hooks or InvocationHooks(),
         )
 
     def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         def operation() -> InvocationResult[T]:
             starttime = time.time()
-            if len(inspect.signature(self.create_messages).parameters) == 1:
-                input_messages = self.create_messages(input)  # type:ignore
-            else:
-                input_messages = self.create_messages(input, execution_context)  # type: ignore
+            input_messages = self.create_messages(input, execution_context)
             connection = self.connection or execution_context.connection
             llm_param = self.llm_param or execution_context.llm_param
             llm_facade = LLMFacade(

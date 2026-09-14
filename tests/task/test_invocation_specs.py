@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -19,7 +19,8 @@ def test_llm_invocation_spec_from_any_wraps_single_argument_creator() -> None:
     spec = LLMInvocationSpec.from_any(create_messages, output_type=str)
 
     assert spec.meta.name == "create_messages"
-    assert isinstance(spec.create_messages("input", None), LLMMessage)
+    context = ExecutionContext(llm_param=None, connection=None, llm_messages=())
+    assert isinstance(spec.create_messages("input", context), LLMMessage)
 
 
 def test_agent_invocation_spec_from_any_accepts_context_creator() -> None:
@@ -46,7 +47,7 @@ def test_invocation_spec_from_any_rejects_unsupported_creator_arity() -> None:
         return LLMMessage.from_prompt(user=f"{value}:{context.state}:{extra}")
 
     with pytest.raises(ValueError, match="input and execution context"):
-        LLMInvocationSpec.from_any(create_messages, output_type=str)
+        LLMInvocationSpec.from_any(cast(Any, create_messages), output_type=str)
 
 
 def test_hook_exceptions_do_not_change_successful_invocation() -> None:
