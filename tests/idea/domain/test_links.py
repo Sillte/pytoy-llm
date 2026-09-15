@@ -32,7 +32,8 @@ def test_local_path_is_converted_to_a_standard_file_uri(tmp_path: Path) -> None:
 def test_file_uri_is_converted_back_to_a_path() -> None:
     link = make_idea_link("file:///C:/notes/hello%20world.md")
 
-    assert link.target_file_path == Path("C:/notes/hello world.md")
+    assert link.target_file_path
+    assert link.target_file_path.as_posix() == Path("C:/notes/hello world.md").as_posix()
     assert LinkReachabilityChecker().check(link) is False
 
 
