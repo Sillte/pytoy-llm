@@ -19,13 +19,17 @@ if __name__ == "__main__":
         user_id: Annotated[str, Field(description="ID of the user involved")]
         action: Annotated[str, Field(description="What happened")]
         severity: Annotated[str, Field(description="Severity level: low / medium / high")]
-        user_name: Annotated[str | None, Field(description="Readable user name, it does not appear in the log.")] = None
+        user_name: Annotated[
+            str | None, Field(description="Readable user name, it does not appear in the log.")
+        ] = None
 
     class IncidentSummaries(BaseModel):
         items: Annotated[Sequence[IncidentSummary], Field(description="Items of incident Summary")]
 
-    parse_log_invocation = LLMInvocationSpec[IncidentSummaries](
-        meta=InvocationSpecMeta(name="ParseLogInvocation", intent="Parse system logs to extract incident summaries."),
+    parse_log_invocation = LLMInvocationSpec.from_any(
+        meta=InvocationSpecMeta(
+            name="ParseLogInvocation", intent="Parse system logs to extract incident summaries."
+        ),
         output_type=IncidentSummaries,
         create_messages=lambda input: [
             LLMMessage.from_prompt(
@@ -75,7 +79,10 @@ if __name__ == "__main__":
         return input + "free"
 
     decide_action_invocation = AgentInvocationSpec[IncidentActions](
-        meta=InvocationSpecMeta(name="DecideIncidentActions", intent="Decide actions for each incident based on severity."),
+        meta=InvocationSpecMeta(
+            name="DecideIncidentActions",
+            intent="Decide actions for each incident based on severity.",
+        ),
         output_type=IncidentActions,
         create_messages=lambda summaries, ctx: [
             LLMMessage.from_prompt(
@@ -99,12 +106,15 @@ if __name__ == "__main__":
 
     email_invocation = LLMInvocationSpec[str](
         meta=InvocationSpecMeta(
-            name="intent=GenerateNotificationEmails", intent="Generate notification emails for affected users."
+            name="intent=GenerateNotificationEmails",
+            intent="Generate notification emails for affected users.",
         ),
         output_type=str,
         create_messages=lambda actions, ctx: [
             LLMMessage.from_prompt(
-                system=("You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."),
+                system=(
+                    "You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."
+                ),
                 user="\n".join(
                     f"""
     User ID: {a.user_id}, "UserName: {a.user_name}"
@@ -121,7 +131,11 @@ if __name__ == "__main__":
     task_meta = TaskSpecMeta(
         name="IncidentNotificationTask",
         intent="Analyze system logs and notify affected users via email",
-        rules=["Do not invent incidents", "Do not include internal system details", "Write clear and polite emails"],
+        rules=[
+            "Do not invent incidents",
+            "Do not include internal system details",
+            "Write clear and polite emails",
+        ],
     )
     task_spec = TaskSpec.from_specs(
         meta=task_meta,

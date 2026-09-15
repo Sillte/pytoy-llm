@@ -151,7 +151,7 @@ class IdeaNote:
     @classmethod
     def from_path(
         cls,
-        file_path: Path,
+        file_path: str | Path,
         root: Path | None = None,
         *,
         link_source_extractor: LinkSourceExtractor | None = None,
@@ -160,6 +160,7 @@ class IdeaNote:
         """
         Parse an IdeaNote from the original document.
         """
+        file_path = Path(file_path)
         file_reader = file_reader or DiskFileReader()
         text = file_reader.read(file_path)
         root = root or file_path.parent
