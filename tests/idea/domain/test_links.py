@@ -33,7 +33,14 @@ def test_file_uri_is_converted_back_to_a_path() -> None:
     link = make_idea_link("file:///C:/notes/hello%20world.md")
 
     assert link.target_file_path
-    assert link.target_file_path.as_posix() == Path("C:/notes/hello world.md").as_posix()
+    assert link.target_file_path == Path("C:/notes/hello world.md")
+    assert LinkReachabilityChecker().check(link) is False
+
+
+def test_file_url_is_recovered_back_to_a_path() -> None:
+    link = make_idea_link("file:///tmp/hello%20world.md")
+    assert link.target_file_path
+    assert link.target_file_path == Path("/tmp/hello world.md")
     assert LinkReachabilityChecker().check(link) is False
 
 
