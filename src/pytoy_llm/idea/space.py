@@ -12,17 +12,23 @@ def default_note_predicator(file_path: Path) -> bool:
     return file_path.suffix == ".md"
 
 
+def _to_path_folder(path: Path):
+    return path if path.is_dir() else path.parent
+
+
 class IdeaSpace:
     CONVENTION_CANDIDATES: Final[tuple[str, ...]] = (".convention.md", ".index.md", "index.md")
     SPACE_META_NAME: Final[str] = ".space_meta"
+    ROOT_FILE_NAME: Final[str] = ".idea_space_root"
 
     def __init__(
         self,
         path: Path | str,
         *,
-        root: Path | None = None,
+        root: str | Path | None = None,
         file_reader: FileReaderProtocol | None = None,
         note_predicator: Callable[[Path], bool] | None = None,
+        ensure_root_marker: bool = False,
     ) -> None:
         path = Path(path)
         file_reader = file_reader or DiskFileReader()
@@ -30,18 +36,20 @@ class IdeaSpace:
 
         if root is None:
             path = path.resolve()
-            root = path
+            root = root or self.find_idea_space_root_path(path)
         else:
-            root = root.resolve()
+            root = Path(root).resolve()
             path = (root / path).resolve() if not path.is_absolute() else path.resolve()
 
         if not path.is_relative_to(root):
             raise OutsidePathError(f"Space must be inside root: path={path}, root={root}")
 
-        self._root = root
+        self._root = Path(root)
         self._relative_path = path.relative_to(root)
         self._file_reader = file_reader
         self._note_predicator = note_predicator
+        if ensure_root_marker:
+            self.ensure_root_marker()
 
     @classmethod
     def from_path(
@@ -51,14 +59,16 @@ class IdeaSpace:
         *,
         file_reader: FileReaderProtocol | None = None,
         note_predicator: Callable[[Path], bool] | None = None,
+        ensure_marker: bool = False,
     ) -> Self:
-        def _to_path_folder(path: Path):
-            return path if path.is_dir() else path.parent
 
         path = Path(path)
-        root = root or _to_path_folder(path)
         return cls(
-            path=path, root=Path(root), file_reader=file_reader, note_predicator=note_predicator
+            path=path,
+            root=root,
+            file_reader=file_reader,
+            note_predicator=note_predicator,
+            ensure_root_marker=ensure_marker,
         )
 
     def resolve(self, path: str | Path) -> Path:
@@ -169,3 +179,25 @@ class IdeaSpace:
 
     def _is_meta_folder(self, folder_path: Path) -> bool:
         return folder_path.name == self.SPACE_META_NAME
+
+    def ensure_root_marker(self) -> None:
+        (self.root / self.ROOT_FILE_NAME).touch()
+
+    @classmethod
+    def find_idea_space_root_path(cls, start_path: Path | str) -> Path:
+        """Find the IdeaSpace root associated with the given path.
+
+        Searches the given path and its ancestors for an IdeaSpace root marker.
+        If no marker is found, the folder containing `start_path` is returned.
+        """
+        start_folder = _to_path_folder(Path(start_path))
+
+        current = start_folder
+        while True:
+            if (current / cls.ROOT_FILE_NAME).exists():
+                return current
+
+            parent = current.parent
+            if parent == current:
+                return start_folder
+            current = parent
