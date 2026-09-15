@@ -141,6 +141,16 @@ characters and events rather than explained directly.
 The reader should be given opportunities to understand what these
 events mean rather than being told their meaning explicitly.
 
+### 5. The story should not clearly misrepresent factual matters
+
+When a story refers to specific historical, scientific, technical,
+geographical, or other factual matters, it should not present
+clearly false information as fact.
+
+This does not prohibit fictional settings, imagined events, or
+deliberate departures from reality when they are clearly part of
+the story.
+
 ## Three-Word Story Principles
 
 The following principles describe the qualities of the stories we are pursuing in this Task.
