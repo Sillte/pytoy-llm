@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from typing import Self
 
@@ -97,13 +98,16 @@ class PytoyPydanticAIAgent:
         agent = self._make_agent(system_prompt=pair.system_prompt, tools=tools)
         event_handler = EventHandler(self._event_emitters)
         event_handler.emit_request(messages)
-        result = agent.run_sync(
-            user_prompt=pair.user_prompt,
-            output_type=output_type,
-            message_history=message_history,
-            usage_limits=usage_limits,
-            event_stream_handler=event_handler.event_stream_handler,
-        )
+        with asyncio.Runner() as runner:
+            result = runner.run(
+                agent.run(
+                    user_prompt=pair.user_prompt,
+                    output_type=output_type,
+                    message_history=message_history,
+                    usage_limits=usage_limits,
+                    event_stream_handler=event_handler.event_stream_handler,
+                )
+            )
         return result
 
     def run_with_result[T: BaseModel | str](
