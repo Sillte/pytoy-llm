@@ -78,7 +78,10 @@ class TextAnalyzer:
         )
         composer = InvocationComposer(system_prompt_spec=prompt_spec)
         llm_spec = composer.compose_llm_invocation_spec()
-        request = TaskRequest(spec=TaskSpec.from_single_spec(meta="TextAnalyzer", invocation_spec=llm_spec), input=text)
+        request = TaskRequest(
+            spec=TaskSpec.from_single_spec(meta="TextAnalyzer", invocation_spec=llm_spec),
+            input=text,
+        )
         response = TaskSyncExecutor().execute(request)
         return response.output
 

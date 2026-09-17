@@ -8,7 +8,7 @@ from pytoy_llm.task.models.exceptions import TaskExecutionException
 from pytoy_llm.task.shared.outcome import Outcome
 
 type TaskExecutionID = str
-type TaskExecutionStatus = Literal["created", "running", "finished", "error"]
+type TaskExecutionStatus = Literal["created", "running", "finished", "error", "canceled"]
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,16 @@ class TaskExecutionContext[T]:
 class TaskExecutionExit[T]:
     id: TaskExecutionID
     outcome: Outcome[TaskResult[T], TaskExecutionException]
+
+
+@dataclass(frozen=True)
+class TaskExecutionStart:
+    id: TaskExecutionID
+
+
+@dataclass(frozen=True)
+class TaskExecutionCancel:
+    id: TaskExecutionID
 
 
 @dataclass(frozen=True)

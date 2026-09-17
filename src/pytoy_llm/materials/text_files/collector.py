@@ -4,11 +4,18 @@ from pathlib import Path
 from typing import Self
 
 from pytoy_llm.foundation.paths import PathGatherer
-from pytoy_llm.materials.text_files.models import FileMeta, TextFile, TextFilesMaterial, TextFilesMaterialQuery
+from pytoy_llm.materials.text_files.models import (
+    FileMeta,
+    TextFile,
+    TextFilesMaterial,
+    TextFilesMaterialQuery,
+)
 
 
 class TextFilesCollector:
-    def __init__(self, *, workspace: Path | str, default_excludes: None | tuple[str, ...] = None) -> None:
+    def __init__(
+        self, *, workspace: Path | str, default_excludes: None | tuple[str, ...] = None
+    ) -> None:
         workspace = Path(workspace).resolve()
         if not workspace.is_dir():
             workspace = workspace.parent
@@ -49,7 +56,11 @@ class TextFilesCollector:
 
         gatherer = PathGatherer(default_excludes=self._default_excludes)
         file_paths = gatherer.gather(
-            root, max_depth=query.max_depth, patterns=query.patterns, excludes=query.excludes, target="file"
+            root,
+            max_depth=query.max_depth,
+            patterns=query.patterns,
+            excludes=query.excludes,
+            target="file",
         )
         if query.only_meta:
             text_files = [FileMeta.from_path(path, self.workspace) for path in file_paths]

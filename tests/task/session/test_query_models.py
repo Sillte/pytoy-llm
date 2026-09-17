@@ -14,7 +14,9 @@ def test_query_from_any_preserves_multiple_values_and_none() -> None:
     statuses: tuple[TaskSessionStatus, ...] = ("idle", "running")
     task_statuses: tuple[TaskExecutionStatus, ...] = ("finished", "error")
 
-    query = TaskSessionQuery.from_any(kind="interactive", status=statuses, task_status=task_statuses)
+    query = TaskSessionQuery.from_any(
+        kind="interactive", status=statuses, task_status=task_statuses
+    )
 
     assert query.kind == "interactive"
     assert query.status == statuses

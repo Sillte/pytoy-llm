@@ -15,7 +15,9 @@ class InvocationInfo(BaseModel, frozen=True):
     kind: Annotated[str, Field(description="Type of invocation")]
     started_at: Annotated[float, Field(description="Start time of this invocation")]
     ended_at: Annotated[float, Field(description="End time of this invocation")]
-    meta: Annotated[InvocationSpecMeta, Field(description="Metadata about this invocation spec")] = InvocationSpecMeta()
+    meta: Annotated[
+        InvocationSpecMeta, Field(description="Metadata about this invocation spec")
+    ] = InvocationSpecMeta()
 
     @property
     def spec_name(self) -> str:
@@ -31,7 +33,9 @@ class InvocationTrace(BaseModel, frozen=True):
     input: Annotated[Any, Field(description="Input")]
     output: Annotated[Any, Field(description="Output")]
     info: Annotated[InvocationInfo, Field(description="Metatada Information about the invocation.")]
-    details: Annotated[Mapping[str, JsonValue], Field(description="detailed information for debugging")] = {}
+    details: Annotated[
+        Mapping[str, JsonValue], Field(description="detailed information for debugging")
+    ] = {}
     children: Annotated[Sequence[InvocationTrace], Field(description="Children of execution")] = ()
 
 

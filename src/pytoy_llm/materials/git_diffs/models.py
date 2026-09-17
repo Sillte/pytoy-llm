@@ -43,9 +43,15 @@ class LineRange(BaseModel, frozen=True):
 class AtomicChange(BaseModel, frozen=True):
     """Represents an atomic text change in a file."""
 
-    range: Annotated[LineRange, Field(description="Line range in the original file that is changed")]
-    old_lines: Annotated[Sequence[str], Field(description="Original lines that were replaced or deleted")]
-    new_lines: Annotated[Sequence[str], Field(description="New lines that were added in place of old_lines")]
+    range: Annotated[
+        LineRange, Field(description="Line range in the original file that is changed")
+    ]
+    old_lines: Annotated[
+        Sequence[str], Field(description="Original lines that were replaced or deleted")
+    ]
+    new_lines: Annotated[
+        Sequence[str], Field(description="New lines that were added in place of old_lines")
+    ]
 
     @property
     def structured_text(self) -> str:
@@ -66,7 +72,9 @@ class FileAdd(BaseModel, frozen=True):
 class FileDelete(BaseModel, frozen=True):
     """Represents a file deletion."""
 
-    path: Annotated[FilePath, Field(description="Relative path to the deleted file from the git root.")]
+    path: Annotated[
+        FilePath, Field(description="Relative path to the deleted file from the git root.")
+    ]
     old_lines: Annotated[Sequence[str], Field(description="Content lines of the deleted file")]
     op_type: Literal["Delete"] = "Delete"
 
@@ -74,8 +82,12 @@ class FileDelete(BaseModel, frozen=True):
 class FileModify(BaseModel, frozen=True):
     """Represents modifications to an existing file."""
 
-    path: Annotated[FilePath, Field(description="Relative path to the modified file from the git root.")]
-    atomic_changes: Annotated[Sequence[AtomicChange], Field(description="Sequence of atomic changes applied to the file")]
+    path: Annotated[
+        FilePath, Field(description="Relative path to the modified file from the git root.")
+    ]
+    atomic_changes: Annotated[
+        Sequence[AtomicChange], Field(description="Sequence of atomic changes applied to the file")
+    ]
     op_type: Literal["Modify"] = "Modify"
 
 
@@ -88,10 +100,20 @@ type FileOperation = FileAdd | FileDelete | FileModify
 class FileDiff(BaseModel, frozen=True):
     """Represents a single file change in a diff."""
 
-    id: str = Field(default_factory=lambda: str(uuid4()), description="Unique ID for the file associated with this diff")
-    operation: Annotated[FileOperation, Field(description="The type of file operation (add, delete, modify)")]
-    timestamp: Annotated[float, Field(description="Time when the change occurred (commit time or file mtime)")]
-    location: Annotated[Sequence[str], Field(description="Relative path from the workspace root as sequence of directories")]
+    id: str = Field(
+        default_factory=lambda: str(uuid4()),
+        description="Unique ID for the file associated with this diff",
+    )
+    operation: Annotated[
+        FileOperation, Field(description="The type of file operation (add, delete, modify)")
+    ]
+    timestamp: Annotated[
+        float, Field(description="Time when the change occurred (commit time or file mtime)")
+    ]
+    location: Annotated[
+        Sequence[str],
+        Field(description="Relative path from the workspace root as sequence of directories"),
+    ]
 
     @property
     def path(self) -> FilePath:
@@ -119,8 +141,12 @@ class FileDiff(BaseModel, frozen=True):
 class DiffMaterial(BaseModel, frozen=True):
     """Bundle for multiple file diffs, with a root location context."""
 
-    root_location: Annotated[Sequence[str], Field(description="Workspace-relative root location for this diff set")]
-    file_diffs: Annotated[Sequence[FileDiff], Field(description="List of file diffs contained in this container")]
+    root_location: Annotated[
+        Sequence[str], Field(description="Workspace-relative root location for this diff set")
+    ]
+    file_diffs: Annotated[
+        Sequence[FileDiff], Field(description="List of file diffs contained in this container")
+    ]
 
     @property
     def text_material_data(self) -> TextMaterialData:

@@ -140,7 +140,9 @@ class FileOperationCreator:
 
 
 class GitDiffCollector:
-    def __init__(self, repo_path: str | Path | None = None, root_folder: str | Path | None = None) -> None:
+    def __init__(
+        self, repo_path: str | Path | None = None, root_folder: str | Path | None = None
+    ) -> None:
         # Note: `repo_path should be a directory.
         if repo_path is None:
             repo_path = Path(".")
@@ -179,7 +181,9 @@ class GitDiffCollector:
             timestamp_provider = lambda _: float(timestamp)
         return self._create_bundle_from_ops(diffs, timestamp_provider)
 
-    def _create_bundle_from_ops(self, diffs: Any, timestamp_provider: Callable[[Path], float]) -> DiffMaterial:
+    def _create_bundle_from_ops(
+        self, diffs: Any, timestamp_provider: Callable[[Path], float]
+    ) -> DiffMaterial:
         def _relative_location(operation: FileOperation) -> tuple[str, ...] | None:
             try:
                 return (self.workspace / operation.path).relative_to(self.root_folder).parts

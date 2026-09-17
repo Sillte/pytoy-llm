@@ -3,7 +3,10 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from pytoy_llm.connection_configuration import ConnectionConfiguration, _make_default_connection_dict
+from pytoy_llm.connection_configuration import (
+    ConnectionConfiguration,
+    _make_default_connection_dict,
+)
 from pytoy_llm.models.connections import Connection
 
 

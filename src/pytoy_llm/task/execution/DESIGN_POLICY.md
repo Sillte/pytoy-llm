@@ -8,7 +8,7 @@ history and shared context belong to `task.session`.
 ## Boundaries
 
 - `TaskExecutionHandler` is the public entry point for creating, querying,
-  starting, and observing executions.
+  starting, canceling, and observing executions.
 - `TaskExecution` is an internal lifecycle object. The handler exposes its
   identifier, state, and events without exposing the object itself.
 - `TaskExecutionManager` is the internal registry used by handlers; it is not
@@ -33,6 +33,11 @@ symbols from the package, not from `handler.py`, `models.py`, or `manager.py`.
 
 `TaskExecutionQuery` uses `TaskExecutionStatus` as its status vocabulary and
 returns handlers rather than internal execution objects.
+
+Cancellation is supported only before an execution starts. It transitions the
+execution from `created` to `canceled` and is separate from execution exit.
+The execution manager deregisters executions after cancellation or exit; a
+handler no longer resolves status or events after deregistration.
 
 ## Constraints
 

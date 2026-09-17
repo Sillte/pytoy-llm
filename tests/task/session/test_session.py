@@ -2,9 +2,20 @@ from threading import Event
 
 import pytest
 
+from pytoy_llm.task.execution import TaskExecutionHandler
 from pytoy_llm.task.execution.manager import TaskExecutionManager
-from pytoy_llm.task.models import ContextPatch, FunctionInvocationSpec, InvocationResult, TaskRequest
-from pytoy_llm.task.session import TaskSessionHandler, TaskSessionManager, TaskSessionQuery, TaskSessionRequest
+from pytoy_llm.task.models import (
+    ContextPatch,
+    FunctionInvocationSpec,
+    InvocationResult,
+    TaskRequest,
+)
+from pytoy_llm.task.session import (
+    TaskSessionHandler,
+    TaskSessionManager,
+    TaskSessionQuery,
+    TaskSessionRequest,
+)
 
 
 def create_session(
@@ -12,14 +23,23 @@ def create_session(
     execution_manager: TaskExecutionManager,
     *,
     kind: str | None = None,
+    max_records: int = 100,
 ) -> TaskSessionHandler:
-    request = TaskSessionRequest.from_any(kind=kind) if kind is not None else TaskSessionRequest.from_any()
-    return TaskSessionHandler.create(request=request, manager=session_manager, execution_manager=execution_manager)
+    request = (
+        TaskSessionRequest.from_any(kind=kind, max_records=max_records)
+        if kind is not None
+        else TaskSessionRequest.from_any(max_records=max_records)
+    )
+    return TaskSessionHandler.create(
+        request=request, manager=session_manager, execution_manager=execution_manager
+    )
 
 
 def wait_for_exit(session, task_id: str) -> None:
     completed = Event()
-    session.on_task_exit.filter(lambda exit_entity: exit_entity.id == task_id).once().subscribe(lambda _: completed.set())
+    session.on_task_exit.filter(lambda exit_entity: exit_entity.id == task_id).once().subscribe(
+        lambda _: completed.set()
+    )
     assert completed.wait(timeout=1)
 
 
@@ -29,9 +49,14 @@ def test_session_propagates_context_between_task_executions() -> None:
     session = create_session(session_manager, execution_manager)
 
     def remember(value: str, _context) -> InvocationResult[str]:
-        return InvocationResult(output=value, context_patch=ContextPatch(state={"remembered": value}))
+        return InvocationResult(
+            output=value, context_patch=ContextPatch(state={"remembered": value})
+        )
 
-    first = session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(remember), "first"))
+    first = session.create_task(
+        TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(remember), "first")
+    )
+    first.start()
     wait_for_exit(session, first.id)
 
     observed: list[str] = []
@@ -40,7 +65,10 @@ def test_session_propagates_context_between_task_executions() -> None:
         observed.append(context.state["remembered"])
         return value
 
-    second = session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(read_context), "second"))
+    second = session.create_task(
+        TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(read_context), "second")
+    )
+    second.start()
     wait_for_exit(session, second.id)
 
     assert observed == ["first"]
@@ -62,9 +90,15 @@ def test_failed_task_returns_session_to_idle_and_can_be_retried() -> None:
             raise ValueError("temporary failure")
         return value
 
-    first = session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(fail_once), "retry"))
+    first = session.create_task(
+        TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(fail_once), "retry")
+    )
+    first.start()
     wait_for_exit(session, first.id)
-    second = session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(fail_once), "retry"))
+    second = session.create_task(
+        TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(fail_once), "retry")
+    )
+    second.start()
     wait_for_exit(session, second.id)
 
     assert session.status == "idle"
@@ -73,6 +107,135 @@ def test_failed_task_returns_session_to_idle_and_can_be_retried() -> None:
     assert session.records[1].output == "retry"
     assert session.records[0].status == "error"
     assert session.records[1].status == "finished"
+
+
+def test_session_prunes_old_terminal_records_to_max_records() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager, max_records=2)
+
+    tasks = []
+    for value in ("first", "second", "third"):
+        task = session.create_task(
+            TaskRequest.from_invocation_spec(
+                FunctionInvocationSpec.from_any(lambda item: item), value
+            )
+        )
+        task.start()
+        wait_for_exit(session, task.id)
+        tasks.append(task)
+
+    assert [record.id for record in session.records] == [tasks[1].id, tasks[2].id]
+
+
+def test_task_execution_manager_removes_exit_and_canceled_tasks() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager)
+
+    finished = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "finished"
+        )
+    )
+    finished.start()
+    wait_for_exit(session, finished.id)
+    assert execution_manager.get(finished.id) is None
+
+    canceled = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "canceled"
+        )
+    )
+    canceled.cancel()
+    assert execution_manager.get(canceled.id) is None
+
+
+def test_task_start_event_is_emitted_before_task_runs() -> None:
+    execution_manager = TaskExecutionManager()
+    observed: list[tuple[str, str | None]] = []
+
+    task = TaskExecutionHandler.create(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "value"
+        ),
+        manager=execution_manager,
+    )
+    task.on_start.subscribe(lambda start: observed.append((start.id, task.status)))
+
+    task.start()
+    completed = Event()
+    task.on_exit.once().subscribe(lambda _: completed.set())
+    assert completed.wait(timeout=1)
+
+    assert observed == [(task.id, "running")]
+
+
+def test_create_task_allows_start_event_subscription_before_start() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager)
+    observed: list[tuple[str, str | None]] = []
+
+    task = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "value"
+        )
+    )
+    task.on_start.subscribe(lambda start: observed.append((start.id, task.status)))
+
+    assert session.status == "pending"
+    assert session.records[0].status == "created"
+    task.start()
+    wait_for_exit(session, task.id)
+
+    assert observed == [(task.id, "running")]
+    assert session.records[0].status == "finished"
+
+
+def test_session_allows_only_one_pending_task() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager)
+    request = TaskRequest.from_invocation_spec(
+        FunctionInvocationSpec.from_any(lambda value: value), "value"
+    )
+
+    session.create_task(request)
+
+    with pytest.raises(RuntimeError, match="status='pending'"):
+        session.create_task(request)
+
+
+def test_canceling_pending_task_returns_session_to_idle() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager)
+    task = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "value"
+        )
+    )
+
+    task.cancel()
+
+    assert execution_manager.get(task.id) is None
+    assert session.status == "idle"
+    assert session.records[0].status == "canceled"
+
+
+def test_pending_task_prevents_session_completion() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager)
+    session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "value"
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="status='pending'"):
+        session.complete()
 
 
 def test_completed_session_rejects_new_tasks_and_emits_session_exit() -> None:
@@ -93,7 +256,12 @@ def test_terminate_removes_session_and_clears_retained_resources() -> None:
     execution_manager = TaskExecutionManager()
     session = create_session(session_manager, execution_manager)
 
-    task = session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(lambda value: value), "value"))
+    task = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "value"
+        )
+    )
+    task.start()
     wait_for_exit(session, task.id)
     session.terminate()
 
@@ -113,7 +281,10 @@ def test_terminate_does_not_accept_late_task_callbacks() -> None:
         release.wait(timeout=1)
         return value
 
-    session.submit(TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(blocked), "value"))
+    task = session.create_task(
+        TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(blocked), "value")
+    )
+    task.start()
     assert started.wait(timeout=1)
     session.terminate()
     release.set()

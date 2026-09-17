@@ -9,12 +9,24 @@ from pytoy_llm.task.global_context import GlobalContext
 from pytoy_llm.task.models import TaskContextState, TaskRequest
 
 from .manager import TaskSessionManager
-from .models import TaskRecord, TaskSessionID, TaskSessionQuery, TaskSessionRequest, TaskSessionStatus
+from .models import (
+    TaskRecord,
+    TaskSessionID,
+    TaskSessionQuery,
+    TaskSessionRequest,
+    TaskSessionStatus,
+)
 from .session import TaskSession
 
 
 class TaskSessionHandler:
-    def __init__(self, id: TaskSessionID, *, manager: TaskSessionManager, execution_manager: TaskExecutionManager) -> None:
+    def __init__(
+        self,
+        id: TaskSessionID,
+        *,
+        manager: TaskSessionManager,
+        execution_manager: TaskExecutionManager,
+    ) -> None:
         self._id = id
         self._manager = manager
         self._execution_manager = execution_manager
@@ -31,7 +43,11 @@ class TaskSessionHandler:
         execution_manager = execution_manager or GlobalContext.get().execution_manager
 
         request = request or TaskSessionRequest.from_any()
-        session = TaskSession.from_any(context_state=request.context_state, kind=request.kind)
+        session = TaskSession.from_any(
+            context_state=request.context_state,
+            kind=request.kind,
+            max_records=request.max_records,
+        )
         manager.register(session)
         handler = cls(id=session.id, manager=manager, execution_manager=execution_manager)
         return handler
@@ -46,7 +62,10 @@ class TaskSessionHandler:
     ) -> Sequence[Self]:
         manager = manager or GlobalContext.get().session_manager
         execution_manager = execution_manager or GlobalContext.get().execution_manager
-        return [cls(id=session.id, manager=manager, execution_manager=execution_manager) for session in manager.select(query)]
+        return [
+            cls(id=session.id, manager=manager, execution_manager=execution_manager)
+            for session in manager.select(query)
+        ]
 
     @property
     def id(self) -> TaskSessionID:
@@ -62,9 +81,13 @@ class TaskSessionHandler:
         session = self._require_session()
         return session.context_state
 
-    def submit(self, request: TaskRequest) -> TaskExecutionHandler:
+    @property
+    def max_records(self) -> int:
+        return self._require_session().max_records
+
+    def create_task(self, request: TaskRequest) -> TaskExecutionHandler:
         session = self._require_session()
-        return session.submit(request, execution_manager=self._execution_manager)
+        return session.create_task(request, execution_manager=self._execution_manager)
 
     @property
     def records(self) -> Sequence[TaskRecord]:

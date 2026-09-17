@@ -95,7 +95,13 @@ class SystemPromptSpec[T: BaseModel | str](BaseModel):
             )
         else:
             auxiliary_guidance = None
-        return cls(name=name, output_spec=output_spec, intent=intent, rules=rules, auxiliary_guidance=auxiliary_guidance)
+        return cls(
+            name=name,
+            output_spec=output_spec,
+            intent=intent,
+            rules=rules,
+            auxiliary_guidance=auxiliary_guidance,
+        )
 
 
 class SupplementarySectionProtocol(Protocol):

@@ -17,7 +17,9 @@ def check_relative_path(v: Any) -> Path:
     return p
 
 
-TextFilePath = Annotated[Path, Field(description="Relative path"), BeforeValidator(check_relative_path)]
+TextFilePath = Annotated[
+    Path, Field(description="Relative path"), BeforeValidator(check_relative_path)
+]
 
 
 class TextFile(BaseModel, frozen=True):
@@ -28,7 +30,9 @@ class TextFile(BaseModel, frozen=True):
         Field(description="Path relative to the workspace root"),
     ]
 
-    modified_at: float = Field(..., description="Last modification time of the file (epoch seconds)")
+    modified_at: float = Field(
+        ..., description="Last modification time of the file (epoch seconds)"
+    )
     body: str = Field(..., description="The content of the file")
 
     @classmethod
@@ -57,7 +61,9 @@ class FileMeta(BaseModel, frozen=True):
         Field(description="Path relative to the workspace root"),
     ]
 
-    modified_at: float = Field(..., description="Last modification time of the file (epoch seconds)")
+    modified_at: float = Field(
+        ..., description="Last modification time of the file (epoch seconds)"
+    )
     size: int = Field(..., description="Byte size of the text")
 
     @classmethod
@@ -70,7 +76,9 @@ class FileMeta(BaseModel, frozen=True):
     @property
     def structured_text(self) -> str:
         lines = []
-        lines.append(f"<entry path={self.path.as_posix()} modified_at={self.modified_at} size={self.size} />")
+        lines.append(
+            f"<entry path={self.path.as_posix()} modified_at={self.modified_at} size={self.size} />"
+        )
         return "\n".join(lines)
 
 
@@ -180,5 +188,9 @@ class TextFilesMaterialQuery(BaseModel, frozen=True):
                 excludes,
             ]
         return cls(
-            collection_root=collection_root, max_depth=max_depth, only_meta=only_meta, patterns=patterns, excludes=excludes
+            collection_root=collection_root,
+            max_depth=max_depth,
+            only_meta=only_meta,
+            patterns=patterns,
+            excludes=excludes,
         )

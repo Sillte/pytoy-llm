@@ -2,7 +2,11 @@ from pydantic import BaseModel
 
 from pytoy_llm.composer.models import OutputSpec, SystemPromptSpec
 from pytoy_llm.composer.system_prompt_composer import SystemPromptComposer
-from pytoy_llm.composers.materials.models import MaterialSection, MaterialUsage, build_material_sections
+from pytoy_llm.composers.materials.models import (
+    MaterialSection,
+    MaterialUsage,
+    build_material_sections,
+)
 from pytoy_llm.materials.models import (
     ModelMaterialData,
     TextMaterialData,

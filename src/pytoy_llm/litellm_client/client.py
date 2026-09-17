@@ -59,7 +59,9 @@ class PytoyLiteLLMClient:
         message_adapter = LiteLLMMessageAdapter()
         input_messages = LLMMessage.to_messages(messages)
         model_response = self.completion_with_native(input_messages, output_type)
-        return message_adapter.to_llm_model(input_messages=input_messages, llm_response=model_response, output_type=output_type)
+        return message_adapter.to_llm_model(
+            input_messages=input_messages, llm_response=model_response, output_type=output_type
+        )
 
     def completion_with_native[T: BaseModel | str](
         self,

@@ -20,8 +20,10 @@ class TaskExecutionManager:
         def _deregister(_):
             with self._lock:
                 self._executions.pop(execution.id, None)
+            execution.dispose()
 
         execution.on_exit.subscribe(_deregister)
+        execution.on_cancel.subscribe(_deregister)
 
     def select(self, query: TaskExecutionQuery | None = None) -> Sequence[TaskExecution]:
         query = query or TaskExecutionQuery()

@@ -26,7 +26,10 @@ class SystemPromptComposer:
         self.prompt_spec = prompt_spec
 
     def compose_prompt(
-        self, supplementary_sections: SupplementarySections | None | Sequence[SupplementarySectionProtocol] = None
+        self,
+        supplementary_sections: SupplementarySections
+        | None
+        | Sequence[SupplementarySectionProtocol] = None,
     ) -> str:
         if supplementary_sections is not None:
             supplementary_sections = SupplementarySections.from_any(supplementary_sections)
@@ -48,11 +51,15 @@ class SystemPromptComposer:
             blocks = [*blocks, "## Task Rules", rules_body]
 
         if self.prompt_spec.auxiliary_guidance:
-            task_auxiliary_guidance = self._to_auxiliary_guidance_instruction(self.prompt_spec.auxiliary_guidance)
+            task_auxiliary_guidance = self._to_auxiliary_guidance_instruction(
+                self.prompt_spec.auxiliary_guidance
+            )
             blocks = [*blocks, task_auxiliary_guidance]
 
         if supplementary_sections is not None:
-            task_supplement = self._to_supplementary_instruction(supplementary_sections=supplementary_sections)
+            task_supplement = self._to_supplementary_instruction(
+                supplementary_sections=supplementary_sections
+            )
             blocks = [*blocks, task_supplement]
 
         prompt = _join_blocks(blocks)
@@ -77,7 +84,9 @@ class SystemPromptComposer:
             blocks = [*blocks, "### Guidance Role", auxiliary_guidance.guidance_role]
 
         if auxiliary_guidance.reasoning_guidance:
-            warn_forbidden_headers(auxiliary_guidance.reasoning_guidance, min_allowed_header_level=4)
+            warn_forbidden_headers(
+                auxiliary_guidance.reasoning_guidance, min_allowed_header_level=4
+            )
             blocks = [*blocks, "### Reasoning Guidance", auxiliary_guidance.reasoning_guidance]
         return _join_blocks(blocks)
 
@@ -142,7 +151,9 @@ def warn_request_headers(text: str, header_depth: int) -> None:
     expected_prefix = "#" * header_depth + " "
 
     if not first_line.startswith(expected_prefix):
-        warnings.warn(f"Section must start with a Markdown header at depth {header_depth}: `{expected_prefix}<title>`")
+        warnings.warn(
+            f"Section must start with a Markdown header at depth {header_depth}: `{expected_prefix}<title>`"
+        )
 
 
 if __name__ == "__main__":

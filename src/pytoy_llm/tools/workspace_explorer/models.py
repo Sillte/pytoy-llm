@@ -45,7 +45,9 @@ class DirectoryInfo(BaseModel, frozen=True):
     modified: datetime = Field(description="Last modification timestamp.")
 
     @classmethod
-    def from_relative_path(cls, relative_path: WorkspacePath, workspace_root: Path) -> "DirectoryInfo":
+    def from_relative_path(
+        cls, relative_path: WorkspacePath, workspace_root: Path
+    ) -> "DirectoryInfo":
         abs_path = workspace_root / relative_path
         stat = abs_path.stat()
         return cls(
@@ -134,7 +136,11 @@ class WorkspaceAccess:
     def resolve(self, path: WorkspacePath) -> Path | ToolError:
         abs_path = (self.workspace / path).resolve(strict=False)
         if not abs_path.is_relative_to(self.workspace):
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} is outside workspace", retry=False)
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg=f"{path=} is outside workspace",
+                retry=False,
+            )
         return abs_path
 
     def is_within_workspace(self, path: Path) -> bool:

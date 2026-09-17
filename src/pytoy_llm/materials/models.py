@@ -27,7 +27,9 @@ class TextMaterialData(BaseModel, frozen=True):
     description: Annotated[
         str,
         Field(
-            description=("Human-readable description of what this material contains and what it represents."),
+            description=(
+                "Human-readable description of what this material contains and what it represents."
+            ),
         ),
     ]
 
@@ -54,7 +56,9 @@ class ModelMaterialData[T: BaseModel](BaseModel, frozen=True):
     while the JSON Schema describes their structure and fields.
     """
 
-    description: Annotated[str, Field(description="Human-readable explanation of the section's purpose and contents.")]
+    description: Annotated[
+        str, Field(description="Human-readable explanation of the section's purpose and contents.")
+    ]
     instances: Sequence[T] = Field(
         ...,
         description="Concrete JSON instances representing the material.",
@@ -88,7 +92,8 @@ class ModelMaterialData[T: BaseModel](BaseModel, frozen=True):
             else [cls.model_json_schema() for cls in set(type(item) for item in self.instances)]
         )
         schema_fragments = "\n\n".join(
-            "\n```json\n" + json.dumps(schema, indent=2, ensure_ascii=False) + "\n```" for schema in json_schemas
+            "\n```json\n" + json.dumps(schema, indent=2, ensure_ascii=False) + "\n```"
+            for schema in json_schemas
         )
         blocks = [*blocks, f"{sub_header_prefix} JSON Schemas", schema_fragments]
 

@@ -49,19 +49,26 @@ class LiteLLMMessageAdapter:
     ) -> Sequence[Mapping[str, Any]]:
         return [self._part_converter.to_native(part) for part in message.parts]
 
-    def from_native(self, native_records: Sequence[Mapping[str, Any]], kind: Literal["response", "request"]) -> LLMMessage:
+    def from_native(
+        self, native_records: Sequence[Mapping[str, Any]], kind: Literal["response", "request"]
+    ) -> LLMMessage:
         parts = [self._part_converter.from_native(elem) for elem in native_records]
         return LLMMessage(kind=kind, parts=parts)
 
     def to_llm_model[T: BaseModel | str](
-        self, input_messages: Sequence[LLMMessage], llm_response: ModelResponse, output_type: type[T]
+        self,
+        input_messages: Sequence[LLMMessage],
+        llm_response: ModelResponse,
+        output_type: type[T],
     ) -> LLMResult[T]:
 
         response = cast(litellm.TextCompletionResponse, llm_response)
         usage = response.usage
         if usage is None:
             raise ValueError("Response is strange.")
-        tokens = LLMTokens(prompt=usage.prompt_tokens, completion=usage.completion_tokens, total=usage.total_tokens)
+        tokens = LLMTokens(
+            prompt=usage.prompt_tokens, completion=usage.completion_tokens, total=usage.total_tokens
+        )
         finish_reason = response.choices[0].finish_reason
         meta = LLMOutputMeta(tokens=tokens, finish_reason=finish_reason, llm_calls=1)
 

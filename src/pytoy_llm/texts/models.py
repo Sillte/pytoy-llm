@@ -26,8 +26,14 @@ class TextSemanticsOutcomeModel(BaseModel, frozen=True):
     which may tend toward the boundary against ``pragmatics`.
     """
 
-    explicit: str = Field(description=("Description of semantic content directly supported by the text."))
-    inferred: str = Field(description=("Description of semantic content inferred from the text but not directly expressed."))
+    explicit: str = Field(
+        description=("Description of semantic content directly supported by the text.")
+    )
+    inferred: str = Field(
+        description=(
+            "Description of semantic content inferred from the text but not directly expressed."
+        )
+    )
 
 
 class TextPragmaticsOutcomeModel(BaseModel, frozen=True):
@@ -55,7 +61,9 @@ class TextPragmaticsOutcomeModel(BaseModel, frozen=True):
     depend on context, intention, or information outside the text.
     """
 
-    explicit: str = Field(description=("Description of pragmatic properties directly recoverable from the text."))
+    explicit: str = Field(
+        description=("Description of pragmatic properties directly recoverable from the text.")
+    )
     inferred: str = Field(
         description=(
             "Description of pragmatic interpretations that require contextual, intentional, or other inferential information."
@@ -133,5 +141,7 @@ class TextRealizationModel(BaseModel, frozen=True):
     """
 
     description: str = Field(
-        description=("Natural-language description of the linguistic and discourse-level means used to realize the outcome.")
+        description=(
+            "Natural-language description of the linguistic and discourse-level means used to realize the outcome."
+        )
     )

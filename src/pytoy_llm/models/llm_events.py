@@ -14,3 +14,6 @@ class LLMEventEmitters:
 
     def emit_activity(self, activity: LLMActivity) -> None:
         self.activity_emitter.fire(activity)
+
+    def dispose(self) -> None:
+        self.activity_emitter.dispose()

@@ -80,7 +80,9 @@ class WorkspaceInspection:
             )
         if max_bytes is not None and max_bytes < 1:
             return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT, msg="`max_bytes` must be greater than or equal to 1.", retry=False
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg="`max_bytes` must be greater than or equal to 1.",
+                retry=False,
             )
 
         abs_path = self.access.resolve(path)
@@ -95,7 +97,9 @@ class WorkspaceInspection:
                     retry=False,
                 )
             if not abs_path.is_file():
-                return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False)
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False
+                )
             if max_bytes is not None and abs_path.stat().st_size > max_bytes:
                 return ToolError(
                     kind=ToolErrorKind.RESOURCE_LIMIT,
@@ -184,7 +188,9 @@ class WorkspaceInspection:
             )
         if max_bytes is not None and max_bytes < 1:
             return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT, msg="`max_bytes` must be greater than or equal to 1.", retry=False
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg="`max_bytes` must be greater than or equal to 1.",
+                retry=False,
             )
 
         results: list[FileContent | FilePartContent] = []
@@ -251,19 +257,28 @@ class WorkspaceInspection:
                 retry=False,
             )
         if start_line < 0:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg="start_line must be a non-negative integer.")
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg="start_line must be a non-negative integer.",
+            )
         if max_bytes is not None and max_bytes < 1:
             return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT, msg="`max_bytes` must be greater than or equal to 1.", retry=False
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg="`max_bytes` must be greater than or equal to 1.",
+                retry=False,
             )
         abs_path = self.access.resolve(path)
         if isinstance(abs_path, ToolError):
             return abs_path
         try:
             if not abs_path.exists():
-                return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=f"{path=} does not exist.", retry=False)
+                return ToolError(
+                    kind=ToolErrorKind.NOT_FOUND, msg=f"{path=} does not exist.", retry=False
+                )
             if not abs_path.is_file():
-                return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False)
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False
+                )
             if max_bytes is not None and abs_path.stat().st_size > max_bytes:
                 return ToolError(
                     kind=ToolErrorKind.RESOURCE_LIMIT,
@@ -279,7 +294,10 @@ class WorkspaceInspection:
                     msg=f"`{end_line=}` is out of range; the file has {len(lines)} lines.",
                 )
             return FilePartContent(
-                path=path, content="".join(lines[start_line:end_line]), start_line=start_line, end_line=end_line
+                path=path,
+                content="".join(lines[start_line:end_line]),
+                start_line=start_line,
+                end_line=end_line,
             )
         except FileNotFoundError as exc:
             return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=None)

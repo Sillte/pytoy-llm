@@ -31,4 +31,6 @@ class TaskRequest[T]:
             spec,
             meta="SingleInvocationTask",
         )
-        return cls(spec=task_spec, input=input, context_state=context_state, activity_sink=activity_sink)
+        return cls(
+            spec=task_spec, input=input, context_state=context_state, activity_sink=activity_sink
+        )

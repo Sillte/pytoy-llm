@@ -44,7 +44,9 @@ class LLMMessage(BaseModel, frozen=True):
         return cls.from_parts(parts, kind)
 
     @classmethod
-    def from_parts(cls, parts: Sequence[Part], kind: Literal["request", "response"] | None = None) -> Self:
+    def from_parts(
+        cls, parts: Sequence[Part], kind: Literal["request", "response"] | None = None
+    ) -> Self:
         def _infer_kind(parts: Sequence[Part]) -> Literal["request", "response"]:
             for part in parts:
                 if isinstance(part, TextPart) and part.role in {"user", "system"}:
@@ -55,7 +57,10 @@ class LLMMessage(BaseModel, frozen=True):
         return cls(kind=kind, parts=parts)
 
     @classmethod
-    def from_any(cls, arg: str | Sequence[Part] | Mapping[str, Any] | Sequence[Mapping[str, Any]] | LLMMessage) -> Self:
+    def from_any(
+        cls,
+        arg: str | Sequence[Part] | Mapping[str, Any] | Sequence[Mapping[str, Any]] | LLMMessage,
+    ) -> Self:
         if isinstance(arg, str):
             try:
                 result = cls.model_validate_json(arg)

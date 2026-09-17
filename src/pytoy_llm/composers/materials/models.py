@@ -16,7 +16,9 @@ class MaterialUsage(BaseModel, frozen=True):
     usage: Annotated[
         str,
         Field(
-            description=("Human-readable guidance describing how the material should be used when solving the task."),
+            description=(
+                "Human-readable guidance describing how the material should be used when solving the task."
+            ),
         ),
     ]
 
@@ -65,7 +67,9 @@ class MaterialSection(SupplementarySectionProtocol):
         )
 
     @classmethod
-    def build_supplementary_sections(cls, material_sections: Sequence[Self]) -> SupplementarySections:
+    def build_supplementary_sections(
+        cls, material_sections: Sequence[Self]
+    ) -> SupplementarySections:
         return build_material_sections(material_sections)
 
 

@@ -58,7 +58,9 @@ class ConnectionConfiguration:
     def get_connection(self, name: str = DEFAULT_NAME) -> Connection:
         path = self.get_connection_path(name)
         if not path.exists():
-            raise IllegalConfigurationError(f"`{name}`'s configuration file is not existent. See {path}.")
+            raise IllegalConfigurationError(
+                f"`{name}`'s configuration file is not existent. See {path}."
+            )
         try:
             return Connection.model_validate_json(path.read_text())
         except Exception:

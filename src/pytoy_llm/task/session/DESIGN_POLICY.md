@@ -8,7 +8,7 @@ one logical interaction or workflow.
 ## Responsibilities
 
 - `TaskExecution` owns the lifecycle of one task execution.
-- `TaskSessionHandler` is the public API for creating, submitting to, and
+- `TaskSessionHandler` is the public API for creating tasks in, and
   observing a session.
 - `TaskSession` owns the shared `TaskContextState` and task result history.
 - `TaskSessionRequest` is the input for creating a session. Its default `kind`
@@ -16,6 +16,9 @@ one logical interaction or workflow.
 - `TaskRecord` is the session's task-level history record. It retains the
   request, status, output or exception, and activities, but not the full exit
   payload or task result.
+- `TaskSessionRequest.max_records` limits retained task history. Old terminal
+  records are pruned after completion or cancellation; active records are
+  never pruned.
 - A successful execution updates the session context for later executions.
 - `TaskExecutionManager` manages execution lookup and lifecycle access; it is
   not the session history store.
@@ -26,10 +29,12 @@ exposing or reimplementing the internal `TaskExecution` object.
 
 ## Lifecycle
 
-Submitting a task is accepted only while the session is `idle`, and changes the
-session to `running`. Every task exit, including failure, returns the session
-to `idle` and records the task result or exception. A completed session is
-entered explicitly and cannot accept further tasks.
+Creating a task is accepted only while the session is `idle` and registers the
+task in `created` state. The session changes to `pending` until the caller
+starts or cancels the task. A started task changes the session to `running`;
+cancellation returns it to `idle`. Every task exit, including failure, returns
+the session to `idle` and records the task result or exception. A completed
+session is entered explicitly and cannot accept further tasks.
 
 A request with an explicit context state keeps that state for the execution.
 Otherwise, the session's current context state is used.

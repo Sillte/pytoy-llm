@@ -106,10 +106,14 @@ class PydanticAIMessageAdapter:
     def from_native(self, model_message: ModelMessage) -> LLMMessage:
         match model_message.kind:
             case "request":
-                parts = [self._request_part_converter.from_native(part) for part in model_message.parts]
+                parts = [
+                    self._request_part_converter.from_native(part) for part in model_message.parts
+                ]
                 return LLMMessage(kind="request", parts=parts)
             case "response":
-                parts = [self._response_part_converter.from_native(part) for part in model_message.parts]
+                parts = [
+                    self._response_part_converter.from_native(part) for part in model_message.parts
+                ]
                 return LLMMessage(kind="response", parts=parts)
             case _:
                 assert_never(model_message.kind)
@@ -120,7 +124,9 @@ class PydanticAIMessageAdapter:
         usage = run_result.usage
         prompt = usage.input_tokens
         completion = usage.output_tokens
-        tokens = LLMTokens(prompt=prompt, completion=completion, total=prompt + completion)  # NOTE: ....? really?
+        tokens = LLMTokens(
+            prompt=prompt, completion=completion, total=prompt + completion
+        )  # NOTE: ....? really?
         meta = LLMOutputMeta(tokens=tokens, finish_reason=None, llm_calls=usage.requests)
         return LLMResult(output=run_result.output, meta=meta, messages=messages)
 
@@ -153,4 +159,6 @@ class UsageLimitConverter:
     def __init__(self) -> None: ...
 
     def to_usage_limits(self, usage_limit: PytoyUsageLimit) -> UsageLimits:
-        return UsageLimits(total_tokens_limit=usage_limit.max_total_tokens, request_limit=usage_limit.max_requests)
+        return UsageLimits(
+            total_tokens_limit=usage_limit.max_total_tokens, request_limit=usage_limit.max_requests
+        )

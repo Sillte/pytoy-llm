@@ -7,7 +7,12 @@ from pytoy_llm.materials.git_diffs.collectors import (
     FileModifyCreator,
     GitDiffCollector,
 )
-from pytoy_llm.materials.git_diffs.models import FileAdd, FileDelete, FileModify, GitDiffMaterialQuery
+from pytoy_llm.materials.git_diffs.models import (
+    FileAdd,
+    FileDelete,
+    FileModify,
+    GitDiffMaterialQuery,
+)
 
 
 # --- FileAddCreator テスト ---

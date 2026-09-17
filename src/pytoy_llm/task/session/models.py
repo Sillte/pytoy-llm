@@ -8,7 +8,7 @@ from pytoy_llm.task.models import TaskContextState, TaskRequest
 from pytoy_llm.task.models.exceptions import TaskExecutionException
 
 type TaskSessionID = str
-type TaskSessionStatus = Literal["idle", "running", "completed"]
+type TaskSessionStatus = Literal["idle", "pending", "running", "completed"]
 
 
 DEFAULT_KIND = "$default"
@@ -28,10 +28,16 @@ class TaskRecord:
 class TaskSessionRequest:
     kind: str = DEFAULT_KIND
     context_state: TaskContextState | None = None
+    max_records: int = 100
 
     @classmethod
-    def from_any(cls, kind: str = DEFAULT_KIND, context_state: TaskContextState | None = None):
-        return cls(kind=kind, context_state=context_state)
+    def from_any(
+        cls,
+        kind: str = DEFAULT_KIND,
+        context_state: TaskContextState | None = None,
+        max_records: int = 100,
+    ):
+        return cls(kind=kind, context_state=context_state, max_records=max_records)
 
 
 @dataclass(frozen=True)

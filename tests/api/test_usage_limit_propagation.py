@@ -28,6 +28,8 @@ def test_run_forwards_all_parameters_to_agent(monkeypatch):
 
     assert result == "result"
     assert agent.mock_calls == [
-        call(connection, llm_param=llm_param, event_emitters=agent.call_args.kwargs["event_emitters"]),
+        call(
+            connection, llm_param=llm_param, event_emitters=agent.call_args.kwargs["event_emitters"]
+        ),
         call.run(messages, output_type=str, tools=tools, usage_limit=usage_limit),
     ]

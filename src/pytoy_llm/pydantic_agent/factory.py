@@ -45,6 +45,10 @@ class PydanticAIModelFactory:
             provider = OpenAIProvider(api_key=api_key, base_url=base_url)
             sub_name = "/".join(parts[1:])
 
-            return OpenAIChatModel(sub_name, provider=provider, settings=model_settings, profile=thinking_override)
+            return OpenAIChatModel(
+                sub_name, provider=provider, settings=model_settings, profile=thinking_override
+            )
         else:
-            raise ValueError(f"Only `openai/` or `gemini/` models are accepted, `{parts[0]}` is not accepted.")
+            raise ValueError(
+                f"Only `openai/` or `gemini/` models are accepted, `{parts[0]}` is not accepted."
+            )

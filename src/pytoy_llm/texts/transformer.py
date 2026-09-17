@@ -172,18 +172,26 @@ class CompositeTransformationRule(BaseTransformRule, frozen=True):
     rule: str
 
     @classmethod
-    def from_rules(cls, semantics_rule: BaseTransformRule | None, pragmatics_rule: BaseTransformRule | None) -> Self:
+    def from_rules(
+        cls, semantics_rule: BaseTransformRule | None, pragmatics_rule: BaseTransformRule | None
+    ) -> Self:
         rules = []
         if semantics_rule:
             rules.append(
                 "\n\n".join(
-                    ["For transforming semantics OUTCOME, please comply with the following rules:", semantics_rule.rule]
+                    [
+                        "For transforming semantics OUTCOME, please comply with the following rules:",
+                        semantics_rule.rule,
+                    ]
                 )
             )
         if pragmatics_rule:
             rules.append(
                 "\n\n".join(
-                    ["For transforming pragmatics OUTCOME, please comply with the following rules:", pragmatics_rule.rule]
+                    [
+                        "For transforming pragmatics OUTCOME, please comply with the following rules:",
+                        pragmatics_rule.rule,
+                    ]
                 )
             )
         if rules:
@@ -198,7 +206,9 @@ class TextTransformRequest(BaseModel, frozen=True):
 
     orig_text: str = Field(description="Original text")
     orig_outcome: TextOutcomeModel
-    orig_realization: TextRealizationModel | None = Field(description="Original realization if given.", default=None)
+    orig_realization: TextRealizationModel | None = Field(
+        description="Original realization if given.", default=None
+    )
     transform_rule: str = Field(description="Rule for transformation")
     instruction: str = Field(
         description="Instruction for transforming the text. As long as transform_rule permits,"
@@ -207,10 +217,14 @@ class TextTransformRequest(BaseModel, frozen=True):
 
 
 class TextTransformer:
-    def transform(self, text: str, transform_rule: BaseTransformRule | str, instruction: str) -> str:
+    def transform(
+        self, text: str, transform_rule: BaseTransformRule | str, instruction: str
+    ) -> str:
         analyzer = TextAnalyzer()
         analysis = analyzer.analyze(text)
-        return self.transform_from_analysis(analysis, transform_rule=transform_rule, instruction=instruction)
+        return self.transform_from_analysis(
+            analysis, transform_rule=transform_rule, instruction=instruction
+        )
 
     def transform_from_analysis(
         self, analysis: TextAnalysisModel, transform_rule: BaseTransformRule | str, instruction: str
@@ -222,7 +236,10 @@ class TextTransformer:
         spec = SystemPromptSpec.from_any(
             name="TextTransform",
             intent="Transform the text based on instruction.",
-            rules=["Return only the transformed text.", "Do not include other information such as reasoning."],
+            rules=[
+                "Return only the transformed text.",
+                "Do not include other information such as reasoning.",
+            ],
             output_spec=OutputSpec(output_type=str, description="Transformed Text"),
             guidance_role="Expert of the linguistics and education teacher.",
         )

@@ -10,7 +10,11 @@ from litellm.integrations.custom_logger import CustomLogger
 from pydantic import ValidationError
 
 from pytoy_llm.models import LLMEventEmitters, LLMTokens
-from pytoy_llm.models.llm_activities.llm_activities import LLMMinimumActivity, LLMRequestActivity, LLMResponseActivity
+from pytoy_llm.models.llm_activities.llm_activities import (
+    LLMMinimumActivity,
+    LLMRequestActivity,
+    LLMResponseActivity,
+)
 
 
 class EventEmittersRepository:
@@ -113,7 +117,9 @@ class LiteLLMEventHandler(CustomLogger):
                 activity_type="pre_api_call",
             )
         except ValidationError as e:
-            activity = LLMMinimumActivity(activity_type="pre_api_call", message=f"Failed to create LLMRequestActivity: {e}")
+            activity = LLMMinimumActivity(
+                activity_type="pre_api_call", message=f"Failed to create LLMRequestActivity: {e}"
+            )
         emitters.emit_activity(activity)
 
     def log_post_api_call(self, kwargs, response_obj, start_time, end_time, **_):
@@ -140,14 +146,21 @@ class LiteLLMEventHandler(CustomLogger):
         try:
             usage = response_obj.usage
             if usage:
-                tokens = LLMTokens(prompt=usage.prompt_tokens, completion=usage.completion_tokens, total=usage.total_tokens)
+                tokens = LLMTokens(
+                    prompt=usage.prompt_tokens,
+                    completion=usage.completion_tokens,
+                    total=usage.total_tokens,
+                )
             else:
                 tokens = None
             choice = response_obj.choices[0]
             content = choice.message.content
-            activity = LLMResponseActivity(response=content, tokens=tokens, activity_type="response_activity")
+            activity = LLMResponseActivity(
+                response=content, tokens=tokens, activity_type="response_activity"
+            )
         except Exception as e:
             activity = LLMMinimumActivity(
-                activity_type="response_activity", message=f"Failed to create LLMResponseActivity: {e}"
+                activity_type="response_activity",
+                message=f"Failed to create LLMResponseActivity: {e}",
             )
         return activity

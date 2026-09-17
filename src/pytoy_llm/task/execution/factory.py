@@ -7,7 +7,7 @@ from pytoy_llm.task.models import TaskContextState
 from pytoy_llm.task.models.exceptions import TaskUnknownException
 from pytoy_llm.task.shared.outcome import Error
 
-from .models import TaskExecutionExit
+from .models import TaskExecutionCancel, TaskExecutionExit, TaskExecutionStart
 from .task_execution import TaskExecution
 
 
@@ -22,6 +22,8 @@ class TaskExecutionFactory:
 
         lock = RLock()
         event_emitters = LLMEventEmitters()
+        start_emitter = EventEmitter[TaskExecutionStart]()
+        cancel_emitter = EventEmitter[TaskExecutionCancel]()
         exit_emitter = EventEmitter()
 
         if request.activity_sink is not None:
@@ -38,8 +40,7 @@ class TaskExecutionFactory:
                 outcome = Error(TaskUnknownException(e))
 
             exit_entity = TaskExecutionExit(id=request.id, outcome=outcome)
-            with lock:
-                exit_emitter.fire(exit_entity)
+            execution.record_exit(exit_entity)
             return exit_entity
 
         thread = Thread(target=_main)
@@ -48,6 +49,8 @@ class TaskExecutionFactory:
             lock=lock,
             request=request,
             events=event_emitters,
+            start_emitter=start_emitter,
+            cancel_emitter=cancel_emitter,
             exit_emitter=exit_emitter,
             id=request.id,
         )
