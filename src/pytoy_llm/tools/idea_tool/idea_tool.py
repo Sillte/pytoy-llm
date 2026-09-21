@@ -26,7 +26,7 @@ from .semantic_types import (
 
 
 def build_idea_note_model(
-    idea_note: IdeaNote, idea_graph: IdeaGraph, workspace_root: Path
+    idea_note: IdeaNote, idea_graph: IdeaGraph, workspace_root: Path | None
 ) -> IdeaNoteModel | ToolError:
     idea_space = idea_graph.space
     idea_links = idea_graph.resolve_links(idea_note)
@@ -46,10 +46,13 @@ def build_idea_note_model(
                         IdeaNoteLinkModel(path=idea_note.path, target_path=target_path)
                     )
                 else:
-                    reference_path = target_file_path.relative_to(workspace_root).as_posix()
-                    local_links.append(
-                        LocalLinkModel(path=idea_note.path, reference_path=reference_path)
-                    )
+                    if workspace_root is not None:
+                        reference_path = target_file_path.relative_to(workspace_root).as_posix()
+                        local_links.append(
+                            LocalLinkModel(path=idea_note.path, reference_path=reference_path)
+                        )
+                    else:
+                        raise ValueError("Workspace is not given here.")
             else:
                 remote_links.append(RemoteLinkModel(path=idea_note.path, uri=idea_link.uri))
         except (ValueError, TypeError) as exc:
@@ -75,7 +78,19 @@ def build_idea_note_model(
 
 
 class IdeaTool:
-    def __init__(self, idea_space: IdeaSpace, workspace_explorer: WorkspaceExplorer) -> None:
+    """Provides tools for accessing and modifying an IdeaSpace.
+
+    The tool also records the start and completion times of LLM invocations.
+    ``mark_llm_start`` and ``mark_llm_finished`` are intended to be registered
+    as lifecycle event handlers for this purpose.
+
+    Note that this class may also provide the tools of WorkspaceExplorer.
+
+    """
+
+    def __init__(
+        self, idea_space: IdeaSpace, workspace_explorer: WorkspaceExplorer | None = None
+    ) -> None:
         self._idea_space = idea_space
         self._idea_graph = IdeaGraph(self._idea_space)
         self._file_writer = DiskFileWriter()
@@ -84,31 +99,38 @@ class IdeaTool:
         self._started_at: datetime = datetime.now(tz=timezone.utc)
 
     @classmethod
-    def from_any(cls, idea_space_root: Path | str, workspace_root: Path | str) -> Self:
+    def from_any(
+        cls, idea_space_root: Path | str, workspace_root: Path | str | None = None
+    ) -> Self:
+        if isinstance(workspace_root, str):
+            workspace_root = Path(workspace_root)
+
         idea_space_root = Path(idea_space_root).resolve()
-        workspace_root = Path(workspace_root).resolve()
 
         idea_space = IdeaSpace.from_path(path=idea_space_root, root=idea_space_root)
 
-        exclude_patterns = set(WorkspaceExplorer.DEFAULT_EXCLUDE_PATTERNS)
-
-        if idea_space_root.is_relative_to(workspace_root) and idea_space_root != workspace_root:
-            relative_path = idea_space_root.relative_to(workspace_root)
-            exclude_patterns.add(relative_path.as_posix())
-
-        workspace_explorer = WorkspaceExplorer.from_any(
-            workspace=workspace_root,
-            excludes=exclude_patterns,
-        )
-
+        if workspace_root is not None:
+            workspace_root = Path(workspace_root).resolve()
+            exclude_patterns = set(WorkspaceExplorer.DEFAULT_EXCLUDE_PATTERNS)
+            if idea_space_root.is_relative_to(workspace_root) and idea_space_root != workspace_root:
+                relative_path = idea_space_root.relative_to(workspace_root)
+                exclude_patterns.add(relative_path.as_posix())
+            workspace_explorer = WorkspaceExplorer.from_any(
+                workspace=workspace_root,
+                excludes=exclude_patterns,
+            )
+        else:
+            workspace_explorer = None
         return cls(
             idea_space=idea_space,
             workspace_explorer=workspace_explorer,
         )
 
     @property
-    def workspace_root(self) -> Path:
-        return self._workspace_explorer.workspace
+    def workspace_root(self) -> Path | None:
+        if self._workspace_explorer is not None:
+            return self._workspace_explorer.workspace
+        return None
 
     @property
     def ideaspace_root(self) -> Path:
@@ -120,20 +142,31 @@ class IdeaTool:
 
     @property
     def tools(self) -> Sequence[Callable]:
-        return [
+        tools = [
             self.get_idea_space_root_context,
             self.get_convention,
             self.get_subspaces,
             self.get_note_paths,
             self.get_note,
             self.write_note,
-            *self._workspace_explorer.tools,
+            self.delete_note,
         ]
+        if self._workspace_explorer is not None:
+            tools = [*tools, *self._workspace_explorer.tools]
+        return tools
 
-    def mark_llm_start(self):
+    def mark_llm_start(self) -> None:
+        """Mark the start of an LLM invocation.
+
+        Intended to be subscribed to the invocation start event.
+        """
         self._started_at = datetime.now(tz=timezone.utc)
 
-    def mark_llm_finished(self):
+    def mark_llm_finished(self) -> None:
+        """Mark the completion of an LLM invocation.
+
+        Intended to be subscribed to the invocation completion event.
+        """
         model = IdeaSpaceToolMetaModel.model_validate(
             {
                 "last_llm_started_at": self._started_at,
@@ -156,7 +189,8 @@ class IdeaTool:
                 tool_meta = IdeaSpaceToolMetaModel.model_validate_json(text)
             except ValueError as exc:
                 return ToolError(
-                    kind=ToolErrorKind.UNKNOWN, msg=f"`IdeaSpaceToolMetaMode` cannot be made: {exc}"
+                    kind=ToolErrorKind.UNKNOWN,
+                    msg=f"`IdeaSpaceToolMetaModel` cannot be made: {exc}",
                 )
         return IdeaSpaceContextModel(root_convention=convention, tool_meta=tool_meta)
 
@@ -276,4 +310,43 @@ class IdeaTool:
             idea_note.write(self._file_writer)
         except OSError as e:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e))
+        return path
+
+    def delete_note(self, path: IdeaSpacePath) -> IdeaSpacePath | ToolError:
+        """Delete an IdeaNote from the IdeaSpace."""
+        try:
+            file_path = self._idea_space.resolve(path)
+
+            if file_path.is_dir():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Given `{path=}` corresponds to `IdeaSpacePivot`, not a path to `IdeaNote`.",
+                    suggestion="Use `get_note_paths` to get the paths of `IdeaSpaceNote`.",
+                )
+
+            idea_note = IdeaNote.from_path(
+                file_path=file_path,
+                root=self._idea_space.root,
+            )
+            idea_note.file_path.unlink()
+
+        except FileNotFoundError as e:
+            return ToolError(
+                kind=ToolErrorKind.NOT_FOUND,
+                msg=str(e),
+                retry=False,
+            )
+        except OutsidePathError as e:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=str(e),
+                retry=False,
+            )
+        except OSError as e:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=str(e),
+                retry=False,
+            )
+
         return path

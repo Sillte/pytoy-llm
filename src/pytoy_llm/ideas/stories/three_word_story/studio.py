@@ -15,6 +15,7 @@ from .prompts import CONVENTION, SYSTEM_PROMPT
 class ThreeWordStoryStudio:
     def __init__(self, idea_space: IdeaSpace):
         self._idea_space = idea_space
+        self._idea_space.ensure_root_marker()
 
     @classmethod
     def from_any(cls, idea_space_folder: Path | str) -> Self:

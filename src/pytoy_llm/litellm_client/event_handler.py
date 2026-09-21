@@ -106,12 +106,11 @@ class LiteLLMEventHandler(CustomLogger):
         if emitters is None:
             return
         try:
-            trace_id, call_id = kwargs.get("litellm_trace_id"), kwargs.get("litellm_call_id")
+            trace_id, _ = kwargs.get("litellm_trace_id"), kwargs.get("litellm_call_id")
             timeout = kwargs.get("timeout")
             activity = LLMRequestActivity(
                 messages=messages,
                 trace_id=trace_id,
-                call_id=call_id,
                 model=model,
                 timeout=timeout,
                 activity_type="pre_api_call",

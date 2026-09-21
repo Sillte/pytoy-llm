@@ -22,6 +22,10 @@ class Interpretation:
     body_start_line: int
 
 
+def _is_frontmatter_delimiter(line: str) -> bool:
+    return line.strip(" \t\r\n") == "---"
+
+
 def interpret(text: str) -> Interpretation:
     lines = text.splitlines(keepends=True)
     # --------------------------------------------------------
@@ -46,9 +50,7 @@ def interpret(text: str) -> Interpretation:
     # No front matter.
     # --------------------------------------------------------
 
-    first_line = lines[start].rstrip(" \r\n")
-
-    if first_line != "---":
+    if not _is_frontmatter_delimiter(lines[start]):
         return Interpretation(metadata=None, body=text, body_start_line=0)
 
     # --------------------------------------------------------
@@ -58,7 +60,7 @@ def interpret(text: str) -> Interpretation:
     for i in range(start + 1, len(lines)):
         line = lines[i]
 
-        if line.rstrip("\r\n") != "---":
+        if not _is_frontmatter_delimiter(line):
             continue
 
         yaml_text = "".join(lines[start + 1 : i])

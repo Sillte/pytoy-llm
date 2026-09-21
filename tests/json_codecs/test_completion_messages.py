@@ -6,7 +6,7 @@ from pytoy_llm.models.parts import (
     AnyContentPart,
     OpaquePart,
     TextPart,
-    ToolCallRequestPart,
+    ToolCallPart,
     ToolResultPart,
 )
 
@@ -42,7 +42,7 @@ def test_messages_array_flattens_parts_and_decodes(codec):
 
 def test_tool_call_round_trip(codec):
     message = LLMMessage.from_parts(
-        [ToolCallRequestPart(tool_name="weather", call_id="call-1", args={"city": "Tokyo"})],
+        [ToolCallPart(tool_name="weather", call_id="call-1", args={"city": "Tokyo"})],
         kind="response",
     )
 
@@ -63,7 +63,7 @@ def test_tool_call_round_trip(codec):
     decoded = codec.from_native(native[0], kind="response")
     assert decoded.kind == "response"
     assert decoded.parts == [
-        ToolCallRequestPart(tool_name="weather", call_id="call-1", args='{"city": "Tokyo"}')
+        ToolCallPart(tool_name="weather", call_id="call-1", args='{"city": "Tokyo"}')
     ]
 
 
@@ -71,8 +71,8 @@ def test_assistant_text_and_tool_calls_are_combined(codec):
     message = LLMMessage.from_parts(
         [
             TextPart(role="assistant", content="I will check."),
-            ToolCallRequestPart(tool_name="weather", call_id="call-1", args={"city": "Tokyo"}),
-            ToolCallRequestPart(tool_name="time", call_id="call-2", args=None),
+            ToolCallPart(tool_name="weather", call_id="call-1", args={"city": "Tokyo"}),
+            ToolCallPart(tool_name="time", call_id="call-2", args=None),
         ],
         kind="response",
     )

@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from pytoy_llm.activity_sinks import PrintActivitySink
-from pytoy_llm.models import UsageLimit
+from pytoy_llm.models import LLMParam, UsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage
 from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import (
@@ -22,8 +22,10 @@ logging.getLogger("httpcore").setLevel(logging.DEBUG)
 
 explorer = WorkspaceExplorer.from_any(Path("../"))
 print("WORKSPACE-EXPLOREER", explorer.workspace)
+llm_param = LLMParam(reasoning_effort="low")
 
 analysis_agent = AgentInvocationSpec.from_any(
+    llm_param=llm_param,
     meta=InvocationSpecMeta(
         name="AnalyzeProject",
         intent="Analyze source code architecture using available tools.",

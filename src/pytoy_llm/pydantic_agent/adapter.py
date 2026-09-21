@@ -26,7 +26,7 @@ from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens, ReasoningEffort
 from pytoy_llm.models.parts import AnyContentPart, OpaquePart, ToolResultPart
 from pytoy_llm.models.parts import TextPart as LLMTextPart
-from pytoy_llm.models.parts import ToolCallRequestPart as LLMToolCallRequestPart
+from pytoy_llm.models.parts import ToolCallPart as LLMToolCallPart
 
 
 class RequestPartConverter:
@@ -44,7 +44,7 @@ class RequestPartConverter:
             case OpaquePart():
                 return part.value
 
-            case LLMToolCallRequestPart():
+            case LLMToolCallPart():
                 raise TypeError(f"{part=}")
             case ToolResultPart():
                 if part.tool_name is None:
@@ -81,7 +81,7 @@ class ResponsePartConverter:
         match part:
             case LLMTextPart():
                 return PydanticTextPart(content=part.content)
-            case LLMToolCallRequestPart():
+            case LLMToolCallPart():
                 return ToolCallPart(
                     tool_name=part.tool_name, tool_call_id=part.call_id, args=part.args
                 )
@@ -105,7 +105,7 @@ class ResponsePartConverter:
                     args = dict(part.args)
                 else:
                     args = part.args
-                return LLMToolCallRequestPart(
+                return LLMToolCallPart(
                     args=args, call_id=part.tool_call_id, tool_name=part.tool_name
                 )
             case ThinkingPart():

@@ -12,7 +12,7 @@ from pytoy_llm.models.parts import (
     OpaquePart,
     Part,
     TextPart,
-    ToolCallRequestPart,
+    ToolCallPart,
     ToolResultPart,
 )
 
@@ -24,11 +24,11 @@ class _AssistantMessageComposer:
         self._content: str | None = None
         self._tool_calls: list[dict[str, Any]] = []
 
-    def add(self, part: TextPart | ToolCallRequestPart) -> None:
+    def add(self, part: TextPart | ToolCallPart) -> None:
         match part:
             case TextPart():
                 self._content = (self._content or "") + part.content
-            case ToolCallRequestPart():
+            case ToolCallPart():
                 self._tool_calls.append(
                     {
                         "id": part.call_id,
@@ -62,7 +62,7 @@ class CompletionMessagesCodec:
                 if assistant_composer is None:
                     assistant_composer = _AssistantMessageComposer()
                 assistant_composer.add(part)
-            elif isinstance(part, ToolCallRequestPart):
+            elif isinstance(part, ToolCallPart):
                 if assistant_composer is None:
                     assistant_composer = _AssistantMessageComposer()
                 assistant_composer.add(part)
@@ -144,7 +144,7 @@ class CompletionMessagesCodec:
                 return {"role": part.role, "content": part.content}
             case AnyContentPart():
                 return {"role": part.role, "content": part.content}
-            case ToolCallRequestPart():
+            case ToolCallPart():
                 return {
                     "role": "assistant",
                     "tool_calls": [
@@ -173,7 +173,7 @@ class CompletionMessagesCodec:
         raise TypeError(f"Unsupported part: {part!r}")
 
     @staticmethod
-    def _tool_call_from_native(tool_call: Any) -> ToolCallRequestPart:
+    def _tool_call_from_native(tool_call: Any) -> ToolCallPart:
         if not isinstance(tool_call, Mapping):
             raise ValueError("Completion message tool_calls must contain objects.")
         function = tool_call.get("function")
@@ -185,7 +185,7 @@ class CompletionMessagesCodec:
             arguments = function.get("arguments")
         except KeyError as error:
             raise ValueError("Completion tool call is missing a required field.") from error
-        return ToolCallRequestPart(
+        return ToolCallPart(
             tool_name=str(tool_name),
             call_id=str(call_id),
             args=arguments,

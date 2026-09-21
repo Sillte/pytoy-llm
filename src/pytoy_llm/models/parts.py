@@ -18,7 +18,7 @@ class AnyContentPart(BasePart, frozen=True):
     content: Any
 
 
-class ToolCallRequestPart(BasePart, frozen=True):
+class ToolCallPart(BasePart, frozen=True):
     tool_name: str
     call_id: str
     args: str | dict[str, Any] | None = None
@@ -34,5 +34,5 @@ class OpaquePart(BasePart, frozen=True):
     value: Any
 
 
-Part = TextPart | AnyContentPart | ToolCallRequestPart | ToolResultPart | OpaquePart
+Part = TextPart | AnyContentPart | ToolCallPart | ToolResultPart | OpaquePart
 PartAdapter = TypeAdapter(Part)
