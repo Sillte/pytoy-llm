@@ -56,3 +56,9 @@ ignore = [
 "__init__.py" = ["F401"]
 
 
+
+[tool.ty.rules]
+unused-ignore-comment = "ignore"
+
+[tool.uv]
+exclude-newer = "1 week"
