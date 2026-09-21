@@ -30,13 +30,12 @@ def test_request_tool_result_part_converts_to_tool_return() -> None:
     native = PydanticAIMessageAdapter().to_native(message)
 
     assert isinstance(native, ModelRequest)
-    assert native.parts == [
-        ToolReturnPart(
-            tool_name="weather",
-            tool_call_id="call-1",
-            content='{"temperature": 20}',
-        )
-    ]
+    assert len(native.parts) == 1
+    part = native.parts[0]
+    assert isinstance(part, ToolReturnPart)
+    assert part.tool_call_id == "call-1"
+    assert part.tool_name == "weather"
+    assert part.content == '{"temperature": 20}'
 
 
 def test_tool_return_converts_to_tool_result_part() -> None:
@@ -52,10 +51,9 @@ def test_tool_return_converts_to_tool_result_part() -> None:
 
     message = PydanticAIMessageAdapter().from_native(native)
 
-    assert message.parts == [
-        ToolResultPart(
-            call_id="call-1",
-            tool_name="weather",
-            content='{"temperature": 20}',
-        )
-    ]
+    assert len(message.parts) == 1
+    part = message.parts[0]
+    assert isinstance(part, ToolResultPart)
+    assert part.call_id == "call-1"
+    assert part.tool_name == "weather"
+    assert part.content == '{"temperature": 20}'
