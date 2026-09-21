@@ -135,6 +135,12 @@ class WorkspaceInspection:
                     start_line=0,
                     end_line=max_lines,
                 )
+        except UnicodeDecodeError:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg=f"`{path=}` is not a UTF-8 text file.",
+                retry=False,
+            )
         except Exception as exc:
             return ToolError(
                 kind=ToolErrorKind.UNKNOWN,
@@ -303,3 +309,15 @@ class WorkspaceInspection:
             return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=None)
         except OSError as exc:
             return ToolError(kind=ToolErrorKind.UNKNOWN, msg=str(exc))
+        except UnicodeDecodeError:
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg=f"`{path=}` is not a UTF-8 text file.",
+                retry=False,
+            )
+        except Exception as exc:
+            return ToolError(
+                kind=ToolErrorKind.UNKNOWN,
+                msg=str(exc),
+                retry=False,
+            )
