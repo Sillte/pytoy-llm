@@ -1,4 +1,4 @@
-from typing import assert_never
+from typing import Mapping, assert_never
 
 from pydantic import BaseModel
 from pydantic_ai import (
@@ -13,6 +13,7 @@ from pydantic_ai import (
     SystemPromptPart,
     ThinkingPart,
     ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai import TextPart as PydanticTextPart
@@ -23,8 +24,9 @@ from pytoy_llm.models import Part as LLMPart
 from pytoy_llm.models.agent_metas import UsageLimit as PytoyUsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens, ReasoningEffort
-from pytoy_llm.models.parts import OpaquePart
+from pytoy_llm.models.parts import AnyContentPart, OpaquePart, ToolResultPart
 from pytoy_llm.models.parts import TextPart as LLMTextPart
+from pytoy_llm.models.parts import ToolCallRequestPart as LLMToolCallRequestPart
 
 
 class RequestPartConverter:
@@ -37,8 +39,21 @@ class RequestPartConverter:
                     return UserPromptPart(content=part.content)
                 elif part.role == "system":
                     return SystemPromptPart(content=part.content)
+            case AnyContentPart():
+                raise ValueError(f"`{part}` cannot be converted to a ModelRequestPart")
             case OpaquePart():
                 return part.value
+
+            case LLMToolCallRequestPart():
+                raise TypeError(f"{part=}")
+            case ToolResultPart():
+                if part.tool_name is None:
+                    raise ValueError(f"ToolResultPart must have `tool_name`.{part=}")
+                return ToolReturnPart(
+                    tool_name=part.tool_name,
+                    tool_call_id=part.call_id,
+                    content=part.content,
+                )
             case _:
                 assert_never(part)
         raise ValueError(f"`{part}` cannot be converted to a ModelRequestPart")
@@ -49,6 +64,12 @@ class RequestPartConverter:
                 return LLMTextPart(role="user", content=str(part.content))
             case SystemPromptPart():
                 return LLMTextPart(role="system", content=part.content)
+            case ToolReturnPart():
+                return ToolResultPart(
+                    call_id=part.tool_call_id,
+                    content=part.content,
+                    tool_name=part.tool_name,
+                )
             case _:
                 return OpaquePart(value=part)
 
@@ -60,6 +81,15 @@ class ResponsePartConverter:
         match part:
             case LLMTextPart():
                 return PydanticTextPart(content=part.content)
+            case LLMToolCallRequestPart():
+                return ToolCallPart(
+                    tool_name=part.tool_name, tool_call_id=part.call_id, args=part.args
+                )
+            case ToolResultPart():
+                raise TypeError(f"{part=}")
+
+            case AnyContentPart():
+                raise ValueError(f"`{part}` cannot be converted to a ModelResponsePart")
             case OpaquePart():
                 return part.value
             case _:
@@ -71,14 +101,17 @@ class ResponsePartConverter:
             case PydanticTextPart():
                 return LLMTextPart(content=part.content, role="assistant")
             case ToolCallPart():
-                # TODO: Should be revised
-                return LLMTextPart(content=str(part.args), role="assistant")
+                if isinstance(part.args, Mapping):
+                    args = dict(part.args)
+                else:
+                    args = part.args
+                return LLMToolCallRequestPart(
+                    args=args, call_id=part.tool_call_id, tool_name=part.tool_name
+                )
             case ThinkingPart():
-                # TODO: Should be revised
-                return LLMTextPart(content=part.content, role="assistant")
+                return OpaquePart(value=part)
             case FilePart():
-                # TODO: Should be revised
-                return LLMTextPart(content=str(part.content), role="assistant")
+                return OpaquePart(value=part)
             case _:
                 return OpaquePart(value=part)
 
