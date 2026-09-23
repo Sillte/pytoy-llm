@@ -11,6 +11,7 @@ from pydantic_ai import (
     SystemPromptPart,
     UserPromptPart,
 )
+from pydantic_ai.capabilities import ReinjectSystemPrompt
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import (
@@ -64,10 +65,20 @@ class PytoyPydanticAIAgent:
         self._event_emitters = event_emitters or LLMEventEmitters()
 
     def _make_agent(self, system_prompt: str | None | tuple, tools: LLMToolsLike) -> Agent:
+        capabilities = []
+        if system_prompt:
+            capabilities.append(ReinjectSystemPrompt(replace_existing=True))
+        else:
+            capabilities.append(ReinjectSystemPrompt(replace_existing=False))
         system_prompt = system_prompt or tuple()
         model = PydanticAIModelFactory.create(self._connection, self._llm_param)
         tools = from_llm_tools_like(tools)
-        return Agent(model=model, system_prompt=system_prompt, tools=tools)
+        return Agent(
+            model=model,
+            system_prompt=system_prompt,
+            tools=tools,
+            capabilities=capabilities,
+        )
 
     def run[T: BaseModel | str](
         self,

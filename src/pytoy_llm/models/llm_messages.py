@@ -103,6 +103,7 @@ class LLMMessage(BaseModel, frozen=True):
         )
 
 
+# TODO: Consider SystemPromptPart is acceptable when the multiple messages define them.
 type LLMMessagesLike = Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage
 
 
