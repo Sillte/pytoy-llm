@@ -23,12 +23,10 @@ def _make_default_connection_dict(kind: Literal["google", "local"] | None = None
             result["model"] = "gemini/gemini-2.5-flash"
             result["base_url"] = "https://generativelanguage.googleapis.com/v1beta"
             result["api_key"] = "SECRET"
-            result["llm_param"] = {"temperature": None}
         case "local":
             result["model"] = "ollama/qwen2.5:7b"
             result["base_url"] = "http://localhost:11434/"
             result["api_key"] = "SECRET"
-            result["llm_param"] = {"temperature": None}
         case _:
             assert_never(kind)
     return result

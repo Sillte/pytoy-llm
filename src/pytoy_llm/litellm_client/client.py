@@ -4,7 +4,7 @@ from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
-from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConverter
+from pytoy_llm.litellm_client.adapter import LiteLLMTransactionAdapter, LLMParamConverter
 from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
@@ -55,7 +55,7 @@ class PytoyLiteLLMClient:
         request: LLMRequestLike,
         output_type: type[T],
     ) -> LLMResult[T]:
-        message_adapter = LiteLLMMessageAdapter()
+        message_adapter = LiteLLMTransactionAdapter()
         request = LLMRequest.from_any(request)
         model_response = self.completion_with_native(request, output_type)
         return message_adapter.to_llm_model(
@@ -70,7 +70,13 @@ class PytoyLiteLLMClient:
         from litellm import ModelResponse
         from litellm import completion as litellm_completion
 
-        input_messages = LLMRequest.from_any(request)
+        if self._connection.api_protocol == "responses":
+            raise ValueError(
+                "The connection is configured to use the 'responses' API protocol. "
+                "However, the 'completion_with_native' method is designed for the 'completions' API protocol. "
+            )
+
+        request = LLMRequest.from_any(request)
 
         response_format: type[BaseModel] | None
 
@@ -79,9 +85,8 @@ class PytoyLiteLLMClient:
         else:
             response_format = cast(type[BaseModel], output_type)
 
-        message_adapter = LiteLLMMessageAdapter()
-
-        raw_messages = message_adapter.to_native(input_messages)
+        adapter = LiteLLMTransactionAdapter()
+        raw_messages = adapter.to_native(request)
 
         kwargs = LLMParamConverter().to_litellm_kwargs(self._llm_param)
 

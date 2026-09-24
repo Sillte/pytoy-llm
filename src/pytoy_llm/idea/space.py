@@ -43,6 +43,9 @@ class IdeaSpace:
 
         if not path.is_relative_to(root):
             raise OutsidePathError(f"Space must be inside root: path={path}, root={root}")
+        if path.exists() and not path.is_dir():
+            raise ValueError(f"Space path must be a folder: {path}")
+        path.mkdir(exist_ok=True, parents=True)
 
         self._root = Path(root)
         self._relative_path = path.relative_to(root)

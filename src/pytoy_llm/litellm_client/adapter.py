@@ -12,7 +12,7 @@ from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens
 from pytoy_llm.models.parts import SystemPromptHistoryPart
 
 
-class LiteLLMMessageAdapter:
+class LiteLLMTransactionAdapter:
     def __init__(self) -> None:
         self._codec = CompletionMessagesCodec()
 

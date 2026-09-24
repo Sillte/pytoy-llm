@@ -1,3 +1,5 @@
+from typing import assert_never
+
 from pydantic_ai.models import Model as PydanticAIModel
 from pydantic_ai.profiles import ModelProfile, merge_profile
 
@@ -38,18 +40,28 @@ class PydanticAIModelFactory:
             return GoogleModel(sub_name, provider=provider, settings=model_settings)
         elif parts[0] in {"openai"}:
             assert base_url, "for fool proof."
-            from pydantic_ai.models.openai import OpenAIResponsesModel
+            from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
             from pydantic_ai.providers.openai import OpenAIProvider
 
-            # For Google, `openai` or in local LLM, you must pass the url.
             provider = OpenAIProvider(api_key=api_key, base_url=base_url)
             sub_name = "/".join(parts[1:])
-            return OpenAIResponsesModel(
-                sub_name, provider=provider, settings=model_settings, profile=thinking_override
-            )
-            # return OpenAIChatModel(
-            #    sub_name, provider=provider, settings=model_settings, profile=thinking_override
-            # )
+            match connection.api_protocol:
+                case "completions":
+                    return OpenAIChatModel(
+                        sub_name,
+                        provider=provider,
+                        settings=model_settings,
+                        profile=thinking_override,
+                    )
+                case "responses" | None:
+                    return OpenAIResponsesModel(
+                        sub_name,
+                        provider=provider,
+                        settings=model_settings,
+                        profile=thinking_override,
+                    )
+                case _:
+                    assert_never(connection.api_protocol)
         else:
             raise ValueError(
                 f"Only `openai/` or `gemini/` models are accepted, `{parts[0]}` is not accepted."

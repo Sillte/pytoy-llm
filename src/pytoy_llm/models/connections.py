@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
@@ -26,6 +26,14 @@ class Connection(BaseModel, frozen=True):
         StrictStr,
         Field(description="Credential Information for using LLM.", examples=["SECRET-KEY"]),
     ]
+
+    api_protocol: Annotated[
+        Literal["completions", "responses"] | None,
+        Field(
+            description="API protocol used to communicate with the LLM.",
+            examples=["completions", "responses"],
+        ),
+    ] = None
 
     llm_param: Annotated[LLMParam, Field(description="Default LLM Parameter")] = LLMParam()
 
