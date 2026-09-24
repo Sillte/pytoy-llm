@@ -41,11 +41,11 @@ class PytoyLiteLLMClient:
 
     def completion[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
     ) -> T:
         result = self.completion_with_result(
-            messages,
+            request,
             output_type,
         )
         return result.output

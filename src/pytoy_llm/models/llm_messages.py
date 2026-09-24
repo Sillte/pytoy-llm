@@ -121,9 +121,7 @@ class LLMRequest(BaseModel, frozen=True):
         system_prompt = SystemPrompt.from_any(system_prompt) if system_prompt else None
         if isinstance(arg, cls):
             if system_prompt:
-                raise ValueError(
-                    "Cannot provide `system_prompt` when `arg` is already LLMMessages."
-                )
+                raise ValueError("Cannot provide `system_prompt` when `arg` is already LLMRequest.")
             return arg
 
         elif isinstance(arg, LLMMessage):
@@ -139,7 +137,7 @@ class LLMRequest(BaseModel, frozen=True):
                 messages=[LLMMessage.from_any(elem) for elem in arg],
             )
         else:
-            raise ValueError(f"Cannot convert {arg} to LLMMessages.")
+            raise ValueError(f"Cannot convert {arg} to LLMRequest.")
 
 
 # TODO: Consider SystemPromptPart is acceptable when the multiple messages define them.
