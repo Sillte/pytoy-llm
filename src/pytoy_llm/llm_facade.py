@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
-from pytoy_llm.models import LLMMessagesLike
+from pytoy_llm.models import LLMRequestLike
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_activities import LLMActivitySink
@@ -32,7 +32,7 @@ class LLMFacade:
 
     def completion[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
     ) -> T:
         client = PytoyLiteLLMClient(
@@ -44,7 +44,7 @@ class LLMFacade:
 
     def completion_with_result[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
     ) -> LLMResult[T]:
         client = PytoyLiteLLMClient(
@@ -56,7 +56,7 @@ class LLMFacade:
 
     def run[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = (),
         usage_limit: UsageLimit | None = None,
@@ -71,7 +71,7 @@ class LLMFacade:
 
     def run_with_result[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = (),
         usage_limit: UsageLimit | None = None,

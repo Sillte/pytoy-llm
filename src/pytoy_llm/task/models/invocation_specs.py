@@ -13,7 +13,7 @@ from pytoy_llm.llm_facade import LLMFacade
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_activities.llm_activities import ToolCallActivity, ToolResultActivity
-from pytoy_llm.models.llm_messages import LLMMessagesLike
+from pytoy_llm.models.llm_messages import LLMRequestLike
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
 from pytoy_llm.task.models.context import (
@@ -42,22 +42,22 @@ def _to_invocation_meta(
 
 
 def _normalize_message_creator(
-    arg: Callable[[Any], LLMMessagesLike] | Callable[[Any, ExecutionContext], LLMMessagesLike],
-) -> Callable[[Any, ExecutionContext], LLMMessagesLike]:
+    arg: Callable[[Any], LLMRequestLike] | Callable[[Any, ExecutionContext], LLMRequestLike],
+) -> Callable[[Any, ExecutionContext], LLMRequestLike]:
     if not callable(arg):
         raise TypeError(f"{arg} is not callable")
 
     params = list(inspect.signature(arg).parameters.values())
     if len(params) == 1:
-        single_arg = cast(Callable[[Any], LLMMessagesLike], arg)
+        single_arg = cast(Callable[[Any], LLMRequestLike], arg)
 
         @wraps(single_arg)
-        def wrapped_create_messages(input_data: Any, _context: ExecutionContext) -> LLMMessagesLike:
+        def wrapped_create_messages(input_data: Any, _context: ExecutionContext) -> LLMRequestLike:
             return single_arg(input_data)
 
         return wrapped_create_messages
     if len(params) == 2:
-        return cast(Callable[[Any, ExecutionContext], LLMMessagesLike], arg)
+        return cast(Callable[[Any, ExecutionContext], LLMRequestLike], arg)
     raise ValueError("Callable must accept either input or input and execution context")
 
 
@@ -199,7 +199,7 @@ class SelectedInvocationSpec[T]:
 @dataclass(frozen=True)
 class LLMInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: Callable[[Any, ExecutionContext], LLMMessagesLike]
+    create_messages: Callable[[Any, ExecutionContext], LLMRequestLike]
     llm_param: LLMParam | None = None
     connection: Connection | str | None = None
     meta: InvocationSpecMeta = field(
@@ -211,8 +211,8 @@ class LLMInvocationSpec[T: BaseModel | str]:
     @classmethod
     def from_any(
         cls,
-        create_messages: Callable[[Any], LLMMessagesLike]
-        | Callable[[Any, ExecutionContext], LLMMessagesLike],
+        create_messages: Callable[[Any], LLMRequestLike]
+        | Callable[[Any, ExecutionContext], LLMRequestLike],
         *,
         output_type: type[T] | None = None,
         llm_param: LLMParam | None = None,
@@ -262,7 +262,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
 @dataclass(frozen=True)
 class AgentInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: Callable[[Any, ExecutionContext], LLMMessagesLike]
+    create_messages: Callable[[Any, ExecutionContext], LLMRequestLike]
     tools: LLMToolsLike = field(default_factory=list)
     connection: Connection | str | None = None
     llm_param: LLMParam | None = None
@@ -277,8 +277,8 @@ class AgentInvocationSpec[T: BaseModel | str]:
     @classmethod
     def from_any(
         cls,
-        create_messages: Callable[[Any], LLMMessagesLike]
-        | Callable[[Any, ExecutionContext], LLMMessagesLike],
+        create_messages: Callable[[Any], LLMRequestLike]
+        | Callable[[Any, ExecutionContext], LLMRequestLike],
         *,
         output_type: type[T] | None = None,
         tools: LLMToolsLike | None = None,

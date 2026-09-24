@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
 from pytoy_llm.llm_facade import LLMFacade
-from pytoy_llm.models import LLMMessagesLike
+from pytoy_llm.models import LLMRequestLike
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_activities import LLMActivitySink
@@ -26,7 +26,7 @@ def get_configuration_path(name: str = DEFAULT_NAME) -> Path:
 
 
 def completion[T: BaseModel | str](
-    messages: LLMMessagesLike,
+    messages: LLMRequestLike,
     output_type: type[T] = str,  # type: ignore
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
@@ -38,7 +38,7 @@ def completion[T: BaseModel | str](
 
 
 def run[T: BaseModel | str](
-    messages: LLMMessagesLike,
+    messages: LLMRequestLike,
     output_type: type[T],
     tools: LLMToolsLike = tuple(),
     llm_param: LLMParam | None = None,

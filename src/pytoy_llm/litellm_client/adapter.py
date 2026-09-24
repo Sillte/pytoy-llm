@@ -7,7 +7,7 @@ from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.json_codecs import CompletionMessagesCodec
-from pytoy_llm.models.llm_messages import LLMMessage, LLMMessages, LLMResult
+from pytoy_llm.models.llm_messages import LLMMessage, LLMRequest, LLMResult
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens
 from pytoy_llm.models.parts import SystemPromptHistoryPart
 
@@ -18,9 +18,9 @@ class LiteLLMMessageAdapter:
 
     def to_native(
         self,
-        messages: LLMMessages,
+        messages: LLMRequest,
     ) -> list[dict[str, Any]]:
-        dict_arrays = sum((self._codec.to_native(elem) for elem in messages.values), [])
+        dict_arrays = sum((self._codec.to_native(elem) for elem in messages.messages), [])
         if messages.system_prompt:
             row = {"role": "system", "content": messages.system_prompt.content}
             dict_arrays.insert(0, row)
@@ -33,7 +33,7 @@ class LiteLLMMessageAdapter:
 
     def to_llm_model[T: BaseModel | str](
         self,
-        input_messages: LLMMessages,
+        input_messages: LLMRequest,
         llm_response: ModelResponse,
         output_type: type[T],
     ) -> LLMResult[T]:
@@ -60,18 +60,18 @@ class LiteLLMMessageAdapter:
             content = cast(T, t_output_type.model_validate_json(content))  # type:ignore
         output_message = self.from_native(choice.message, kind="response")
         if input_messages.system_prompt and input_messages.system_prompt.as_history:
-            last_message = list(input_messages.values)[-1]
+            last_message = list(input_messages.messages)[-1]
             parts = [
                 SystemPromptHistoryPart(content=input_messages.system_prompt.content),
                 *last_message.parts,
             ]
             messages = [
-                *input_messages.values[:-1],
+                *input_messages.messages[:-1],
                 last_message.model_copy(update={"parts": parts}),
                 output_message,
             ]
         else:
-            messages = [*input_messages.values, output_message]
+            messages = [*input_messages.messages, output_message]
         return cast(LLMResult[T], LLMResult(output=content, meta=meta, messages=messages))
 
 

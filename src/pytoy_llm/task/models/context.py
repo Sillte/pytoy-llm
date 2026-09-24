@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
-from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike
+from pytoy_llm.models.llm_messages import LLMMessage, LLMRequestLike
 from pytoy_llm.models.llm_metas import LLMParam
 
 type TaskRunState = MutableMapping[str, Any]
@@ -86,7 +86,7 @@ class TaskContextState(BaseModel, frozen=True):
 
     @field_validator("llm_messages", mode="before")
     @classmethod
-    def normalize_messages(cls, value: LLMMessagesLike) -> Sequence[LLMMessage]:
+    def normalize_messages(cls, value: LLMRequestLike) -> Sequence[LLMMessage]:
         if not value:
             return ()
         return LLMMessage.to_messages(value)

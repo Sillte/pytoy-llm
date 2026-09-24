@@ -1,4 +1,3 @@
-from itertools import chain
 from typing import cast
 
 from litellm import ModelResponse
@@ -9,7 +8,7 @@ from pytoy_llm.litellm_client.adapter import LiteLLMMessageAdapter, LLMParamConv
 from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
-from pytoy_llm.models.llm_messages import LLMMessage, LLMMessagesLike, LLMResult
+from pytoy_llm.models.llm_messages import LLMRequest, LLMRequestLike, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
 
 
@@ -42,7 +41,7 @@ class PytoyLiteLLMClient:
 
     def completion[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
     ) -> T:
         result = self.completion_with_result(
@@ -53,11 +52,11 @@ class PytoyLiteLLMClient:
 
     def completion_with_result[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
     ) -> LLMResult[T]:
         message_adapter = LiteLLMMessageAdapter()
-        input_messages = LLMMessage.to_messages(messages)
+        input_messages = LLMRequest.from_any(messages)
         model_response = self.completion_with_native(input_messages, output_type)
         return message_adapter.to_llm_model(
             input_messages=input_messages, llm_response=model_response, output_type=output_type
@@ -65,13 +64,13 @@ class PytoyLiteLLMClient:
 
     def completion_with_native[T: BaseModel | str](
         self,
-        messages: LLMMessagesLike,
+        messages: LLMRequestLike,
         output_type: type[T],
     ) -> ModelResponse:
         from litellm import ModelResponse
         from litellm import completion as litellm_completion
 
-        input_messages = LLMMessage.to_messages(messages)
+        input_messages = LLMRequest.from_any(messages)
 
         response_format: type[BaseModel] | None
 
@@ -81,8 +80,8 @@ class PytoyLiteLLMClient:
             response_format = cast(type[BaseModel], output_type)
 
         message_adapter = LiteLLMMessageAdapter()
-        chat_messages = [message_adapter.to_native(elem) for elem in input_messages]
-        raw_messages = list(chain.from_iterable(chat_messages))
+
+        raw_messages = message_adapter.to_native(input_messages)
 
         kwargs = LLMParamConverter().to_litellm_kwargs(self._llm_param)
 
