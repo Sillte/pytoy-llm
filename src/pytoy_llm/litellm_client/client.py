@@ -52,25 +52,25 @@ class PytoyLiteLLMClient:
 
     def completion_with_result[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
     ) -> LLMResult[T]:
         message_adapter = LiteLLMMessageAdapter()
-        input_messages = LLMRequest.from_any(messages)
-        model_response = self.completion_with_native(input_messages, output_type)
+        request = LLMRequest.from_any(request)
+        model_response = self.completion_with_native(request, output_type)
         return message_adapter.to_llm_model(
-            input_messages=input_messages, llm_response=model_response, output_type=output_type
+            request=request, llm_response=model_response, output_type=output_type
         )
 
     def completion_with_native[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
     ) -> ModelResponse:
         from litellm import ModelResponse
         from litellm import completion as litellm_completion
 
-        input_messages = LLMRequest.from_any(messages)
+        input_messages = LLMRequest.from_any(request)
 
         response_format: type[BaseModel] | None
 

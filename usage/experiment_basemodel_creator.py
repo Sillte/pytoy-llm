@@ -7,12 +7,16 @@ from pydantic import BaseModel
 from pytoy_llm import completion
 from pytoy_llm.composer.models import OutputSpec, SystemPromptSpec
 from pytoy_llm.composer.system_prompt_composer import SystemPromptComposer
-from pytoy_llm.composers.materials.models import MaterialSection, MaterialUsage, build_material_sections
+from pytoy_llm.composers.materials.models import (
+    MaterialSection,
+    MaterialUsage,
+    build_material_sections,
+)
 from pytoy_llm.materials.basemodels import BaseModelMaterial
 from pytoy_llm.materials.models import (
     TextMaterialData,
 )
-from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models.llm_messages import LLMRequest
 
 
 def construct_basemodel[T: BaseModel](
@@ -30,13 +34,16 @@ def construct_basemodel[T: BaseModel](
         raise ValueError("Must provide at least one `instances`.")
 
     system_prompt = make_system_prompt(instances, output_mode, explanation=explanation)
-    message = LLMMessage.from_prompt(system=system_prompt, user=user_prompt)
+    message = LLMRequest.from_prompt(system=system_prompt, user=user_prompt)
     output_type = str if output_mode == "python_code" else type(instances[0])
     return completion(message, output_type=output_type)
 
 
 def make_system_prompt[T: BaseModel](
-    instances: Sequence[T], output_mode: Literal["python_code", "instance"] = "python_code", *, explanation: str | None = None
+    instances: Sequence[T],
+    output_mode: Literal["python_code", "instance"] = "python_code",
+    *,
+    explanation: str | None = None,
 ) -> str:
     if not instances:
         raise ValueError("Must provide at least one `instances`.")
@@ -59,7 +66,9 @@ def make_system_prompt[T: BaseModel](
             ]
         ),
     )
-    sections.append(MaterialSection(name="BaseModelMaterial", usage=usage, data=bundle.model_material_data))
+    sections.append(
+        MaterialSection(name="BaseModelMaterial", usage=usage, data=bundle.model_material_data)
+    )
 
     # Decide output instruction
     if output_mode == "python_code":
@@ -101,8 +110,12 @@ def make_system_prompt[T: BaseModel](
     )
     if explanation:
         section_data = TextMaterialData(description=explanation, content=explanation)
-        usage = MaterialUsage(usage="This section provides problem-specific hints not covered by the examples.")
-        sections.append(MaterialSection(name="AddtionalExplanation", usage=usage, data=section_data))
+        usage = MaterialUsage(
+            usage="This section provides problem-specific hints not covered by the examples."
+        )
+        sections.append(
+            MaterialSection(name="AddtionalExplanation", usage=usage, data=section_data)
+        )
 
     composer = SystemPromptComposer(prompt_spec)
     return composer.compose_prompt(supplementary_sections=build_material_sections(sections))
@@ -132,7 +145,10 @@ if __name__ == "__main__":
 
     # --- LLMに投げる ---
     result_instance = construct_basemodel(
-        user_prompt=user_input, instances=examples, output_mode="python_code", explanation=explanation
+        user_prompt=user_input,
+        instances=examples,
+        output_mode="python_code",
+        explanation=explanation,
     )
 
     print("Generated SampleModel:", result_instance)

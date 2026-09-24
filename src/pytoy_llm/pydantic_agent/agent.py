@@ -69,38 +69,38 @@ class PytoyPydanticAIAgent:
 
     def run[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = tuple(),
         usage_limit: UsageLimit | None = None,
     ) -> T:
         result = self.run_with_native(
-            messages=messages, output_type=output_type, tools=tools, usage_limit=usage_limit
+            request=request, output_type=output_type, tools=tools, usage_limit=usage_limit
         )
         return result.output
 
     def run_with_native[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = tuple(),
         usage_limit: UsageLimit | None = None,
     ) -> AgentRunResult[T]:
         usage_limits = UsageLimitConverter().to_usage_limits(usage_limit or UsageLimit())
 
-        messages = LLMRequest.from_any(messages)
+        request = LLMRequest.from_any(request)
         adapter = PydanticAIMessageAdapter()
-        if messages.system_prompt:
-            if messages.system_prompt.as_history:
-                system_prompt = messages.system_prompt.content
+        if request.system_prompt:
+            if request.system_prompt.as_history:
+                system_prompt = request.system_prompt.content
                 instructions = None
             else:
                 system_prompt = None
-                instructions = messages.system_prompt.content
+                instructions = request.system_prompt.content
         else:
             system_prompt = None
             instructions = None
-        model_messages = [adapter.to_native(message) for message in messages.messages]
+        model_messages = [adapter.to_native(message) for message in request.messages]
         message_history, latest_message = model_messages[:-1], model_messages[-1]
         resolver = LatestMessageResolver.from_model_message(latest_message)
         if resolver.user_prompt is None:
@@ -111,7 +111,7 @@ class PytoyPydanticAIAgent:
             user_prompt = resolver.user_prompt
         agent = self._make_agent(system_prompt=system_prompt, tools=tools)
         event_handler = EventHandler(self._event_emitters)
-        event_handler.emit_request(messages)
+        event_handler.emit_request(request)
         result = agent.run_sync(
             user_prompt=user_prompt,
             instructions=instructions,
@@ -124,13 +124,13 @@ class PytoyPydanticAIAgent:
 
     def run_with_result[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = tuple(),
         usage_limit: UsageLimit | None = None,
     ) -> LLMResult[T]:
         adapter = PydanticAIMessageAdapter()
         run_result = self.run_with_native(
-            messages, output_type=output_type, tools=tools, usage_limit=usage_limit
+            request, output_type=output_type, tools=tools, usage_limit=usage_limit
         )
         return adapter.to_llm_output(run_result)

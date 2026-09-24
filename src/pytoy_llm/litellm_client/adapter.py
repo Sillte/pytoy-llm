@@ -18,11 +18,11 @@ class LiteLLMMessageAdapter:
 
     def to_native(
         self,
-        messages: LLMRequest,
+        request: LLMRequest,
     ) -> list[dict[str, Any]]:
-        dict_arrays = sum((self._codec.to_native(elem) for elem in messages.messages), [])
-        if messages.system_prompt:
-            row = {"role": "system", "content": messages.system_prompt.content}
+        dict_arrays = sum((self._codec.to_native(elem) for elem in request.messages), [])
+        if request.system_prompt:
+            row = {"role": "system", "content": request.system_prompt.content}
             dict_arrays.insert(0, row)
         return dict_arrays
 
@@ -33,7 +33,7 @@ class LiteLLMMessageAdapter:
 
     def to_llm_model[T: BaseModel | str](
         self,
-        input_messages: LLMRequest,
+        request: LLMRequest,
         llm_response: ModelResponse,
         output_type: type[T],
     ) -> LLMResult[T]:
@@ -59,19 +59,19 @@ class LiteLLMMessageAdapter:
             t_output_type = cast(T, output_type)
             content = cast(T, t_output_type.model_validate_json(content))  # type:ignore
         output_message = self.from_native(choice.message, kind="response")
-        if input_messages.system_prompt and input_messages.system_prompt.as_history:
-            last_message = list(input_messages.messages)[-1]
+        if request.system_prompt and request.system_prompt.as_history:
+            last_message = list(request.messages)[-1]
             parts = [
-                SystemPromptHistoryPart(content=input_messages.system_prompt.content),
+                SystemPromptHistoryPart(content=request.system_prompt.content),
                 *last_message.parts,
             ]
             messages = [
-                *input_messages.messages[:-1],
+                *request.messages[:-1],
                 last_message.model_copy(update={"parts": parts}),
                 output_message,
             ]
         else:
-            messages = [*input_messages.messages, output_message]
+            messages = [*request.messages, output_message]
         return cast(LLMResult[T], LLMResult(output=content, meta=meta, messages=messages))
 
 

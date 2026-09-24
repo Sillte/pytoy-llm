@@ -35,8 +35,8 @@ class EventHandler:
         self._event_adapter = ActivityAdapter(self._trace_id)
         self._event_emitters = event_emitters
 
-    def emit_request(self, llm_messages: LLMRequest) -> None:
-        messages = [elem.model_dump() for elem in llm_messages.messages]
+    def emit_request(self, llm_request: LLMRequest) -> None:
+        messages = [elem.model_dump() for elem in llm_request.messages]
         activity = LLMRequestActivity(trace_id=self._trace_id, messages=messages)
         self._event_emitters.emit_activity(activity)
 

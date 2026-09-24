@@ -17,7 +17,7 @@ def experiment_func(name: str = DEFAULT_NAME):
     mes = LLMMessage.chat(content="Are you happy?")
     config = LLMParam(temperature=0.7)
     agent = PytoyPydanticAIAgent(name, llm_param=config)
-    ret = agent.run(messages=mes, output_type=AnswerOutput)
+    ret = agent.run(request=mes, output_type=AnswerOutput)
     print(ret)
 
 

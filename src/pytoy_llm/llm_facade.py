@@ -2,12 +2,11 @@ from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
-from pytoy_llm.models import LLMRequestLike
+from pytoy_llm.models import LLMRequestLike, LLMResult
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_activities import LLMActivitySink
 from pytoy_llm.models.llm_events import LLMEventEmitters
-from pytoy_llm.models.llm_messages import LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
 from pytoy_llm.pydantic_agent.agent import PytoyPydanticAIAgent
@@ -32,7 +31,7 @@ class LLMFacade:
 
     def completion[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
     ) -> T:
         client = PytoyLiteLLMClient(
@@ -40,11 +39,11 @@ class LLMFacade:
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
         )
-        return client.completion(messages, output_type=output_type)
+        return client.completion(request, output_type=output_type)
 
     def completion_with_result[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
     ) -> LLMResult[T]:
         client = PytoyLiteLLMClient(
@@ -52,11 +51,11 @@ class LLMFacade:
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
         )
-        return client.completion_with_result(messages, output_type=output_type)
+        return client.completion_with_result(request, output_type=output_type)
 
     def run[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = (),
         usage_limit: UsageLimit | None = None,
@@ -67,11 +66,11 @@ class LLMFacade:
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
         )
-        return agent.run(messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
+        return agent.run(request, output_type=output_type, tools=tools, usage_limit=usage_limit)
 
     def run_with_result[T: BaseModel | str](
         self,
-        messages: LLMRequestLike,
+        request: LLMRequestLike,
         output_type: type[T],
         tools: LLMToolsLike = (),
         usage_limit: UsageLimit | None = None,
@@ -82,7 +81,7 @@ class LLMFacade:
             event_emitters=self.event_emitters,
         )
         return agent.run_with_result(
-            messages, output_type=output_type, tools=tools, usage_limit=usage_limit
+            request, output_type=output_type, tools=tools, usage_limit=usage_limit
         )
 
 

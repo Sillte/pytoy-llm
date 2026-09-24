@@ -41,7 +41,7 @@ def _to_invocation_meta(
     return InvocationSpecMeta(name=name, intent=intent.strip())
 
 
-def _normalize_message_creator(
+def _normalize_request_creator(
     arg: Callable[[Any], LLMRequestLike] | Callable[[Any, ExecutionContext], LLMRequestLike],
 ) -> Callable[[Any, ExecutionContext], LLMRequestLike]:
     if not callable(arg):
@@ -52,10 +52,10 @@ def _normalize_message_creator(
         single_arg = cast(Callable[[Any], LLMRequestLike], arg)
 
         @wraps(single_arg)
-        def wrapped_create_messages(input_data: Any, _context: ExecutionContext) -> LLMRequestLike:
+        def wrapped_create_request(input_data: Any, _context: ExecutionContext) -> LLMRequestLike:
             return single_arg(input_data)
 
-        return wrapped_create_messages
+        return wrapped_create_request
     if len(params) == 2:
         return cast(Callable[[Any, ExecutionContext], LLMRequestLike], arg)
     raise ValueError("Callable must accept either input or input and execution context")
@@ -199,7 +199,7 @@ class SelectedInvocationSpec[T]:
 @dataclass(frozen=True)
 class LLMInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: Callable[[Any, ExecutionContext], LLMRequestLike]
+    create_request: Callable[[Any, ExecutionContext], LLMRequestLike]
     llm_param: LLMParam | None = None
     connection: Connection | str | None = None
     meta: InvocationSpecMeta = field(
@@ -211,7 +211,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
     @classmethod
     def from_any(
         cls,
-        create_messages: Callable[[Any], LLMRequestLike]
+        create_request: Callable[[Any], LLMRequestLike]
         | Callable[[Any, ExecutionContext], LLMRequestLike],
         *,
         output_type: type[T] | None = None,
@@ -224,17 +224,17 @@ class LLMInvocationSpec[T: BaseModel | str]:
             raise TypeError("output_type must be provided when creating an LLMInvocationSpec")
         return cls(
             output_type=output_type,
-            create_messages=_normalize_message_creator(create_messages),
+            create_request=_normalize_request_creator(create_request),
             llm_param=llm_param,
             connection=connection,
-            meta=_to_invocation_meta(create_messages, meta),
+            meta=_to_invocation_meta(create_request, meta),
             hooks=hooks or InvocationHooks(),
         )
 
     def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         def operation() -> InvocationResult[T]:
             starttime = time.time()
-            input_messages = self.create_messages(input, execution_context)
+            input_messages = self.create_request(input, execution_context)
             connection = self.connection or execution_context.connection
             llm_param = self.llm_param or execution_context.llm_param
             llm_facade = LLMFacade(
@@ -262,7 +262,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
 @dataclass(frozen=True)
 class AgentInvocationSpec[T: BaseModel | str]:
     output_type: type[T]
-    create_messages: Callable[[Any, ExecutionContext], LLMRequestLike]
+    create_request: Callable[[Any, ExecutionContext], LLMRequestLike]
     tools: LLMToolsLike = field(default_factory=list)
     connection: Connection | str | None = None
     llm_param: LLMParam | None = None
@@ -277,7 +277,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
     @classmethod
     def from_any(
         cls,
-        create_messages: Callable[[Any], LLMRequestLike]
+        create_request: Callable[[Any], LLMRequestLike]
         | Callable[[Any, ExecutionContext], LLMRequestLike],
         *,
         output_type: type[T] | None = None,
@@ -292,19 +292,19 @@ class AgentInvocationSpec[T: BaseModel | str]:
             raise TypeError("output_type must be provided when creating an AgentInvocationSpec")
         return cls(
             output_type=output_type,
-            create_messages=_normalize_message_creator(create_messages),
+            create_request=_normalize_request_creator(create_request),
             tools=[] if tools is None else tools,
             connection=connection,
             llm_param=llm_param,
             usage_limit=usage_limit,
-            meta=_to_invocation_meta(create_messages, meta),
+            meta=_to_invocation_meta(create_request, meta),
             hooks=hooks or InvocationHooks(),
         )
 
     def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
         def operation() -> InvocationResult[T]:
             starttime = time.time()
-            input_messages = self.create_messages(input, execution_context)
+            input_messages = self.create_request(input, execution_context)
             connection = self.connection or execution_context.connection
             llm_param = self.llm_param or execution_context.llm_param
             llm_facade = LLMFacade(

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pytoy_llm.activity_sinks import PrintActivitySink
 from pytoy_llm.models import LLMParam, UsageLimit
-from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models.llm_messages import LLMRequest
 from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
@@ -31,9 +31,8 @@ analysis_agent = AgentInvocationSpec.from_any(
         intent="Analyze source code architecture using available tools.",
     ),
     output_type=str,
-    create_messages=lambda input_: [
-        LLMMessage.from_prompt(
-            system="""
+    create_request=lambda input_: LLMRequest.from_prompt(
+        system="""
 You are an investigation agent.
 
 Answer the user's question by investigating the workspace with the
@@ -255,11 +254,10 @@ limited.
 If the evidence does not justify a strong conclusion, say so rather than
 manufacturing confidence.
 """,
-            user="""
+        user="""
 Why python is too slow, especially in this repository?
 """,
-        )
-    ],
+    ),
     tools=[explorer.tools],
     usage_limit=UsageLimit(max_total_tokens=2000000, max_requests=50),
 )

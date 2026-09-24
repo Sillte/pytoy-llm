@@ -57,7 +57,7 @@ class LLMMessage(BaseModel, frozen=True):
     @classmethod
     def from_any(
         cls,
-        arg: str | Sequence[Part] | Mapping[str, Any] | Sequence[Mapping[str, Any]] | LLMMessage,
+        arg: LLMMessageLike,
     ) -> Self:
         if isinstance(arg, str):
             try:
@@ -67,18 +67,6 @@ class LLMMessage(BaseModel, frozen=True):
             else:
                 return result
         return cls.model_validate(arg)
-
-    @classmethod
-    def to_messages(cls, arg: LLMRequestLike) -> Sequence[LLMMessage]:
-        if isinstance(arg, LLMRequest):
-            return arg.messages
-        if isinstance(arg, str):
-            return [cls.from_prompt(user=arg)]
-        elif isinstance(arg, LLMMessage):
-            return [arg]
-        if not arg:
-            raise ValueError("Emypy messages are not acceptable.")
-        return [cls.from_any(elem) for elem in arg]
 
     @classmethod
     def chat(cls, content: str) -> Self:
@@ -101,6 +89,9 @@ class LLMMessage(BaseModel, frozen=True):
             kind=kind,
             parts=list(chain.from_iterable(message.parts for message in messages)),
         )
+
+
+type LLMMessageLike = LLMMessage | str | Sequence[Mapping[str, Any]] | Mapping[str, Any]
 
 
 class LLMRequest(BaseModel, frozen=True):
@@ -126,9 +117,9 @@ class LLMRequest(BaseModel, frozen=True):
     @classmethod
     def from_any(
         cls, arg: LLMRequestLike, *, system_prompt: SystemPrompt | str | None = None
-    ) -> "LLMRequest":
+    ) -> Self:
         system_prompt = SystemPrompt.from_any(system_prompt) if system_prompt else None
-        if isinstance(arg, LLMRequest):
+        if isinstance(arg, cls):
             if system_prompt:
                 raise ValueError(
                     "Cannot provide `system_prompt` when `arg` is already LLMMessages."

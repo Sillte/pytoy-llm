@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pytoy_llm.activity_sinks import PrintActivitySink
 from pytoy_llm.models import UsageLimit
-from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models.llm_messages import LLMRequest
 from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
@@ -72,7 +72,7 @@ analysis_agent = AgentInvocationSpec.from_any(
     ),
     output_type=str,
     create_messages=lambda input_: [
-        LLMMessage.from_prompt(
+        LLMRequest.from_prompt(
             system="""
 
 ## Writing Principles

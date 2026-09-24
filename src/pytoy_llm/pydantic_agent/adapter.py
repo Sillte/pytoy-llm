@@ -24,7 +24,12 @@ from pytoy_llm.models import Part as LLMPart
 from pytoy_llm.models.agent_metas import UsageLimit as PytoyUsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens, ReasoningEffort
-from pytoy_llm.models.parts import AnyContentPart, OpaquePart, ToolResultPart
+from pytoy_llm.models.parts import (
+    AnyContentPart,
+    OpaquePart,
+    SystemPromptHistoryPart,
+    ToolResultPart,
+)
 from pytoy_llm.models.parts import TextPart as LLMTextPart
 from pytoy_llm.models.parts import ToolCallPart as LLMToolCallPart
 
@@ -37,13 +42,12 @@ class RequestPartConverter:
             case LLMTextPart():
                 if part.role == "user":
                     return UserPromptPart(content=part.content)
-                elif part.role == "system":
-                    return SystemPromptPart(content=part.content)
             case AnyContentPart():
                 raise ValueError(f"`{part}` cannot be converted to a ModelRequestPart")
+            case SystemPromptHistoryPart():
+                return SystemPromptPart(content=part.content)
             case OpaquePart():
                 return part.value
-
             case LLMToolCallPart():
                 raise TypeError(f"{part=}")
             case ToolResultPart():
@@ -63,7 +67,7 @@ class RequestPartConverter:
             case UserPromptPart():
                 return LLMTextPart(role="user", content=str(part.content))
             case SystemPromptPart():
-                return LLMTextPart(role="system", content=part.content)
+                return SystemPromptHistoryPart(content=part.content)
             case ToolReturnPart():
                 return ToolResultPart(
                     call_id=part.tool_call_id,
@@ -89,6 +93,8 @@ class ResponsePartConverter:
                 raise TypeError(f"{part=}")
 
             case AnyContentPart():
+                raise ValueError(f"`{part}` cannot be converted to a ModelResponsePart")
+            case SystemPromptHistoryPart():
                 raise ValueError(f"`{part}` cannot be converted to a ModelResponsePart")
             case OpaquePart():
                 return part.value

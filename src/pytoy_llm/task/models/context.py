@@ -4,11 +4,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, MutableMapping, Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
-from pytoy_llm.models.llm_messages import LLMMessage, LLMRequestLike
+from pytoy_llm.models.llm_messages import LLMMessage
 from pytoy_llm.models.llm_metas import LLMParam
 
 type TaskRunState = MutableMapping[str, Any]
@@ -83,13 +83,6 @@ class TaskContextState(BaseModel, frozen=True):
         TaskRunState,
         Field(description="Persistent task state."),
     ] = Field(default_factory=dict)
-
-    @field_validator("llm_messages", mode="before")
-    @classmethod
-    def normalize_messages(cls, value: LLMRequestLike) -> Sequence[LLMMessage]:
-        if not value:
-            return ()
-        return LLMMessage.to_messages(value)
 
     @classmethod
     def from_execution_context(cls, context: ExecutionContext) -> Self:

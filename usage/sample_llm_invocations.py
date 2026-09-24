@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models.llm_messages import LLMRequest
 from pytoy_llm.task import TaskRequest, TaskSyncExecutor
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
@@ -32,7 +32,7 @@ if __name__ == "__main__":
         ),
         output_type=IncidentSummaries,
         create_messages=lambda input: [
-            LLMMessage.from_prompt(
+            LLMRequest.from_prompt(
                 system=(
                     "You are a log analysis assistant.\n"
                     "Extract structured incident information from the given log.\n"
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         ),
         output_type=IncidentActions,
         create_messages=lambda summaries, ctx: [
-            LLMMessage.from_prompt(
+            LLMRequest.from_prompt(
                 user="\n".join(
                     f"user={item.user_id}, severity={item.severity}, action={item.action}, user_name={item.user_name}"
                     for item in summaries.items
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         ),
         output_type=str,
         create_messages=lambda actions, ctx: [
-            LLMMessage.from_prompt(
+            LLMRequest.from_prompt(
                 system=(
                     "You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."
                 ),

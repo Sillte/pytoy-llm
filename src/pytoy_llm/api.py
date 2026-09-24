@@ -26,7 +26,7 @@ def get_configuration_path(name: str = DEFAULT_NAME) -> Path:
 
 
 def completion[T: BaseModel | str](
-    messages: LLMRequestLike,
+    request: LLMRequestLike,
     output_type: type[T] = str,  # type: ignore
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
@@ -34,11 +34,11 @@ def completion[T: BaseModel | str](
 ) -> T:
     """Execute the `litellm.completion`."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
-    return facade.completion(messages=messages, output_type=output_type)
+    return facade.completion(request=request, output_type=output_type)
 
 
 def run[T: BaseModel | str](
-    messages: LLMRequestLike,
+    request: LLMRequestLike,
     output_type: type[T],
     tools: LLMToolsLike = tuple(),
     llm_param: LLMParam | None = None,
@@ -48,7 +48,7 @@ def run[T: BaseModel | str](
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
-    result = facade.run(messages, output_type=output_type, tools=tools, usage_limit=usage_limit)
+    result = facade.run(request, output_type=output_type, tools=tools, usage_limit=usage_limit)
     return result
 
 
