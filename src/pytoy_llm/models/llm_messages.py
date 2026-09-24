@@ -28,7 +28,7 @@ class LLMMessage(BaseModel, frozen=True):
     ) -> Self:
         parts = parts or []
         parts = list(parts)
-        if user:
+        if user is not None:
             parts.append(TextPart(role="user", content=user))
         return cls(kind="request", parts=parts)
 
@@ -106,9 +106,11 @@ class LLMRequest(BaseModel, frozen=True):
         system_as_history: bool = False,
     ) -> Self:
         system_prompt = (
-            SystemPrompt.from_any(content=system, as_history=system_as_history) if system else None
+            SystemPrompt.from_any(content=system, as_history=system_as_history)
+            if system is not None
+            else None
         )
-        if user:
+        if user is not None:
             llm_messages = [LLMMessage(kind="request", parts=[TextPart(role="user", content=user)])]
         else:
             llm_messages = []
@@ -118,7 +120,7 @@ class LLMRequest(BaseModel, frozen=True):
     def from_any(
         cls, arg: LLMRequestLike, *, system_prompt: SystemPrompt | str | None = None
     ) -> Self:
-        system_prompt = SystemPrompt.from_any(system_prompt) if system_prompt else None
+        system_prompt = SystemPrompt.from_any(system_prompt) if system_prompt is not None else None
         if isinstance(arg, cls):
             if system_prompt:
                 raise ValueError("Cannot provide `system_prompt` when `arg` is already LLMRequest.")

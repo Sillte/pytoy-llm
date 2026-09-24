@@ -59,7 +59,7 @@ class LiteLLMMessageAdapter:
             t_output_type = cast(T, output_type)
             content = cast(T, t_output_type.model_validate_json(content))  # type:ignore
         output_message = self.from_native(choice.message, kind="response")
-        if request.system_prompt and request.system_prompt.as_history:
+        if request.system_prompt and request.system_prompt.as_history and request.messages:
             last_message = list(request.messages)[-1]
             parts = [
                 SystemPromptHistoryPart(content=request.system_prompt.content),

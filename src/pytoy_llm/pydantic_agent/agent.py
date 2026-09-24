@@ -101,14 +101,18 @@ class PytoyPydanticAIAgent:
             system_prompt = None
             instructions = None
         model_messages = [adapter.to_native(message) for message in request.messages]
-        message_history, latest_message = model_messages[:-1], model_messages[-1]
-        resolver = LatestMessageResolver.from_model_message(latest_message)
-        if resolver.user_prompt is None:
-            message_history = model_messages
-            user_prompt = None
+        if model_messages:
+            message_history, latest_message = model_messages[:-1], model_messages[-1]
+            resolver = LatestMessageResolver.from_model_message(latest_message)
+            if resolver.user_prompt is None:
+                message_history = model_messages
+                user_prompt = None
+            else:
+                message_history = [*message_history, ModelRequest(parts=resolver.other_parts)]
+                user_prompt = resolver.user_prompt
         else:
-            message_history = [*message_history, ModelRequest(parts=resolver.other_parts)]
-            user_prompt = resolver.user_prompt
+            message_history = []
+            user_prompt = None
         agent = self._make_agent(system_prompt=system_prompt, tools=tools)
         event_handler = EventHandler(self._event_emitters)
         event_handler.emit_request(request)
