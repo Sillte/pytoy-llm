@@ -27,14 +27,14 @@ def test_text_message_round_trip(codec):
 
 def test_messages_array_flattens_parts_and_decodes(codec):
     messages = [
-        LLMMessage.from_parts([TextPart(role="system", content="Be concise")]),
+        LLMMessage.from_parts([TextPart(role="user", content="Be concise")]),
         LLMMessage.from_parts([TextPart(role="user", content="Hello")]),
     ]
 
     native = codec.to_native_messages(messages)
 
     assert native == [
-        {"role": "system", "content": "Be concise"},
+        {"role": "user", "content": "Be concise"},
         {"role": "user", "content": "Hello"},
     ]
     assert codec.from_native_messages(native, kind="request") == messages

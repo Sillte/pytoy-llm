@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from pytoy_llm.models.llm_metas import LLMOutputMeta
 from pytoy_llm.models.parts import Part, PartAdapter, TextPart
+from pytoy_llm.models.system_prompt import SystemPrompt
 
 
 class LLMMessage(BaseModel, frozen=True):
@@ -22,14 +23,11 @@ class LLMMessage(BaseModel, frozen=True):
     @classmethod
     def from_prompt(
         cls,
-        system: str | None = None,
         user: str | None = None,
         parts: Sequence[Part] | None = None,
     ) -> Self:
         parts = parts or []
         parts = list(parts)
-        if system:
-            parts.append(TextPart(role="system", content=system))
         if user:
             parts.append(TextPart(role="user", content=user))
         return cls(kind="request", parts=parts)
@@ -71,7 +69,9 @@ class LLMMessage(BaseModel, frozen=True):
         return cls.model_validate(arg)
 
     @classmethod
-    def to_messages(cls, arg: LLMMessagesLike) -> Sequence[LLMMessage]:
+    def to_messages(cls, arg: LLMMessagesLike) -> LLMMessages:
+        if isinstance(arg, LLMMessages):
+            return arg
         if isinstance(arg, str):
             return [cls.from_prompt(user=arg)]
         elif isinstance(arg, LLMMessage):
@@ -103,8 +103,58 @@ class LLMMessage(BaseModel, frozen=True):
         )
 
 
+class LLMMessages(BaseModel, frozen=True):
+    system_prompt: SystemPrompt | None = None
+    values: Sequence[LLMMessage] = Field(default_factory=list)
+
+    @classmethod
+    def from_prompt(
+        cls,
+        system: SystemPrompt | str | None = None,
+        user: str | None = None,
+        system_as_history: bool = False,
+    ) -> Self:
+        system_prompt = (
+            SystemPrompt.from_any(content=system, as_history=system_as_history) if system else None
+        )
+        if user:
+            llm_messages = [LLMMessage(kind="request", parts=[TextPart(role="user", content=user)])]
+        else:
+            llm_messages = []
+        return cls(system_prompt=system_prompt, values=llm_messages)
+
+    @classmethod
+    def to_messages(
+        cls, arg: LLMMessagesLike, *, system_prompt: SystemPrompt | str | None = None
+    ) -> "LLMMessages":
+        system_prompt = SystemPrompt.from_any(system_prompt) if system_prompt else None
+        if isinstance(arg, LLMMessages):
+            if system_prompt:
+                raise ValueError(
+                    "Cannot provide `system_prompt` when `arg` is already LLMMessages."
+                )
+            return arg
+
+        elif isinstance(arg, LLMMessage):
+            return cls(
+                system_prompt=system_prompt,
+                values=[arg],
+            )
+        elif isinstance(arg, str):
+            return cls.from_prompt(system=system_prompt, user=arg)
+        elif isinstance(arg, Sequence):
+            return cls(
+                system_prompt=system_prompt,
+                values=[LLMMessage.from_any(elem) for elem in arg],
+            )
+        else:
+            raise ValueError(f"Cannot convert {arg} to LLMMessages.")
+
+
 # TODO: Consider SystemPromptPart is acceptable when the multiple messages define them.
-type LLMMessagesLike = Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage
+type LLMMessagesLike = (
+    Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage | LLMMessages
+)
 
 
 class LLMResult[T: BaseModel | str](BaseModel, frozen=True):

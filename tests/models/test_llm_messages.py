@@ -31,24 +31,22 @@ class DummyStructuredModel(BaseModel):
 
 
 def test_input_converter_str():
-    res = LLMMessage.from_prompt(user="hello", system="evening")
-    assert len(res.parts) == 2
+    res = LLMMessage.from_prompt(user="hello")
+    assert len(res.parts) == 1
     assert isinstance(res.parts[0], TextPart)
-    assert res.parts[0].role == "system"
-    assert res.parts[0].content == "evening"
-    assert isinstance(res.parts[1], TextPart)
-    assert res.parts[1].role == "user"
-    assert res.parts[1].content == "hello"
+    assert res.parts[0].role == "user"
+    assert res.parts[0].content == "hello"
 
 
 def test_merge_messages():
     first = LLMMessage.from_parts(
         [
             TextPart(
-                role="system",
+                role="assistant",
                 content="You are helpful.",
             )
-        ]
+        ],
+        kind="request",
     )
 
     second = LLMMessage.from_parts(

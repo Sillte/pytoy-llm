@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import Self
 
 from pytoy_llm.idea import IdeaSpace
-from pytoy_llm.models import UsageLimit
-from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models import LLMMessages, UsageLimit
 from pytoy_llm.task.models import AgentInvocationSpec, InvocationHooks
 from pytoy_llm.task.models.task_specs import TaskSpec
 from pytoy_llm.tools.idea_tool.idea_tool import IdeaTool
@@ -55,12 +54,10 @@ class ThreeWordStoryStudio:
         )
 
         return AgentInvocationSpec.from_any(
-            lambda input_: [
-                LLMMessage.from_prompt(
-                    system=SYSTEM_PROMPT.strip(),
-                    user=input_,
-                )
-            ],
+            lambda input_: LLMMessages.from_prompt(
+                system=SYSTEM_PROMPT.strip(),
+                user=input_,
+            ),
             output_type=str,
             tools=[idea_tool.tools],
             usage_limit=usage_limit,

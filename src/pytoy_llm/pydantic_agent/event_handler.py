@@ -1,4 +1,4 @@
-from typing import AsyncIterable, Sequence
+from typing import AsyncIterable
 from uuid import uuid4
 
 from pydantic_ai import (
@@ -17,7 +17,7 @@ from pydantic_ai import (
     ToolCallPart,
 )
 
-from pytoy_llm.models import LLMEventEmitters, LLMMessage
+from pytoy_llm.models import LLMEventEmitters, LLMMessages
 from pytoy_llm.models.llm_activities.llm_activities import (
     LLMActivity,
     LLMMinimumActivity,
@@ -35,8 +35,8 @@ class EventHandler:
         self._event_adapter = ActivityAdapter(self._trace_id)
         self._event_emitters = event_emitters
 
-    def emit_request(self, llm_messages: Sequence[LLMMessage]) -> None:
-        messages = [elem.model_dump() for elem in llm_messages]
+    def emit_request(self, llm_messages: LLMMessages) -> None:
+        messages = [elem.model_dump() for elem in llm_messages.values]
         activity = LLMRequestActivity(trace_id=self._trace_id, messages=messages)
         self._event_emitters.emit_activity(activity)
 

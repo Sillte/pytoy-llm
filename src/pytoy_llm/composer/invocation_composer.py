@@ -8,7 +8,7 @@ from pytoy_llm.composer.models import (
     SystemPromptSpec,
 )
 from pytoy_llm.composer.system_prompt_composer import SystemPromptComposer
-from pytoy_llm.models import LLMMessage, LLMToolsLike
+from pytoy_llm.models import LLMMessages, LLMToolsLike
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext
 from pytoy_llm.task.models.metas import InvocationSpecMeta
@@ -19,22 +19,22 @@ class InvocationComposer[T: BaseModel | str]:
         self.system_prompt_spec = system_prompt_spec
         self.system_prompt_composer = SystemPromptComposer(self.system_prompt_spec)
 
-    def compose_message(
+    def compose_messages(
         self, user_prompt: str, supplementary_sections: SupplementarySectionsLike | None = None
-    ) -> LLMMessage:
+    ) -> LLMMessages:
         system_prompt = self.system_prompt_composer.compose_prompt(
             supplementary_sections=supplementary_sections
         )
-        return LLMMessage.from_prompt(user=user_prompt, system=system_prompt)
+        return LLMMessages.from_prompt(user=user_prompt, system=system_prompt)
 
-    def _create_message(
+    def _create_messages(
         self,
         input: Any,
         context: ExecutionContext,
         supplementary_sections: SupplementarySectionsLike | None,
-    ) -> LLMMessage:
+    ) -> LLMMessages:
         input = str(input) if input else "No User Input"
-        message = self.compose_message(
+        message = self.compose_messages(
             user_prompt=str(input), supplementary_sections=supplementary_sections
         )
         return message
@@ -44,7 +44,7 @@ class InvocationComposer[T: BaseModel | str]:
     ) -> LLMInvocationSpec:
         return LLMInvocationSpec(
             create_messages=partial(
-                self._create_message, supplementary_sections=supplementary_sections
+                self._create_messages, supplementary_sections=supplementary_sections
             ),
             output_type=self.system_prompt_spec.output_spec.output_type,
             meta=InvocationSpecMeta(
@@ -59,7 +59,7 @@ class InvocationComposer[T: BaseModel | str]:
     ) -> AgentInvocationSpec:
         return AgentInvocationSpec(
             create_messages=partial(
-                self._create_message, supplementary_sections=supplementary_sections
+                self._create_messages, supplementary_sections=supplementary_sections
             ),
             output_type=self.system_prompt_spec.output_spec.output_type,
             meta=InvocationSpecMeta(

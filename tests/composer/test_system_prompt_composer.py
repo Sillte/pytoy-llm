@@ -121,10 +121,7 @@ def test_system_prompt_composer_with_material_sections():
     print(prompt_str)
 
     # --- Compose message ---
-    message = LLMMessage.from_prompt(
-        user="UserPrompt",
-        system=prompt_str,
-    )
+    message = LLMMessage.from_prompt(user="UserPrompt")
     assert isinstance(message, LLMMessage)
 
 
