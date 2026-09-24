@@ -1,4 +1,5 @@
-from typing import Literal
+from collections.abc import Iterable
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,7 +11,13 @@ class LLMTokens(BaseModel, frozen=True):
     prompt: int
     completion: int
     total: int
-    model_config = ConfigDict(extra="allow")
+
+    @classmethod
+    def aggregate(cls, llm_tokens: Iterable[Self]) -> Self:
+        prompt = sum(elem.prompt for elem in llm_tokens)
+        completion = sum(elem.completion for elem in llm_tokens)
+        total = sum(elem.total for elem in llm_tokens)
+        return cls(prompt=prompt, completion=completion, total=total)
 
 
 class LLMOutputMeta(BaseModel, frozen=True):

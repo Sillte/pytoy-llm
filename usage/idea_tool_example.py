@@ -71,9 +71,8 @@ analysis_agent = AgentInvocationSpec.from_any(
         intent="Make a comment under `IdeaSpace`.",
     ),
     output_type=str,
-    create_messages=lambda input_: [
-        LLMRequest.from_prompt(
-            system="""
+    create_request=lambda input_: LLMRequest.from_prompt(
+        system="""
 
 ## Writing Principles
 
@@ -82,11 +81,10 @@ Prefer concise statements over lengthy explanations.
 Do not add unnecessary context, recommendations, or background.
 Do not expand a question into a proposal or analysis unless requested.
 """,
-            user="""
+        user="""
 現状、不具合の候補をいくつかあげてくれるかな？
 """,
-        )
-    ],
+    ),
     tools=[idea_tool.tools],
     usage_limit=UsageLimit(max_total_tokens=2000000, max_requests=50),
 )

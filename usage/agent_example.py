@@ -281,3 +281,4 @@ request = TaskRequest(
 
 exit = TaskSyncExecutor().execute(request)
 print(exit.output)
+print(exit.result.llm_tokens)

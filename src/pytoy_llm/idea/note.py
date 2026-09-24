@@ -94,7 +94,7 @@ def _to_text(metadata: MetaDataProtocol, body: str) -> str:
     if len(metadata) == 0:
         return body
 
-    yaml_text = metadata.to_text().rstrip("\r\n")
+    yaml_text = metadata.as_text().rstrip("\r\n")
     return f"---\n{yaml_text}\n---\n{body}"
 
 

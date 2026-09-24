@@ -4,6 +4,7 @@ from collections.abc import Iterable, Iterator
 from typing import Any, Self, cast
 
 import yamlrocks
+from pydantic import JsonValue
 from yamlrocks import YAMLRocksDocument
 
 
@@ -47,5 +48,8 @@ class YamlRockWrapper:
     def keys(self) -> Iterable[str]:
         return self._yaml_rock.keys()
 
-    def to_text(self) -> str:
+    def as_text(self) -> str:
         return self._yaml_rock.to_yaml().decode()
+
+    def as_dict(self) -> dict[str, JsonValue]:
+        return dict(self._yaml_rock.to_dict())

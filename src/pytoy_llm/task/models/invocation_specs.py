@@ -20,6 +20,7 @@ from pytoy_llm.task.models.context import (
     ExecutionContext,
     RuntimeContextPatch,
 )
+from pytoy_llm.task.models.expenditures import LLMExpenditure
 from pytoy_llm.task.models.invocation_hooks import InvocationHooks
 from pytoy_llm.task.models.invocation_results import (
     InvocationInfo,
@@ -252,6 +253,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
                 input=input,
                 output=output,
                 info=info,
+                expenditure=LLMExpenditure(tokens=result.meta.tokens),
                 details={"llm_result": result.model_dump(mode="json")},
             )
             return to_invocation_result(output, trace, runtime_patch=runtime_patch)
@@ -327,6 +329,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
                 input=input,
                 output=output,
                 info=info,
+                expenditure=LLMExpenditure(tokens=result.meta.tokens),
                 details={"llm_result": result.model_dump(mode="json")},
             )
             return to_invocation_result(output, trace, runtime_patch=runtime_patch)

@@ -65,7 +65,7 @@ def build_idea_note_model(
             path=idea_note.path,
             modified_at=datetime.fromtimestamp(idea_note.file_path.stat().st_mtime, timezone.utc),
             body=idea_note.body,
-            metadata=dict(idea_note.metadata),
+            metadata=idea_note.metadata.as_dict(),
             note_links=note_links,
             remote_links=remote_links,
             local_links=local_links,
@@ -147,6 +147,8 @@ class IdeaTool:
             self.get_convention,
             self.get_subspaces,
             self.get_note_paths,
+            self.get_metadata,
+            self.update_metadata,
             self.get_note,
             self.write_note,
             self.delete_note,
@@ -259,6 +261,66 @@ class IdeaTool:
         return [
             (note.file_path.relative_to(self.ideaspace_root).as_posix()) for note in result_notes
         ]
+
+    def get_metadata(
+        self, paths: Sequence[IdeaSpacePath]
+    ) -> dict[IdeaSpacePath, IdeaNoteMetadata | None] | ToolError:
+        """Get metadata for multiple IdeaNotes.
+
+        Return ``None`` for a path that is invalid, does not exist, or does
+        not identify an IdeaNote. Return ``ToolError`` only when the metadata
+        operation cannot be completed because of an I/O error.
+        """
+        metadata_by_path: dict[IdeaSpacePath, IdeaNoteMetadata | None] = {}
+
+        for path in paths:
+            try:
+                file_path = self._idea_space.resolve(path)
+                if file_path.is_dir():
+                    metadata_by_path[path] = None
+                    continue
+
+                idea_note = IdeaNote.from_path(file_path=file_path, root=self._idea_space.root)
+            except (FileNotFoundError, OutsidePathError, ValueError):
+                metadata_by_path[path] = None
+            except OSError as e:
+                return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
+            else:
+                metadata_by_path[path] = idea_note.metadata.as_dict()
+
+        return metadata_by_path
+
+    def update_metadata(
+        self, path: IdeaSpacePath, metadata: IdeaNoteMetadata, clear: bool = False
+    ) -> IdeaSpacePath | ToolError:
+        """Add or replace metadata fields of an existing IdeaNote.
+
+        When ``clear`` is true, remove all existing metadata before applying
+        ``metadata``. The Markdown body is always preserved.
+        """
+        try:
+            file_path = self._idea_space.resolve(path)
+            if file_path.is_dir():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Given `{path=}` corresponds to `IdeaSpacePivot`, not a path to `IdeaNote`.",
+                    suggestion="Use `get_note_paths` to get the paths of `IdeaSpaceNote`.",
+                )
+
+            idea_note = IdeaNote.from_path(file_path=file_path, root=self._idea_space.root)
+            if clear:
+                idea_note.metadata.clear()
+            for key, value in metadata.items():
+                idea_note.metadata[key] = value
+            idea_note.write(self._file_writer)
+        except FileNotFoundError as e:
+            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(e), retry=False)
+        except OutsidePathError as e:
+            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
+        except OSError as e:
+            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
+
+        return path
 
     def get_note(self, path: IdeaSpacePath) -> IdeaNoteModel | ToolError:
         """Get an IdeaNote and its links by IdeaSpacePath."""

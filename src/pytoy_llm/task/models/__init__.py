@@ -6,8 +6,9 @@ from pytoy_llm.task.models.context import (
     TaskRunState,
 )
 from pytoy_llm.task.models.exceptions import TaskExecutionException
+from pytoy_llm.task.models.expenditures import Expenditure, LLMExpenditure, NoExpenditure
 from pytoy_llm.task.models.invocation_hooks import InvocationHooks
-from pytoy_llm.task.models.invocation_results import InvocationResult
+from pytoy_llm.task.models.invocation_results import InvocationResult, InvocationTrace
 from pytoy_llm.task.models.invocation_specs import (
     AgentInvocationSpec,
     FunctionInvocationSpec,
@@ -26,6 +27,7 @@ __all__ = [
     "ExecutionEvents",
     "TaskContextState",
     "InvocationResult",
+    "InvocationTrace",
     "InvocationHooks",
     "AgentInvocationSpec",
     "FunctionInvocationSpec",
@@ -39,4 +41,7 @@ __all__ = [
     "TaskSpec",
     "TaskRunState",
     "TaskExecutionException",
+    "Expenditure",
+    "LLMExpenditure",
+    "NoExpenditure",
 ]

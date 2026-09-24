@@ -31,16 +31,14 @@ if __name__ == "__main__":
             name="ParseLogInvocation", intent="Parse system logs to extract incident summaries."
         ),
         output_type=IncidentSummaries,
-        create_messages=lambda input: [
-            LLMRequest.from_prompt(
-                system=(
-                    "You are a log analysis assistant.\n"
-                    "Extract structured incident information from the given log.\n"
-                    "Follow the output schema strictly."
-                ),
-                user=str(input),
-            )
-        ],
+        create_request=lambda input: LLMRequest.from_prompt(
+            system=(
+                "You are a log analysis assistant.\n"
+                "Extract structured incident information from the given log.\n"
+                "Follow the output schema strictly."
+            ),
+            user=str(input),
+        ),
     )
     log_input = """
     2024-01-12 09:31:22 ERROR user=U-1932 action=login_failed reason=too_many_attempts
@@ -84,23 +82,21 @@ if __name__ == "__main__":
             intent="Decide actions for each incident based on severity.",
         ),
         output_type=IncidentActions,
-        create_messages=lambda summaries, ctx: [
-            LLMRequest.from_prompt(
-                user="\n".join(
-                    f"user={item.user_id}, severity={item.severity}, action={item.action}, user_name={item.user_name}"
-                    for item in summaries.items
-                ),
-                system=(
-                    "You are an incident response agent.\n"
-                    "Decide what action should be taken for each incident.\n"
-                    "Rules:\n"
-                    "- high severity → escalate\n"
-                    "- medium severity → notify\n"
-                    "- low severity → ignore\n"
-                    "Return structured results."
-                ),
+        create_request=lambda summaries, ctx: LLMRequest.from_prompt(
+            user="\n".join(
+                f"user={item.user_id}, severity={item.severity}, action={item.action}, user_name={item.user_name}"
+                for item in summaries.items
             ),
-        ],
+            system=(
+                "You are an incident response agent.\n"
+                "Decide what action should be taken for each incident.\n"
+                "Rules:\n"
+                "- high severity → escalate\n"
+                "- medium severity → notify\n"
+                "- low severity → ignore\n"
+                "Return structured results."
+            ),
+        ),
         tools=[append_free_str],
     )
 
@@ -110,22 +106,20 @@ if __name__ == "__main__":
             intent="Generate notification emails for affected users.",
         ),
         output_type=str,
-        create_messages=lambda actions, ctx: [
-            LLMRequest.from_prompt(
-                system=(
-                    "You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."
-                ),
-                user="\n".join(
-                    f"""
+        create_request=lambda actions, ctx: LLMRequest.from_prompt(
+            system=(
+                "You are a notification assistant.\nWrite emails only for actions that are 'notify' or 'escalate'."
+            ),
+            user="\n".join(
+                f"""
     User ID: {a.user_id}, "UserName: {a.user_name}"
     Action: {a.action}
     Reason: {a.reason}
     """
-                    for a in actions.actions
-                    if a.action in ("notify", "escalate")
-                ),
+                for a in actions.actions
+                if a.action in ("notify", "escalate")
             ),
-        ],
+        ),
     )
 
     task_meta = TaskSpecMeta(

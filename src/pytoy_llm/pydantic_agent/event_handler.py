@@ -2,6 +2,7 @@ from typing import AsyncIterable
 from uuid import uuid4
 
 from pydantic_ai import (
+    AgentRunResult,
     AgentStreamEvent,
     FinalResultEvent,
     FunctionToolCallEvent,
@@ -17,7 +18,7 @@ from pydantic_ai import (
     ToolCallPart,
 )
 
-from pytoy_llm.models import LLMEventEmitters, LLMRequest
+from pytoy_llm.models import LLMEventEmitters, LLMRequest, LLMTokens
 from pytoy_llm.models.llm_activities.llm_activities import (
     LLMActivity,
     LLMMinimumActivity,
@@ -38,6 +39,14 @@ class EventHandler:
     def emit_request(self, llm_request: LLMRequest) -> None:
         messages = [elem.model_dump() for elem in llm_request.messages]
         activity = LLMRequestActivity(trace_id=self._trace_id, messages=messages)
+        self._event_emitters.emit_activity(activity)
+
+    def emit_response(self, run_result: AgentRunResult) -> None:
+        usage = run_result.usage
+        prompt = usage.input_tokens
+        completion = usage.output_tokens
+        tokens = LLMTokens(prompt=prompt, completion=completion, total=prompt + completion)
+        activity = LLMResponseActivity(response=str(run_result.output), tokens=tokens)
         self._event_emitters.emit_activity(activity)
 
     async def event_stream_handler(

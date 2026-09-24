@@ -8,6 +8,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, JsonValue
 
 from pytoy_llm.task.models.context import ContextPatch, RuntimeContextPatch
+from pytoy_llm.task.models.expenditures import Expenditure, NoExpenditure
 from pytoy_llm.task.models.metas import InvocationSpecMeta
 
 
@@ -33,6 +34,9 @@ class InvocationTrace(BaseModel, frozen=True):
     input: Annotated[Any, Field(description="Input")]
     output: Annotated[Any, Field(description="Output")]
     info: Annotated[InvocationInfo, Field(description="Metatada Information about the invocation.")]
+    expenditure: Annotated[Expenditure, Field(description="Expenditure of the invocation")] = (
+        NoExpenditure()
+    )
     details: Annotated[
         Mapping[str, JsonValue], Field(description="detailed information for debugging")
     ] = {}

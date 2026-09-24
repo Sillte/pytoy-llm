@@ -82,8 +82,8 @@ class LLMResponseActivity(BaseModel, frozen=True):
         float, Field(description="Timestamp of the activity in seconds since epoch.")
     ] = Field(default_factory=time.time)
     response: Annotated[str, Field(description="Messages from the LLM.")]
-    tokens: Annotated[LLMTokens | None, Field(description="Used tokens")] = None
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
+    tokens: Annotated[LLMTokens | None, Field(description="Used tokens")] = None
     activity_type: Annotated[str, Field(description="Type of the LLM activity.")] = (
         "response_activity"
     )
