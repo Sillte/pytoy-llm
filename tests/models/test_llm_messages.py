@@ -2,7 +2,7 @@ import pytest
 from litellm import ModelResponse
 from pydantic import BaseModel
 
-from pytoy_llm.models.llm_messages import LLMMessage
+from pytoy_llm.models.llm_messages import LLMMessage, LLMRequest
 from pytoy_llm.models.parts import TextPart
 
 
@@ -67,3 +67,21 @@ def test_merge_messages():
     assert isinstance(merged.parts[1], TextPart)
     assert merged.parts[0].content == "You are helpful."
     assert merged.parts[1].content == "Hello"
+
+
+def test_request_from_mapping_wraps_single_message() -> None:
+    request = LLMRequest.from_any(
+        {"kind": "request", "parts": [{"role": "user", "content": "Hello"}]}
+    )
+
+    assert len(request.messages) == 1
+    part = request.messages[0].parts[0]
+    assert isinstance(part, TextPart)
+    assert part.content == "Hello"
+
+
+def test_request_rejects_any_system_prompt_override() -> None:
+    request = LLMRequest.from_prompt(user="Hello")
+
+    with pytest.raises(ValueError, match="already LLMRequest"):
+        LLMRequest.from_any(request, system_prompt="")

@@ -95,6 +95,8 @@ type LLMMessageLike = LLMMessage | str | Sequence[Mapping[str, Any]] | Mapping[s
 
 
 class LLMRequest(BaseModel, frozen=True):
+    """A complete LLM input, including an optional system prompt and history."""
+
     system_prompt: SystemPrompt | None = None
     messages: Sequence[LLMMessage] = Field(default_factory=list)
 
@@ -122,7 +124,7 @@ class LLMRequest(BaseModel, frozen=True):
     ) -> Self:
         system_prompt = SystemPrompt.from_any(system_prompt) if system_prompt is not None else None
         if isinstance(arg, cls):
-            if system_prompt:
+            if system_prompt is not None:
                 raise ValueError("Cannot provide `system_prompt` when `arg` is already LLMRequest.")
             return arg
 
@@ -133,6 +135,11 @@ class LLMRequest(BaseModel, frozen=True):
             )
         elif isinstance(arg, str):
             return cls.from_prompt(system=system_prompt, user=arg)
+        elif isinstance(arg, Mapping):
+            return cls(
+                system_prompt=system_prompt,
+                messages=[LLMMessage.from_any(arg)],
+            )
         elif isinstance(arg, Sequence):
             return cls(
                 system_prompt=system_prompt,
@@ -143,9 +150,7 @@ class LLMRequest(BaseModel, frozen=True):
 
 
 # TODO: Consider SystemPromptPart is acceptable when the multiple messages define them.
-type LLMRequestLike = (
-    Sequence[LLMMessage] | str | Sequence[Mapping[str, Any]] | LLMMessage | LLMRequest
-)
+type LLMRequestLike = LLMRequest | LLMMessageLike
 
 
 class LLMResult[T: BaseModel | str](BaseModel, frozen=True):
