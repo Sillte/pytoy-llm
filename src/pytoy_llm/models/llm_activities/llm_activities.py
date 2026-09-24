@@ -54,6 +54,7 @@ class LLMRequestActivity(BaseModel, frozen=True):
         float, Field(description="Timestamp of the activity in seconds since epoch.")
     ] = Field(default_factory=time.time)
     trace_id: Annotated[str | None, Field(description="Trace ID of Request")] = None
+    system_prompt: Annotated[str | None, Field(description="SystemPrompt")] = None
     messages: Annotated[list[dict[str, Any]], Field(description="Messages sent to the LLM.")]
     timeout: Annotated[float | None, Field(description="Timeout")] = None
     model: Annotated[str | None, Field(description="Name of model")] = None

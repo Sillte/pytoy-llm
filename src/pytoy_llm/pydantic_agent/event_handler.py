@@ -38,7 +38,12 @@ class EventHandler:
 
     def emit_request(self, llm_request: LLMRequest) -> None:
         messages = [elem.model_dump() for elem in llm_request.messages]
-        activity = LLMRequestActivity(trace_id=self._trace_id, messages=messages)
+        system_prompt = (
+            llm_request.system_prompt.content if llm_request.system_prompt is not None else None
+        )
+        activity = LLMRequestActivity(
+            trace_id=self._trace_id, messages=messages, system_prompt=system_prompt
+        )
         self._event_emitters.emit_activity(activity)
 
     def emit_response(self, run_result: AgentRunResult) -> None:
