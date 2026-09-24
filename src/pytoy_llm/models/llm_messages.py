@@ -59,6 +59,8 @@ class LLMMessage(BaseModel, frozen=True):
         cls,
         arg: LLMMessageLike,
     ) -> Self:
+        if isinstance(arg, cls):
+            return arg
         if isinstance(arg, str):
             try:
                 result = cls.model_validate_json(arg)
@@ -150,7 +152,7 @@ class LLMRequest(BaseModel, frozen=True):
 
 
 # TODO: Consider SystemPromptPart is acceptable when the multiple messages define them.
-type LLMRequestLike = LLMRequest | LLMMessageLike
+type LLMRequestLike = LLMRequest | LLMMessageLike | Sequence[LLMMessage]
 
 
 class LLMResult[T: BaseModel | str](BaseModel, frozen=True):
