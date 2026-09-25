@@ -200,7 +200,7 @@ class WorkspaceInspection:
         `start_line` is zero-based and inclusive.
         `end_line` is zero-based and exclusive.
 
-        Unlike `read_text_file`, this tool reads only the requested line range.
+        Unlike `read_text_file`, this tool returns only the requested line range.
 
         Args:
             path:

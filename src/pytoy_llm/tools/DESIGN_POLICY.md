@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `tools` package provides read-only tools for LLM agents to inspect and
+The `tools` package provides tools for LLM agents to inspect and
 search workspace contents.
 
 ## Responsibility Boundaries

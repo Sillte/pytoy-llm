@@ -54,6 +54,16 @@ class PathGatherer:
         Return:
             A sequence of absolute paths.
 
+        Raises:
+            ValueError:
+                If ``root`` does not identify an existing directory.
+
+        Notes:
+            Filesystem errors encountered while walking descendants are not
+            raised by this method. Because ``os.walk`` uses its default error
+            handling, paths under an inaccessible directory may be omitted
+            from the result.
+
         """
         if not patterns:
             patterns = ("*",)

@@ -5,7 +5,6 @@ from typing import Annotated, Self, Sequence
 
 from pydantic import Field
 
-from pytoy_llm.foundation.paths import PathGatherer
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import GrepMatch, GrepMatchContext, WorkspaceAccess
 from pytoy_llm.tools.workspace_explorer.semantic_types import (
@@ -70,7 +69,7 @@ class WorkspaceSearch:
             ),
         ] = 3,
         max_results: MaxResults = 100,
-        max_file_bytes: MaxBytes = 1_000_000,
+        max_file_bytes: MaxBytes | None = 1_000_000,
     ) -> Sequence[GrepMatchContext] | ToolError:
         """
         Search text contents of files within the workspace and return matching
@@ -110,6 +109,19 @@ class WorkspaceSearch:
                 Number of lines to include before and after each matching line.
                 Overlapping or adjacent context ranges are merged.
 
+            max_results:
+                Maximum number of matching lines to include in the result.
+                The limit is applied before matching lines are grouped into
+                GrepMatchContext objects, so the number of returned contexts may
+                be smaller than max_results.
+                At most one GrepMatch is produced for each matching line.
+
+            max_file_bytes:
+                Maximum file size in bytes for files to be searched.
+                Files larger than this limit are excluded from the search targets.
+                If null, no file-size limit is applied.
+
+
         Returns:
             A sequence of `GrepMatchContext` objects containing the matching file,
             the surrounding content, the line range, and the individual matches.
@@ -121,10 +133,14 @@ class WorkspaceSearch:
             search_patterns = [search_patterns]
         if isinstance(file_patterns, str):
             file_patterns = [file_patterns]
-        if context_lines < 0 or max_results < 1 or max_file_bytes < 1:
+        if (
+            context_lines < 0
+            or max_results < 1
+            or (max_file_bytes is not None and max_file_bytes < 1)
+        ):
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg="context_lines must be non-negative, max_results and max_file_bytes must be positive.",
+                msg="context_lines must be non-negative, max_results and max_file_bytes must be positive when specified.",
                 retry=False,
             )
 
@@ -141,42 +157,31 @@ class WorkspaceSearch:
                 msg=f"`{root=}` must be a directory.",
                 retry=None,
             )
+        file_paths = self.access.gather_file_paths(
+            collection_root, file_patterns, max_file_bytes=max_file_bytes
+        )
+        if isinstance(file_paths, ToolError):
+            return file_paths
 
-        try:
-            files = tuple(
-                path
-                for path in PathGatherer().gather(
-                    root=root,
-                    patterns=file_patterns,
-                    excludes=self.access.excludes,
-                    target="file",
-                )
-                if self.access.is_within_workspace(path) and path.stat().st_size <= max_file_bytes
-            )
-        except PermissionError as exc:
-            return ToolError(
-                kind=ToolErrorKind.PERMISSION_DENIED,
-                msg=f"Could not inspect files under `{collection_root}`: {exc}",
-                retry=False,
-            )
-        except OSError as exc:
-            return ToolError(
-                kind=ToolErrorKind.IO_ERROR,
-                msg=f"Could not inspect files under `{collection_root}`: {exc}",
-            )
         if regex:
             matches = self._grep_context_by_regex(
                 search_patterns=search_patterns,
-                files=files,
+                paths=file_paths,
                 case_sensitive=case_sensitive,
+                max_file_bytes=max_file_bytes,
             )
         else:
             matches = self._grep_context_by_text(
-                search_patterns=search_patterns, files=files, case_sensitive=case_sensitive
+                search_patterns=search_patterns,
+                paths=file_paths,
+                case_sensitive=case_sensitive,
+                max_file_bytes=max_file_bytes,
             )
         if isinstance(matches, ToolError):
             return matches
-        return self.integrate_matches(matches[:max_results], context_lines=context_lines)
+        return self.integrate_matches(
+            matches[:max_results], context_lines=context_lines, max_file_bytes=max_file_bytes
+        )
 
     def _grep_context_by_regex(
         self,
@@ -184,11 +189,12 @@ class WorkspaceSearch:
             Sequence[SearchPattern],
             Field(description="Search patterns are combined with OR semantics."),
         ],
-        files: Sequence[Path],
+        paths: Sequence[WorkspacePath],
         case_sensitive: Annotated[
             bool,
             Field(description="Whether the search is case-sensitive."),
         ] = False,
+        max_file_bytes: MaxBytes | None = None,
     ):
         flags = 0 if case_sensitive else re.IGNORECASE
 
@@ -202,24 +208,31 @@ class WorkspaceSearch:
             )
         return tuple(
             itertools.chain.from_iterable(
-                (self._get_matched_by_regex(file_path, compilations) for file_path in files)
+                (
+                    self._get_matched_by_regex(
+                        file_path, compilations, max_file_bytes=max_file_bytes
+                    )
+                    for file_path in paths
+                )
             )
         )
 
     def _get_matched_by_regex(
-        self, file_path: Path, patterns: Sequence[re.Pattern[str]]
+        self,
+        path: WorkspacePath,
+        patterns: Sequence[re.Pattern[str]],
+        max_file_bytes: MaxBytes | None = None,
     ) -> Sequence[GrepMatch]:
         """
         file_path: The abolute path
         """
-        try:
-            lines = file_path.read_text(
-                encoding="utf-8",
-                errors="ignore",
-            ).splitlines()
-        except OSError:
+        text = self.access.read_text(
+            path,
+            max_bytes=max_file_bytes,
+        )
+        if isinstance(text, ToolError):
             return []
-
+        lines = text.splitlines()
         results = []
 
         for lineno, line in enumerate(lines):
@@ -228,7 +241,7 @@ class WorkspaceSearch:
                 if match:
                     results.append(
                         GrepMatch(
-                            path=file_path.relative_to(self.workspace).as_posix(),
+                            path=path,
                             line=lineno,
                             column=match.start(),
                             text=line,
@@ -240,31 +253,35 @@ class WorkspaceSearch:
     def _grep_context_by_text(
         self,
         search_patterns: Sequence[SearchPattern],
-        files: Sequence[Path],
+        paths: Sequence[WorkspacePath],
         case_sensitive: bool = False,
+        max_file_bytes: MaxBytes | None = None,
     ) -> Sequence[GrepMatch]:
 
         return tuple(
             itertools.chain.from_iterable(
                 self._get_matched_by_text(
-                    file_path, patterns=search_patterns, case_sensitive=case_sensitive
+                    path,
+                    patterns=search_patterns,
+                    case_sensitive=case_sensitive,
+                    max_file_bytes=max_file_bytes,
                 )
-                for file_path in files
+                for path in paths
             )
         )
 
     def _get_matched_by_text(
         self,
-        file_path: Path,
+        path: WorkspacePath,
         patterns: Sequence[SearchPattern],
         case_sensitive: bool = False,
+        max_file_bytes: MaxBytes | None = None,
     ) -> Sequence[GrepMatch]:
 
-        try:
-            content = file_path.read_text(encoding="utf8")
-            lines = content.splitlines(keepends=True)
-        except OSError:
+        content = self.access.read_text(path, max_bytes=max_file_bytes)
+        if isinstance(content, ToolError):
             return []
+        lines = content.splitlines(keepends=True)
 
         results = []
 
@@ -277,7 +294,7 @@ class WorkspaceSearch:
                 if idx != -1:
                     results.append(
                         GrepMatch(
-                            path=file_path.relative_to(self.workspace).as_posix(),
+                            path=path,
                             line=lineno,
                             column=idx,
                             text=line,
@@ -287,7 +304,7 @@ class WorkspaceSearch:
         return results
 
     def integrate_matches(
-        self, matches: Sequence[GrepMatch], context_lines: int
+        self, matches: Sequence[GrepMatch], context_lines: int, max_file_bytes: MaxBytes | None
     ) -> Sequence[GrepMatchContext] | ToolError:
         matches_by_path = {}
         for match in matches:
@@ -295,78 +312,76 @@ class WorkspaceSearch:
 
         contexts: list[GrepMatchContext] = []
 
-        for match_path, file_matches in matches_by_path.items():
-            file_path = self.workspace / match_path
-            result = _build_context(file_path, file_matches, context_lines)
+        for _, file_matches in matches_by_path.items():
+            result = self._build_context(file_matches, context_lines, max_file_bytes=max_file_bytes)
             if isinstance(result, ToolError):
                 return result
             contexts.extend(result)
         return contexts
 
+    def _build_context(
+        self,
+        matches: Sequence[GrepMatch],
+        context_lines: int,
+        max_file_bytes: MaxBytes | None = None,
+    ) -> Sequence[GrepMatchContext] | ToolError:
+        if not matches:
+            return []
 
-def _build_context(
-    file_path: Path, matches: Sequence[GrepMatch], context_lines: int
-) -> Sequence[GrepMatchContext] | ToolError:
-    if not matches:
-        return []
+        matches = sorted(matches, key=lambda match: match.line)
+        workspace_path = matches[0].path
 
-    matches = sorted(matches, key=lambda match: match.line)
-    workspace_path = matches[0].path
-
-    try:
-        content = file_path.read_text(encoding="utf8")
+        content = self.access.read_text(workspace_path, max_bytes=max_file_bytes)
+        if isinstance(content, ToolError):
+            return content
         lines = content.splitlines(keepends=True)
-    except OSError:
-        return ToolError(
-            kind=ToolErrorKind.RESOURCE_LIMIT,
-            msg="Resource usage is high. Please restrict the scope of search.",
-        )
-    # `start_line`, `end_line`, list[GrepMatch]
-    ranges: list[tuple[int, int, list[GrepMatch]]] = []
-    contexts: list[GrepMatchContext] = []
 
-    for match in matches:
-        start_line = max(0, match.line - context_lines)
-        end_line = min(len(lines), match.line + context_lines + 1)
+        # `start_line`, `end_line`, list[GrepMatch]
+        ranges: list[tuple[int, int, list[GrepMatch]]] = []
+        contexts: list[GrepMatchContext] = []
 
-        ranges.append(
-            (
-                start_line,
-                end_line,
-                [match],
-            )
-        )
+        for match in matches:
+            start_line = max(0, match.line - context_lines)
+            end_line = min(len(lines), match.line + context_lines + 1)
 
-    # Merge overlapping or adjacent ranges.
-    merged: list[tuple[int, int, list[GrepMatch]]] = [ranges[0]]
-    for start_line, end_line, range_matches in ranges[1:]:
-        previous_start, previous_end, previous_matches = merged[-1]
-
-        if start_line <= previous_end:
-            merged[-1] = (
-                previous_start,
-                max(previous_end, end_line),
-                previous_matches + range_matches,
-            )
-        else:
-            merged.append(
+            ranges.append(
                 (
                     start_line,
                     end_line,
-                    range_matches,
+                    [match],
                 )
             )
 
-    # Read each merged range.
-    for start_line, end_line, range_matches in merged:
-        content = "".join(lines[start_line:end_line])
-        contexts.append(
-            GrepMatchContext(
-                path=workspace_path,
-                content=content,
-                start_line=start_line,
-                end_line=end_line,
-                matches=range_matches,
+        # Merge overlapping or adjacent ranges.
+        merged: list[tuple[int, int, list[GrepMatch]]] = [ranges[0]]
+        for start_line, end_line, range_matches in ranges[1:]:
+            previous_start, previous_end, previous_matches = merged[-1]
+
+            if start_line <= previous_end:
+                merged[-1] = (
+                    previous_start,
+                    max(previous_end, end_line),
+                    previous_matches + range_matches,
+                )
+            else:
+                merged.append(
+                    (
+                        start_line,
+                        end_line,
+                        range_matches,
+                    )
+                )
+
+        # Read each merged range.
+        for start_line, end_line, range_matches in merged:
+            content = "".join(lines[start_line:end_line])
+            contexts.append(
+                GrepMatchContext(
+                    path=workspace_path,
+                    content=content,
+                    start_line=start_line,
+                    end_line=end_line,
+                    matches=range_matches,
+                )
             )
-        )
-    return contexts
+        return contexts

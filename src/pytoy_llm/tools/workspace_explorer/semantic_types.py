@@ -59,7 +59,7 @@ MaxBytes = Annotated[
     Field(
         ge=1,
         le=10_000_000,
-        description="Maximum number of bytes to read from one file.",
+        description="Maximum allowed file size in bytes.",
     ),
 ]
 

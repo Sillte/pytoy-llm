@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal, Self, Sequence
 
 from pydantic import BaseModel, Field
 
+from pytoy_llm.foundation.paths import PathGatherer
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.semantic_types import MaxBytes, WorkspacePath
 
@@ -82,11 +83,11 @@ class FilePartContent(BaseModel, frozen=True):
 
 
 class PartialFilesReadResult(BaseModel, frozen=True):
-    """The part of files are success to read per request, however, it fails to read files some files."""
+    """The result of a batch file-read operation where some files succeeded and others failed."""
 
     status: Literal["partial-success"] = Field(
         default="partial-success",
-        description="This attribute represents the partial success of operations",
+        description="Indicates that some requested files were read successfully while others failed.",
     )
     successes: list[FilePartContent | FileContent] = Field(
         description="Success result of file-read."
@@ -139,7 +140,7 @@ DEFAULT_EXCLUDED_PATTERNS = frozenset(
 class WorkspaceAccess:
     workspace: Path
     excludes: frozenset[str] = DEFAULT_EXCLUDED_PATTERNS
-    text_encodings: tuple[str, ...] = ("utf-8", "utf-8-sig", "cp932")
+    text_encodings: tuple[str, ...] = ("utf-8-sig", "utf-8", "cp932")
 
     @classmethod
     def from_any(cls, workspace: Path | str, excludes: frozenset[str] | None = None) -> Self:
@@ -156,6 +157,9 @@ class WorkspaceAccess:
                 retry=False,
             )
         return abs_path
+
+    def to_workspace_path(self, path: Path) -> WorkspacePath:
+        return path.relative_to(self.workspace).as_posix()
 
     def is_within_workspace(self, path: Path) -> bool:
         return path.resolve(strict=False).is_relative_to(self.workspace)
@@ -215,3 +219,41 @@ class WorkspaceAccess:
                 kind=ToolErrorKind.UNKNOWN,
                 msg=f"Could not read {path=}: {exc}",
             )
+
+    def gather_file_paths(
+        self,
+        collection_root: WorkspacePath,
+        file_patterns: Sequence[str],
+        max_file_bytes: MaxBytes | None,
+    ) -> Sequence[WorkspacePath] | ToolError:
+        root = self.resolve(collection_root)
+        if isinstance(root, ToolError):
+            return root
+        if not root.exists():
+            return ToolError(
+                kind=ToolErrorKind.NOT_FOUND,
+                msg=f"`{collection_root=}` does not exist.",
+                retry=None,
+            )
+        if not root.is_dir():
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg=f"`{collection_root=}` must be a directory.",
+                retry=None,
+            )
+
+        def _is_target_path(path: Path) -> bool:
+            return self.is_within_workspace(path) and (
+                max_file_bytes is None or path.stat().st_size <= max_file_bytes
+            )
+
+        return tuple(
+            self.to_workspace_path(path)
+            for path in PathGatherer().gather(
+                root=root,
+                patterns=file_patterns,
+                excludes=self.excludes,
+                target="file",
+            )
+            if _is_target_path(path)
+        )
