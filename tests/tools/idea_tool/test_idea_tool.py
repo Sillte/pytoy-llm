@@ -37,6 +37,15 @@ def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
     assert result == [".", "knowledge", "knowledge/python"]
 
 
+def test_get_convention_pivot_paths_represents_root_as_dot(tmp_path: Path) -> None:
+    (tmp_path / ".convention.md").write_text("root convention\n")
+    tool = IdeaTool(IdeaSpace(tmp_path))
+
+    result = tool.get_convention_pivot_paths()
+
+    assert result == ["."]
+
+
 def test_get_convention_pivot_paths_returns_empty_sequence_without_conventions(
     tmp_path: Path,
 ) -> None:
