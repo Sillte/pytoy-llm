@@ -31,7 +31,7 @@ IdeaSpaceDepth = Annotated[
         description=(
             "Number of descendant levels to explore. "
             "0 returns only immediate subspaces or notes. "
-            "None explores all descendant levels."
+            "`null` explores all descendant levels."
         ),
         ge=0,
     ),

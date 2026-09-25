@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Self, Sequence
 
+from pydantic import AwareDatetime
+
 from pytoy_llm.idea import DiskFileWriter, IdeaGraph, IdeaNote, IdeaSpace, OutsidePathError
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
@@ -9,9 +11,9 @@ from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
 from .models import (
     IdeaNoteLinkModel,
     IdeaNoteModel,
-    IdeaSpaceContextModel,
     IdeaSpaceConventionModel,
     IdeaSpaceToolMetaModel,
+    IdeaSpaceToolWorkingContextModel,
     LocalLinkModel,
     RemoteLinkModel,
     UnresolvedLinkModel,
@@ -143,8 +145,9 @@ class IdeaTool:
     @property
     def tools(self) -> Sequence[Callable]:
         tools = [
-            self.get_idea_space_root_context,
+            self.get_idea_space_working_context,
             self.get_convention,
+            self.get_updated_time,
             self.get_subspaces,
             self.get_note_paths,
             self.get_metadata,
@@ -178,10 +181,20 @@ class IdeaTool:
         self.tool_context_path.parent.mkdir(exist_ok=True, parents=True)
         self.tool_context_path.write_text(model.model_dump_json(indent=2), encoding="utf8")
 
-    def get_idea_space_root_context(self) -> IdeaSpaceContextModel | ToolError:
-        convention = self.get_convention(pivot=".")
-        if isinstance(convention, ToolError):
-            return convention
+    def get_idea_space_working_context(self) -> IdeaSpaceToolWorkingContextModel | ToolError:
+        """Get the current tool-related working context for the IdeaSpace.
+
+        The working context records the start and completion times of the latest
+        LLM interaction. A missing context file is treated as an initialized
+        context with both timestamps set to ``null``; it is not an error.
+
+        Returns:
+            ``IdeaSpaceToolWorkingContextModel`` containing the latest recorded
+            interaction timestamps. Both timestamps are ``null`` when no interaction
+            has been recorded.
+
+            ``ToolError`` if the saved context exists but cannot be parsed.
+        """
         try:
             text = self.tool_context_path.read_text()
         except FileNotFoundError:
@@ -194,18 +207,21 @@ class IdeaTool:
                     kind=ToolErrorKind.UNKNOWN,
                     msg=f"`IdeaSpaceToolMetaModel` cannot be made: {exc}",
                 )
-        return IdeaSpaceContextModel(root_convention=convention, tool_meta=tool_meta)
+        return IdeaSpaceToolWorkingContextModel(tool_meta=tool_meta)
 
     def get_convention(
         self, pivot: IdeaSpacePivot = "."
     ) -> IdeaSpaceConventionModel | None | ToolError:
-        """Get the convention that applies at the given IdeaSpace pivot.
-        Return `null` if no convention exists for the given pivot.
+        """Get the convention that applies to all notes and subspaces under the given IdeaSpacePivot.
 
-        When you first enter an IdeaSpace, before exploring or modifying it,
-        first call `get_convention(".")` to learn the conventions specific to
-        the IdeaSpace root. Then follow those conventions when navigating,
-        creating, or modifying notes.
+        If a convention exists, its ``applied_to`` field identifies the
+        IdeaSpace path governed by that convention. The convention applies to
+        all notes and subspaces under that path.
+
+        This tool only checks the convention defined directly at ``pivot``.
+        It does not search parent paths for conventions.
+
+        Returns ``null`` if no convention is defined directly at ``pivot``.
         """
 
         try:
@@ -231,7 +247,24 @@ class IdeaTool:
     def get_subspaces(
         self, pivot: IdeaSpacePivot = ".", depth: IdeaSpaceDepth = 0
     ) -> Sequence[IdeaSpacePath] | ToolError:
-        """Get subspaces under a `pivot` in the IdeaSpace."""
+        """List IdeaSpace subdirectories below ``pivot``.
+
+        Args:
+            pivot:
+                Starting directory relative to the IdeaSpace root. ``.``
+                represents the IdeaSpace root.
+
+            depth:
+                ``0`` returns only immediate child subspaces. ``null``
+                returns subspaces at all descendant levels.
+
+        Returns:
+            IdeaSpace-root-relative paths of matching subspaces. This tool
+            returns paths only.
+
+            ``ToolError`` if ``pivot`` is outside the IdeaSpace or cannot be
+            inspected.
+        """
         try:
             path = self._idea_space.resolve(pivot)
             sub_space = IdeaSpace.from_path(path, root=self._idea_space.root)
@@ -249,7 +282,24 @@ class IdeaTool:
     def get_note_paths(
         self, pivot: IdeaSpacePivot = "./", depth: IdeaSpaceDepth = 0
     ) -> Sequence[IdeaSpacePath] | ToolError:
-        """Get path of `IdeaNote` under a `pivot` in the IdeaSpace."""
+        """List IdeaNote paths below ``pivot``.
+
+        Args:
+            pivot:
+                Starting directory relative to the IdeaSpace root. ``.``
+                represents the IdeaSpace root.
+
+            depth:
+                ``0`` returns only notes directly under ``pivot``. ``null``
+                returns notes at all descendant levels.
+
+        Returns:
+            IdeaSpace-root-relative paths of matching IdeaNotes. This tool
+            returns paths only.
+
+            ``ToolError`` if ``pivot`` is outside the IdeaSpace or cannot be
+            inspected.
+        """
         try:
             path = self._idea_space.resolve(pivot)
             sub_space = IdeaSpace.from_path(path, root=self._idea_space.root)
@@ -262,14 +312,70 @@ class IdeaTool:
             (note.file_path.relative_to(self.ideaspace_root).as_posix()) for note in result_notes
         ]
 
+    def get_updated_time(
+        self,
+        pivot: IdeaSpacePivot = "./",
+        depth: IdeaSpaceDepth = 0,
+    ) -> dict[IdeaSpacePath, AwareDatetime] | ToolError:
+        """Get the file modification time of each IdeaNote under a path.
+
+        This is the filesystem modification time, not an LLM edit timestamp.
+        A timestamp later than a previously recorded time indicates that the file
+        was modified after that time, but this tool does not identify who made the
+        change.
+
+        Args:
+            pivot:
+                Starting directory relative to the IdeaSpace root. ``.``
+                represents the IdeaSpace root.
+
+            depth:
+                Number of descendant levels to inspect. ``0`` inspects notes
+                directly under ``pivot``. ``null`` inspects all descendants.
+
+        Returns:
+            A mapping from each IdeaSpace-relative note path to its last file
+            modification time. Timestamps are timezone-aware UTC datetimes.
+
+            ``ToolError`` if ``pivot`` is outside the IdeaSpace or the notes
+            cannot be inspected.
+        """
+
+        def _path_to_aware_datetime(path: Path) -> AwareDatetime:
+            return datetime.fromtimestamp(
+                path.stat().st_mtime,
+                tz=timezone.utc,
+            )
+
+        try:
+            path = self._idea_space.resolve(pivot)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root)
+            notes = sub_space.get_notes(depth=depth)
+            return {
+                note.file_path.relative_to(self.ideaspace_root).as_posix(): _path_to_aware_datetime(
+                    note.file_path
+                )
+                for note in notes
+            }
+
+        except OutsidePathError as e:
+            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
+        except OSError as e:
+            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
+
     def get_metadata(
         self, paths: Sequence[IdeaSpacePath]
     ) -> dict[IdeaSpacePath, IdeaNoteMetadata | None] | ToolError:
         """Get metadata for multiple IdeaNotes.
 
-        Return ``None`` for a path that is invalid, does not exist, or does
-        not identify an IdeaNote. Return ``ToolError`` only when the metadata
-        operation cannot be completed because of an I/O error.
+        For each input path, return a metadata object when the path identifies
+        an IdeaNote. Return an empty object ``{}`` when the note has no
+        metadata. Return ``null`` when the path is invalid, does not exist, or
+        identifies a directory rather than an IdeaNote.
+
+        Return ``ToolError`` only when the metadata operation cannot be
+        completed because of an I/O error. The returned mapping uses the
+        requested paths as keys.
         """
         metadata_by_path: dict[IdeaSpacePath, IdeaNoteMetadata | None] = {}
 
@@ -284,7 +390,12 @@ class IdeaTool:
             except (FileNotFoundError, OutsidePathError, ValueError):
                 metadata_by_path[path] = None
             except OSError as e:
-                return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
+                return ToolError(
+                    kind=ToolErrorKind.IO_ERROR,
+                    msg=str(e),
+                    retry=False,
+                    suggestion=f"Exclude `{path=}` from paths.",
+                )
             else:
                 metadata_by_path[path] = idea_note.metadata.as_dict()
 
@@ -323,7 +434,13 @@ class IdeaTool:
         return path
 
     def get_note(self, path: IdeaSpacePath) -> IdeaNoteModel | ToolError:
-        """Get an IdeaNote and its links by IdeaSpacePath."""
+        """Read one IdeaNote, including its body, metadata, and outgoing links.
+
+        The returned ``body`` excludes YAML frontmatter. Links are separated
+        into links to other IdeaNotes, workspace-local files, remote URIs, and
+        unresolved links.
+
+        """
         try:
             file_path = self._idea_space.resolve(path)
             if file_path.is_dir():
@@ -363,7 +480,16 @@ class IdeaTool:
         body: IdeaNoteBody,
         metadata: IdeaNoteMetadata,
     ) -> IdeaSpacePath | ToolError:
-        """Create or replace an IdeaNote with the given content."""
+        """Create or replace an IdeaNote with the given content.
+
+        If a note already exists, its body and metadata are replaced entirely.
+        This operation does not append to or merge with the existing note.
+        Provide Markdown without YAML frontmatter in ``body`` and provide
+        frontmatter values through ``metadata``.
+
+        Returns the IdeaSpace-root-relative path after a successful write, or
+        ``ToolError`` if the note cannot be written.
+        """
         try:
             file_path = self._idea_space.resolve(path)
             idea_note = IdeaNote.create(file_path=file_path, body=body, root=self._idea_space.root)
@@ -375,7 +501,14 @@ class IdeaTool:
         return path
 
     def delete_note(self, path: IdeaSpacePath) -> IdeaSpacePath | ToolError:
-        """Delete an IdeaNote from the IdeaSpace."""
+        """Permanently delete an existing IdeaNote.
+
+        This operation cannot be undone. ``path`` must identify a note, not a
+        directory.
+
+        Returns the IdeaSpace-root-relative path after a successful deletion,
+        or ``ToolError`` if the note cannot be deleted.
+        """
         try:
             file_path = self._idea_space.resolve(path)
 

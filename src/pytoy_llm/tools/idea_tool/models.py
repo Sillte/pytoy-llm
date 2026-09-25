@@ -124,12 +124,9 @@ class IdeaSpaceToolMetaModel(BaseModel, frozen=True):
     )
 
 
-class IdeaSpaceContextModel(BaseModel, frozen=True):
+class IdeaSpaceToolWorkingContextModel(BaseModel, frozen=True):
     """Context for working with an IdeaSpace."""
 
-    root_convention: IdeaSpaceConventionModel | None = Field(
-        description="The root convention of this IdeaSpace."
-    )
     tool_meta: IdeaSpaceToolMetaModel = Field(
         description="Metadata describing the current tool-related state of the IdeaSpace."
     )

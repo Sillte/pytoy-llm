@@ -223,16 +223,13 @@ class WorkspaceSearch:
         patterns: Sequence[re.Pattern[str]],
         max_file_bytes: MaxBytes | None = None,
     ) -> Sequence[GrepMatch]:
-        """
-        file_path: The abolute path
-        """
         text = self.access.read_text(
             path,
             max_bytes=max_file_bytes,
         )
         if isinstance(text, ToolError):
             return []
-        lines = text.splitlines()
+        lines = text.splitlines(keepends=True)
         results = []
 
         for lineno, line in enumerate(lines):
