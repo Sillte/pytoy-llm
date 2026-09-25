@@ -21,6 +21,34 @@ def test_get_metadata_returns_metadata_and_none_for_invalid_paths(tmp_path: Path
     }
 
 
+def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".convention.md").write_text("root convention\n")
+    (tmp_path / "knowledge").mkdir()
+    (tmp_path / "knowledge" / "index.md").write_text("knowledge convention\n")
+    (tmp_path / "knowledge" / "python").mkdir()
+    (tmp_path / "knowledge" / "python" / ".convention.md").write_text("python convention\n")
+
+    tool = IdeaTool(IdeaSpace(tmp_path))
+
+    result = tool.get_convention_pivot_paths()
+
+    assert result == [".", "knowledge", "knowledge/python"]
+
+
+def test_get_convention_pivot_paths_returns_empty_sequence_without_conventions(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "knowledge").mkdir()
+    (tmp_path / "knowledge" / "note.md").write_text("note\n")
+    tool = IdeaTool(IdeaSpace(tmp_path))
+
+    result = tool.get_convention_pivot_paths()
+
+    assert result == []
+
+
 def test_update_metadata_preserves_body_and_merges_metadata(tmp_path: Path) -> None:
     note_path = tmp_path / "note.md"
     note_path.write_text("---\nstatus: draft\nowner: alice\n---\n# Body\n")

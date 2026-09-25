@@ -146,6 +146,7 @@ class IdeaTool:
     def tools(self) -> Sequence[Callable]:
         tools = [
             self.get_idea_space_working_context,
+            self.get_convention_pivot_paths,
             self.get_convention,
             self.get_updated_time,
             self.get_subspaces,
@@ -208,6 +209,34 @@ class IdeaTool:
                     msg=f"`IdeaSpaceToolMetaModel` cannot be made: {exc}",
                 )
         return IdeaSpaceToolWorkingContextModel(tool_meta=tool_meta)
+
+    def get_convention_pivot_paths(self) -> Sequence[IdeaSpacePivot] | ToolError:
+        """List all IdeaSpace paths where a convention is defined.
+
+        The returned paths are relative to the IdeaSpace root. The root is
+        represented by ``.``.
+
+        Use each returned path as the ``pivot`` argument of ``get_convention`` to
+        read the convention that applies to that path. This tool returns paths only;
+        it does not return convention contents.
+
+        Returns:
+            A sequence of IdeaSpace-relative pivots sorted by path. An empty sequence
+            means that no convention is defined in the IdeaSpace.
+
+            ``ToolError`` if the IdeaSpace cannot be inspected.
+        """
+        try:
+            spaces = [self._idea_space, *self._idea_space.get_subspaces(depth=None)]
+            return [
+                space.folder_path.relative_to(self.ideaspace_root).as_posix()
+                for space in spaces
+                if space.convention is not None
+            ]
+        except OutsidePathError as e:
+            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
+        except OSError as e:
+            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(e), retry=False)
 
     def get_convention(
         self, pivot: IdeaSpacePivot = "."
