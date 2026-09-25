@@ -9,6 +9,7 @@ class ToolErrorKind(str, Enum):
     PERMISSION_DENIED = "permission_denied"
     RESOURCE_LIMIT = "resource_limit"
     PARSE_ERROR = "parse_error"
+    DECODE_ERROR = "decode_error"
     IO_ERROR = "io_error"
     UNKNOWN = "unknown"
 

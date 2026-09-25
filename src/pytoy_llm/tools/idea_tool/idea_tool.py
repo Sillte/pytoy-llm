@@ -176,7 +176,7 @@ class IdeaTool:
             }
         )
         self.tool_context_path.parent.mkdir(exist_ok=True, parents=True)
-        self.tool_context_path.write_text(model.model_dump_json(indent=2))
+        self.tool_context_path.write_text(model.model_dump_json(indent=2), encoding="utf8")
 
     def get_idea_space_root_context(self) -> IdeaSpaceContextModel | ToolError:
         convention = self.get_convention(pivot=".")

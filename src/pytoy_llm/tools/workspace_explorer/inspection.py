@@ -2,7 +2,12 @@ from pathlib import Path
 from typing import Self, Sequence
 
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
-from pytoy_llm.tools.workspace_explorer.models import FileContent, FilePartContent, WorkspaceAccess
+from pytoy_llm.tools.workspace_explorer.models import (
+    FileContent,
+    FilePartContent,
+    PartialFilesReadResult,
+    WorkspaceAccess,
+)
 from pytoy_llm.tools.workspace_explorer.semantic_types import LineNumber, MaxBytes, WorkspacePath
 
 
@@ -28,9 +33,9 @@ class WorkspaceInspection:
 
     @property
     def tools(self):
-        return [self.read_file, self.read_files, self.read_file_range]
+        return [self.read_text_file, self.read_text_files, self.read_text_file_range]
 
-    def read_file(
+    def read_text_file(
         self,
         path: WorkspacePath,
         max_lines: int | None = 20,
@@ -45,7 +50,7 @@ class WorkspaceInspection:
 
         Set `max_lines` to be `null` to request the entire file.
 
-        Use `read_file_range` when you need a specific line range rather
+        Use `read_text_file_range` when you need a specific line range rather
         than the beginning of the file.
 
         Args:
@@ -56,6 +61,11 @@ class WorkspaceInspection:
                 Maximum number of lines to read.
                 - integer: return at most this many lines.
                 - null: read the entire file.
+
+            max_bytes:
+                Acceptable maximum size of the file in bytes.
+                - integer: If the file exceeds `max_bytes`, return `ToolError`.
+                - null: No file-size limit is applied.
 
         Returns:
             FileContent:
@@ -69,8 +79,7 @@ class WorkspaceInspection:
                 cannot be read, or the argument is invalid.
 
         Notes:
-            - This tool reads the file as UTF-8 text.
-            - This tool does NOT accept `start_line` nor `end_line` unlike `read_file_range`.
+            - This tool does NOT accept `start_line` nor `end_line` unlike `read_text_file_range`.
         """
         if max_lines is not None and max_lines < 1:
             return ToolError(
@@ -85,74 +94,24 @@ class WorkspaceInspection:
                 retry=False,
             )
 
-        abs_path = self.access.resolve(path)
-        if isinstance(abs_path, ToolError):
-            return abs_path
+        text = self.access.read_text(path, max_bytes=max_bytes)
+        if isinstance(text, ToolError):
+            return text
+        if max_lines is None:
+            return FileContent(path=path, content=text)
+        lines = text.splitlines(keepends=True)
+        if len(lines) <= max_lines:
+            return FileContent(path=path, content=text)
+        return FilePartContent(
+            path=path, content="".join(lines[:max_lines]), start_line=0, end_line=max_lines
+        )
 
-        try:
-            if not abs_path.exists():
-                return ToolError(
-                    kind=ToolErrorKind.NOT_FOUND,
-                    msg=f"{path=} does not exist.",
-                    retry=False,
-                )
-            if not abs_path.is_file():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False
-                )
-            if max_bytes is not None and abs_path.stat().st_size > max_bytes:
-                return ToolError(
-                    kind=ToolErrorKind.RESOURCE_LIMIT,
-                    msg=f"{path=} exceeds the {max_bytes} byte limit.",
-                    retry=False,
-                )
-            if max_lines is None:
-                return FileContent(path=path, content=abs_path.read_text(encoding="utf8"))
-
-            with abs_path.open("r", encoding="utf8") as f:
-                lines = []
-
-                for _ in range(max_lines):
-                    line = f.readline()
-
-                    if line == "":
-                        return FileContent(
-                            path=path,
-                            content="".join(lines),
-                        )
-
-                    lines.append(line)
-
-                if f.readline() == "":
-                    return FileContent(
-                        path=path,
-                        content="".join(lines),
-                    )
-
-                return FilePartContent(
-                    path=path,
-                    content="".join(lines),
-                    start_line=0,
-                    end_line=max_lines,
-                )
-        except UnicodeDecodeError:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg=f"`{path=}` is not a UTF-8 text file.",
-                retry=False,
-            )
-        except Exception as exc:
-            return ToolError(
-                kind=ToolErrorKind.UNKNOWN,
-                msg=str(exc),
-            )
-
-    def read_files(
+    def read_text_files(
         self,
         paths: Sequence[WorkspacePath],
         max_lines: int | None = 10,
         max_bytes: MaxBytes | None = 1_000_000,
-    ) -> list[FileContent | FilePartContent] | ToolError:
+    ) -> list[FileContent | FilePartContent] | PartialFilesReadResult | ToolError:
         """
         Read the beginning of multiple text files, or the entire files when requested.
 
@@ -160,7 +119,7 @@ class WorkspaceInspection:
         If a file is longer than `max_lines`, its result is `FilePartContent`
         rather than the complete file.
 
-        Set `max_lines=None` to request the complete contents of every file.
+        Set `max_lines=null` to request the complete contents of every file.
 
         Args:
             paths:
@@ -170,15 +129,21 @@ class WorkspaceInspection:
                 - integer: return at most this many lines.
                 - null: read the entire file.
 
+            max_bytes:
+                Acceptable maximum size of the file in bytes.
+                - integer: If the file exceeds `max_bytes`, return `ToolError`.
+                - null: No file-size limit is applied.
+
         Returns:
             A list containing FileContent or FilePartContent for each
             requested file, in the same order as `paths`.
 
             ToolError when:
-                - `max_lines` is invalid
-                - any path is outside the workspace
-                - any requested file does not exist
-                - any file cannot be read
+                - Entire operation is invalid.
+
+            PartialFilesReadResult when:
+                - At least one file failed to be read. Successful and failed
+                  file results are returned separately.
 
         Notes:
             - The line limit applies independently to each file.
@@ -199,28 +164,31 @@ class WorkspaceInspection:
                 retry=False,
             )
 
-        results: list[FileContent | FilePartContent] = []
+        successes: list[FileContent | FilePartContent] = []
+        failures: dict[WorkspacePath, ToolError] = {}
 
         for path in paths:
-            result = self.read_file(
+            result = self.read_text_file(
                 path=path,
                 max_lines=max_lines,
                 max_bytes=max_bytes,
             )
 
             if isinstance(result, ToolError):
-                return result
+                failures[path] = result
+            else:
+                successes.append(result)
 
-            results.append(result)
+        if failures:
+            return PartialFilesReadResult(successes=successes, failures=failures)
+        else:
+            return successes
 
-        return results
-
-    def read_file_range(
+    def read_text_file_range(
         self,
         path: WorkspacePath,
         start_line: LineNumber,
         end_line: LineNumber,
-        max_bytes: MaxBytes | None = 1_000_000,
     ) -> FilePartContent | ToolError:
         """
         Read a specific range of lines from a text file.
@@ -232,7 +200,7 @@ class WorkspaceInspection:
         `start_line` is zero-based and inclusive.
         `end_line` is zero-based and exclusive.
 
-        Unlike `read_file`, this tool reads only the requested line range.
+        Unlike `read_text_file`, this tool reads only the requested line range.
 
         Args:
             path:
@@ -252,9 +220,6 @@ class WorkspaceInspection:
             - the file does not exist
             - the file is outside the workspace
             - the operation cannot be completed
-
-        Notes:
-            This tool reads the file as UTF-8 text.
         """
         if end_line <= start_line:
             return ToolError(
@@ -267,57 +232,19 @@ class WorkspaceInspection:
                 kind=ToolErrorKind.INVALID_ARGUMENT,
                 msg="start_line must be a non-negative integer.",
             )
-        if max_bytes is not None and max_bytes < 1:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg="`max_bytes` must be greater than or equal to 1.",
-                retry=False,
-            )
-        abs_path = self.access.resolve(path)
-        if isinstance(abs_path, ToolError):
-            return abs_path
-        try:
-            if not abs_path.exists():
-                return ToolError(
-                    kind=ToolErrorKind.NOT_FOUND, msg=f"{path=} does not exist.", retry=False
-                )
-            if not abs_path.is_file():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"{path=} must be a file.", retry=False
-                )
-            if max_bytes is not None and abs_path.stat().st_size > max_bytes:
-                return ToolError(
-                    kind=ToolErrorKind.RESOURCE_LIMIT,
-                    msg=f"{path=} exceeds the {max_bytes} byte limit.",
-                    retry=False,
-                )
-            content = abs_path.read_text(encoding="utf8")
-            lines = content.splitlines(keepends=True)
+        text = self.access.read_text(path, max_bytes=None)
+        if isinstance(text, ToolError):
+            return text
 
-            if len(lines) < end_line:
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"`{end_line=}` is out of range; the file has {len(lines)} lines.",
-                )
-            return FilePartContent(
-                path=path,
-                content="".join(lines[start_line:end_line]),
-                start_line=start_line,
-                end_line=end_line,
-            )
-        except FileNotFoundError as exc:
-            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=None)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.UNKNOWN, msg=str(exc))
-        except UnicodeDecodeError:
+        lines = text.splitlines(keepends=True)
+        if len(lines) < end_line:
             return ToolError(
                 kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg=f"`{path=}` is not a UTF-8 text file.",
-                retry=False,
+                msg=f"`{end_line=}` is out of range; the file has {len(lines)} lines.",
             )
-        except Exception as exc:
-            return ToolError(
-                kind=ToolErrorKind.UNKNOWN,
-                msg=str(exc),
-                retry=False,
-            )
+        return FilePartContent(
+            path=path,
+            content="".join(lines[start_line:end_line]),
+            start_line=start_line,
+            end_line=end_line,
+        )

@@ -7,6 +7,7 @@ from typing import Literal
 
 DEFAULT_EXCLUDED_PATTERNS = frozenset(
     {
+        ".pytoy",
         ".venv",
         "venv",
         "node_modules",

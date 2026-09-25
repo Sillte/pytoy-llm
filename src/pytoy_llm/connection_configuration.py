@@ -50,7 +50,7 @@ class ConnectionConfiguration:
     def initialize_connection_file(self, name: str = DEFAULT_NAME) -> Path:
         json_dict = _make_default_connection_dict("local")
         path = self.get_connection_path(name)
-        path.write_text(json.dumps(json_dict, indent=4))
+        path.write_text(json.dumps(json_dict, indent=4), encoding="utf8")
         return path
 
     def get_connection(self, name: str = DEFAULT_NAME) -> Connection:
