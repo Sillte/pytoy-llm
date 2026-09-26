@@ -13,4 +13,6 @@ def test_llm_tokens_aggregate_sums_token_counts() -> None:
 
 
 def test_llm_tokens_aggregate_returns_zero_for_empty_iterable() -> None:
-    assert LLMTokens.aggregate(iter(())) == LLMTokens(prompt=0, completion=0, total=0)
+    assert LLMTokens.aggregate(iter(())) == LLMTokens(
+        prompt=0, completion=0, total=0, cache_read=0, cache_write=0
+    )

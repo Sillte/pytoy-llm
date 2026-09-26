@@ -1,4 +1,11 @@
-from .domain.exceptions import OutsidePathError
+from .domain.exceptions import (
+    MetadataDeserializationError,
+    MetadataError,
+    MetadataKeyError,
+    MetadataSerializationError,
+    MetadataValueError,
+    OutsidePathError,
+)
 from .domain.links import (
     AnchorLocation,
     IdeaLink,
@@ -22,6 +29,11 @@ __all__ = [
     "IdeaSpace",
     "DiskFileWriter",
     "OutsidePathError",
+    "MetadataError",
+    "MetadataDeserializationError",
+    "MetadataKeyError",
+    "MetadataSerializationError",
+    "MetadataValueError",
     "FileWriterProtocol",
     "LineLocation",
     "LinkReachabilityChecker",

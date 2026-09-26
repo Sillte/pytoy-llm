@@ -43,7 +43,12 @@ class LiteLLMTransactionAdapter:
         if usage is None:
             raise ValueError("Response is strange.")
         tokens = LLMTokens(
-            prompt=usage.prompt_tokens, completion=usage.completion_tokens, total=usage.total_tokens
+            prompt=usage.prompt_tokens,
+            completion=usage.completion_tokens,
+            total=usage.total_tokens,
+            cache_read=getattr(usage, "cache_read_input_tokens", None),
+            cache_write=getattr(usage, "cache_creation_input_tokens", None)
+            or getattr(getattr(usage, "prompt_tokens_details", None), "cache_write_tokens", None),
         )
         finish_reason = response.choices[0].finish_reason
         meta = LLMOutputMeta(tokens=tokens, finish_reason=finish_reason, llm_calls=1)

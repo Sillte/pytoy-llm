@@ -163,7 +163,13 @@ class PydanticAIMessageAdapter:
         usage = run_result.usage
         prompt = usage.input_tokens
         completion = usage.output_tokens
-        tokens = LLMTokens(prompt=prompt, completion=completion, total=prompt + completion)
+        tokens = LLMTokens(
+            prompt=prompt,
+            completion=completion,
+            total=prompt + completion,
+            cache_read=usage.cache_read_tokens,
+            cache_write=usage.cache_write_tokens,
+        )
         meta = LLMOutputMeta(tokens=tokens, finish_reason=None, llm_calls=usage.requests)
         return LLMResult(output=run_result.output, meta=meta, messages=messages)
 

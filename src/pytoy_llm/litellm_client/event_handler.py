@@ -149,6 +149,11 @@ class LiteLLMEventHandler(CustomLogger):
                     prompt=usage.prompt_tokens,
                     completion=usage.completion_tokens,
                     total=usage.total_tokens,
+                    cache_read=getattr(usage, "cache_read_input_tokens", None),
+                    cache_write=getattr(usage, "cache_creation_input_tokens", None)
+                    or getattr(
+                        getattr(usage, "prompt_tokens_details", None), "cache_write_tokens", None
+                    ),
                 )
             else:
                 tokens = None

@@ -11,13 +11,28 @@ class LLMTokens(BaseModel, frozen=True):
     prompt: int
     completion: int
     total: int
+    cache_read: int | None = None
+    cache_write: int | None = None
 
     @classmethod
     def aggregate(cls, llm_tokens: Iterable[Self]) -> Self:
-        prompt = sum(elem.prompt for elem in llm_tokens)
-        completion = sum(elem.completion for elem in llm_tokens)
-        total = sum(elem.total for elem in llm_tokens)
-        return cls(prompt=prompt, completion=completion, total=total)
+        tokens = list(llm_tokens)
+
+        return cls(
+            prompt=sum(x.prompt for x in tokens),
+            completion=sum(x.completion for x in tokens),
+            total=sum(x.total for x in tokens),
+            cache_read=(
+                sum(x.cache_read if x.cache_read else 0 for x in tokens)
+                if all(x.cache_read is not None for x in tokens)
+                else None
+            ),
+            cache_write=(
+                sum(x.cache_write if x.cache_write else 0 for x in tokens)
+                if all(x.cache_write is not None for x in tokens)
+                else None
+            ),
+        )
 
 
 class LLMOutputMeta(BaseModel, frozen=True):

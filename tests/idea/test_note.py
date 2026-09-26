@@ -1,6 +1,15 @@
 from pathlib import Path
 
-from pytoy_llm.idea import IdeaNote, TextPosition
+from pytoy_llm.idea import IdeaNote, MetadataSerializationError, TextPosition
+from pytoy_llm.idea.domain.metadata import MetaDataProtocol
+
+
+class FailingMetadata(MetaDataProtocol):
+    def __len__(self) -> int:
+        return 1
+
+    def as_text(self) -> str:
+        raise MetadataSerializationError("cannot serialize")
 
 
 def test_note_parses_front_matter_and_preserves_body_offset() -> None:
@@ -32,3 +41,14 @@ def test_note_metadata_can_be_added_when_frontmatter_is_absent() -> None:
     note.metadata["id"] = "example"
 
     assert "id: example" in note.text
+
+
+def test_note_omits_metadata_when_it_cannot_be_serialized(tmp_path: Path) -> None:
+    note = IdeaNote.create(
+        file_path=tmp_path / "note.md",
+        body="Body",
+        metadata=FailingMetadata(),
+        root=tmp_path,
+    )
+
+    assert note.to_text() == "Body"

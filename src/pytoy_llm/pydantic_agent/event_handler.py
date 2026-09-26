@@ -1,3 +1,15 @@
+"""
+Adapt PydanticAI events and parts into domain-level activities.
+
+Note that `Activity` in pytoy_llm represents a domain-level interaction between the application and the LLM.
+The adapter normalizes multiple PydanticAI representations of the same
+activity. Events are preferred when they directly represent an activity;
+Parts are used only when the corresponding activity is not represented
+by an Event. Streaming control events are not treated as activities
+themselves, and framework-internal events without domain-level meaning
+may be ignored.
+"""
+
 from typing import AsyncIterable
 from uuid import uuid4
 
@@ -15,7 +27,6 @@ from pydantic_ai import (
     RunContext,
     TextPart,
     ThinkingPart,
-    ToolCallPart,
 )
 
 from pytoy_llm.models import LLMEventEmitters, LLMRequest, LLMTokens
@@ -50,7 +61,13 @@ class EventHandler:
         usage = run_result.usage
         prompt = usage.input_tokens
         completion = usage.output_tokens
-        tokens = LLMTokens(prompt=prompt, completion=completion, total=prompt + completion)
+        tokens = LLMTokens(
+            prompt=prompt,
+            completion=completion,
+            total=prompt + completion,
+            cache_read=usage.cache_read_tokens,
+            cache_write=usage.cache_write_tokens,
+        )
         activity = LLMResponseActivity(response=str(run_result.output), tokens=tokens)
         self._event_emitters.emit_activity(activity)
 
@@ -118,14 +135,6 @@ class ActivityAdapter:
                 event = LLMThinkingActivity(
                     trace_id=self._trace_id,
                     content=stream_event.part.content,
-                )
-
-            case ToolCallPart():
-                event = ToolCallActivity(
-                    trace_id=self._trace_id,
-                    call_id=stream_event.part.tool_call_id,
-                    tool_name=stream_event.part.tool_name,
-                    args=stream_event.part.args,
                 )
 
             case _:

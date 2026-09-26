@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Final, Self, Sequence
+from typing import Final, Self, Sequence
 
 from .domain.exceptions import OutsidePathError
 from .domain.readers import DiskFileReader, FileReaderProtocol
 from .note import IdeaNote
 
 
-def default_note_predicator(file_path: Path) -> bool:
+def note_predicator_v1(file_path: Path) -> bool:
     return file_path.suffix == ".md"
 
 
@@ -17,9 +17,9 @@ def _to_path_folder(path: Path):
 
 
 class IdeaSpace:
-    CONVENTION_CANDIDATES: Final[tuple[str, ...]] = (".convention.md", ".index.md", "index.md")
+    CONVENTION_CANDIDATES: Final[tuple[str, ...]] = (".convention.md", ".idea_space_convention.md")
     SPACE_META_NAME: Final[str] = ".space_meta"
-    ROOT_FILE_NAME: Final[str] = ".idea_space_root"
+    ROOT_MARKER_FILE_NAME: Final[str] = ".idea_space_root"
 
     def __init__(
         self,
@@ -27,12 +27,10 @@ class IdeaSpace:
         *,
         root: str | Path | None = None,
         file_reader: FileReaderProtocol | None = None,
-        note_predicator: Callable[[Path], bool] | None = None,
         ensure_root_marker: bool = False,
     ) -> None:
         path = Path(path)
         file_reader = file_reader or DiskFileReader()
-        note_predicator = note_predicator or default_note_predicator
 
         if root is None:
             path = path.resolve()
@@ -44,13 +42,13 @@ class IdeaSpace:
         if not path.is_relative_to(root):
             raise OutsidePathError(f"Space must be inside root: path={path}, root={root}")
         if path.exists() and not path.is_dir():
-            raise ValueError(f"Space path must be a folder: {path}")
-        path.mkdir(exist_ok=True, parents=True)
+            raise ValueError(f"Space path must be a folder, not a: `{path=}`")
 
         self._root = Path(root)
         self._relative_path = path.relative_to(root)
         self._file_reader = file_reader
-        self._note_predicator = note_predicator
+        self._note_predicator = note_predicator_v1
+
         if ensure_root_marker:
             self.ensure_root_marker()
 
@@ -61,18 +59,32 @@ class IdeaSpace:
         root: str | Path | None = None,
         *,
         file_reader: FileReaderProtocol | None = None,
-        note_predicator: Callable[[Path], bool] | None = None,
-        ensure_marker: bool = False,
+        with_creation: bool = False,
+        ensure_root_marker: bool = False,
     ) -> Self:
-
         path = Path(path)
+        path, root = cls._normalize_paths(path, root)
+
+        if with_creation:
+            path.mkdir(exist_ok=True, parents=True)
+
         return cls(
             path=path,
             root=root,
             file_reader=file_reader,
-            note_predicator=note_predicator,
-            ensure_root_marker=ensure_marker,
+            ensure_root_marker=ensure_root_marker,
         )
+
+    @classmethod
+    def _normalize_paths(cls, path: str | Path, root: str | Path | None) -> tuple[Path, Path]:
+        path = Path(path)
+        if root is None:
+            path = path.resolve()
+            root = root or cls.find_idea_space_root_path(path)
+        else:
+            root = Path(root).resolve()
+            path = (root / path).resolve() if not path.is_absolute() else path.resolve()
+        return (path, root)
 
     def resolve(self, path: str | Path) -> Path:
         """Return the absolute path (file_path).
@@ -107,7 +119,6 @@ class IdeaSpace:
             path=self._relative_path.parent,
             root=self._root,
             file_reader=self._file_reader,
-            note_predicator=self._note_predicator,
         )
 
     @property
@@ -143,7 +154,6 @@ class IdeaSpace:
                             path=child,
                             root=self.root,
                             file_reader=self._file_reader,
-                            note_predicator=self._note_predicator,
                         )
                     )
                     visit(child, current_depth + 1)
@@ -184,7 +194,7 @@ class IdeaSpace:
         return folder_path.name == self.SPACE_META_NAME
 
     def ensure_root_marker(self) -> None:
-        (self.root / self.ROOT_FILE_NAME).touch()
+        (self.root / self.ROOT_MARKER_FILE_NAME).touch()
 
     @classmethod
     def find_idea_space_root_path(cls, start_path: Path | str) -> Path:
@@ -197,7 +207,7 @@ class IdeaSpace:
 
         current = start_folder
         while True:
-            if (current / cls.ROOT_FILE_NAME).exists():
+            if (current / cls.ROOT_MARKER_FILE_NAME).exists():
                 return current
 
             parent = current.parent

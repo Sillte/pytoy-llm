@@ -25,13 +25,8 @@ class IdeaGraph:
         root: Path,
         *,
         file_reader: FileReaderProtocol | None = None,
-        note_predicator: Callable[[Path], bool] | None = None,
     ) -> Self:
-        return cls(
-            space=IdeaSpace.from_path(
-                path=root, root=root, file_reader=file_reader, note_predicator=note_predicator
-            )
-        )
+        return cls(space=IdeaSpace.from_path(path=root, root=root, file_reader=file_reader))
 
     @classmethod
     def from_note(
@@ -46,7 +41,6 @@ class IdeaGraph:
                 path=note.root,
                 root=note.root,
                 file_reader=file_reader,
-                note_predicator=note_predicator,
             )
         )
 
@@ -65,6 +59,12 @@ class IdeaGraph:
     def resolve_links(
         self, source_note: IdeaNote, *, only_valid: bool = True
     ) -> Sequence[IdeaLink | UnresolvedIdeaLink]:
+        """Resolve links contained in ``source_note``.
+
+        Links that cannot be resolved because their targets are invalid or
+        inaccessible are returned as ``UnresolvedIdeaLink`` values. They do
+        not raise an exception.
+        """
         resolver = self._resolver
         inner_links = []
         for link_source in source_note.link_sources:

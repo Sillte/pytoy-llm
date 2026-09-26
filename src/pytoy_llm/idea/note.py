@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self, Sequence
 
+from pytoy_llm.idea.domain.exceptions import (
+    MetadataSerializationError,
+)
 from pytoy_llm.idea.domain.links import LinkSource, LinkSourceExtractor
 from pytoy_llm.idea.domain.metadata import MetaDataProtocol
 from pytoy_llm.idea.domain.readers import (
@@ -89,12 +92,18 @@ def _to_text(metadata: MetaDataProtocol, body: str) -> str:
         YAML
         ---
         Markdown body
+
+    If metadata cannot be serialized, return the body instead of
+    propagating the metadata serialization error.
     """
 
     if len(metadata) == 0:
         return body
 
-    yaml_text = metadata.as_text().rstrip("\r\n")
+    try:
+        yaml_text = metadata.as_text().rstrip("\r\n")
+    except MetadataSerializationError:
+        return body
     return f"---\n{yaml_text}\n---\n{body}"
 
 
@@ -135,6 +144,13 @@ class IdeaNote:
         *,
         link_source_extractor: LinkSourceExtractor | None = None,
     ) -> None:
+        """Create an IdeaNote from source text.
+
+        Raises:
+            PermissionError: If ``path`` is outside ``root``.
+            MetadataDeserializationError: If the source text contains invalid
+                YAML front matter.
+        """
         path = Path(path)
         root = root.resolve()
         path = (root / path).resolve() if not path.is_absolute() else path.resolve()
@@ -159,8 +175,13 @@ class IdeaNote:
         link_source_extractor: LinkSourceExtractor | None = None,
         file_reader: FileReaderProtocol | None = None,
     ) -> Self:
-        """
-        Parse an IdeaNote from the original document.
+        """Parse an IdeaNote from the original document.
+
+        Raises:
+            OSError: If the document cannot be read by ``file_reader``.
+            PermissionError: If ``file_path`` is outside ``root``.
+            MetadataDeserializationError: If the document contains invalid YAML
+                front matter.
         """
         file_path = Path(file_path)
         file_reader = file_reader or DiskFileReader()
@@ -180,6 +201,11 @@ class IdeaNote:
         *,
         link_source_extractor: LinkSourceExtractor | None = None,
     ) -> Self:
+        """Create an IdeaNote from a body and optional metadata.
+
+        Raises:
+            PermissionError: If ``file_path`` is outside ``root``.
+        """
         metadata = metadata or YamlRockWrapper()
         text = _to_text(metadata, body)
         root = root or file_path.parent
@@ -227,11 +253,21 @@ class IdeaNote:
             YAML
             ---
             Markdown body
+
+        If the metadata cannot be serialized, only the Markdown ``body`` is
+        returned and the metadata is omitted.
         """
         return _to_text(self._metadata, self._body)
 
     def write(self, file_writer: FileWriterProtocol | None = None) -> None:
-        """Write the serialized note to :attr:`file_path`."""
+        """Write the serialized note to :attr:`file_path`.
+
+        If the metadata cannot be serialized, only the Markdown body is
+        written and the metadata is omitted.
+
+        Raises:
+            OSError: If ``file_writer`` cannot write the document.
+        """
         file_writer = file_writer or DiskFileWriter()
         file_writer.write(self.to_text(), self.file_path)
 
