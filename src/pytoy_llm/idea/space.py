@@ -130,6 +130,14 @@ class IdeaSpace:
         return self._root
 
     @property
+    def root_space(self) -> Self:
+        return self.from_path(
+            path=self.root,
+            root=self.root,
+            file_reader=self._file_reader,
+        )
+
+    @property
     def parent(self) -> "IdeaSpace":
         return IdeaSpace(
             path=self._relative_path.parent,

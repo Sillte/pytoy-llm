@@ -25,3 +25,16 @@ def test_space_only_treats_markdown_files_as_notes_in_subspaces(tmp_path: Path) 
     space = IdeaSpace(tmp_path)
 
     assert [note.path for note in space.get_subspaces()[0].get_notes()] == ["nested/note.md"]
+
+
+def test_root_space_returns_root_level_space_without_creating_it(tmp_path: Path) -> None:
+    nested = tmp_path / "nested"
+    space = IdeaSpace.from_path(nested, root=tmp_path, with_creation=True)
+
+    root_space = space.root_space
+
+    assert root_space.root == tmp_path
+    assert root_space.folder_path == tmp_path
+    assert root_space.path == "."
+    assert nested.exists()
+    assert not (tmp_path / IdeaSpace.ROOT_MARKER_FILE_NAME).exists()
