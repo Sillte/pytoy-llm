@@ -76,6 +76,22 @@ class IdeaSpace:
         )
 
     @classmethod
+    def from_note(
+        cls,
+        note: IdeaNote | str | Path,
+        *,
+        ensure_root_marker: bool = False,
+    ) -> Self:
+        if not isinstance(note, IdeaNote):
+            note = IdeaNote.from_path(note)
+        return cls.from_path(
+            path=note.file_path.parent,
+            root=note.root,
+            file_reader=note.file_reader,
+            ensure_root_marker=ensure_root_marker,
+        )
+
+    @classmethod
     def _normalize_paths(cls, path: str | Path, root: str | Path | None) -> tuple[Path, Path]:
         path = Path(path)
         if root is None:

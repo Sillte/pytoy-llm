@@ -165,6 +165,7 @@ class IdeaNote:
         self._body = interpreted_result.body
         self._body_start_line = interpreted_result.body_start_line
         self._link_source_extractor = link_source_extractor
+        self._file_reader: FileReaderProtocol = DiskFileReader()
 
     @classmethod
     def from_path(
@@ -187,9 +188,11 @@ class IdeaNote:
         file_reader = file_reader or DiskFileReader()
         text = file_reader.read(file_path)
         root = root or file_path.parent
-        return cls(
+        note = cls(
             text=text, path=file_path, root=root, link_source_extractor=link_source_extractor
         )
+        note._file_reader = file_reader
+        return note
 
     @classmethod
     def create(
@@ -216,6 +219,10 @@ class IdeaNote:
     @property
     def path(self) -> str:
         return self._relative_path.as_posix()
+
+    @property
+    def file_reader(self) -> FileReaderProtocol:
+        return self._file_reader
 
     @property
     def file_path(self) -> Path:

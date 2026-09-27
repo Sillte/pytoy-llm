@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, Self, Sequence, overload
+from typing import Self, Sequence, overload
 
 from .domain.links import (
     IdeaLink,
@@ -34,7 +34,6 @@ class IdeaGraph:
         note: IdeaNote,
         *,
         file_reader: FileReaderProtocol | None = None,
-        note_predicator: Callable[[Path], bool] | None = None,
     ) -> Self:
         return cls(
             space=IdeaSpace.from_path(
