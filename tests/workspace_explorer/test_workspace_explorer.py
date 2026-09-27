@@ -5,7 +5,9 @@ import pytest
 from pytoy_llm.tools import WorkspaceExplorer
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import (
+    DirectoryInfo,
     FileContent,
+    FileInfo,
     FilePartContent,
     PartialFilesReadResult,
     WorkspaceAccess,
@@ -95,7 +97,12 @@ def test_discovery_returns_workspace_relative_paths(tmp_path: Path) -> None:
     found = explorer.discovery.workspace_find_directories_and_files("src", patterns="*.py")
 
     assert not isinstance(found, ToolError)
-    assert [item.workspace_file_path for item in found] == ["src/main.py"]
+    file_paths = set(elem.workspace_file_path for elem in found if isinstance(elem, FileInfo))
+    directory_paths = set(
+        elem.workspace_directory_path for elem in found if isinstance(elem, DirectoryInfo)
+    )
+    assert set(file_paths) == set(["src/main.py"])
+    assert set(directory_paths) == set()
 
 
 def test_search_returns_workspace_relative_paths(tmp_path: Path) -> None:
@@ -111,15 +118,24 @@ def test_search_returns_workspace_relative_paths(tmp_path: Path) -> None:
     assert matches[0].matches[0].line == 0
 
 
-def test_empty_excludes_allow_matching_ignored_directory(tmp_path: Path) -> None:
-    (tmp_path / "ignored").mkdir()
-    (tmp_path / "ignored" / "config").write_text("needle\n", encoding="utf-8")
+def test_empty_excludes_allow_matching_any_directory(tmp_path: Path) -> None:
+    (tmp_path / "any").mkdir()
+    (tmp_path / "any" / "sub").mkdir()
+    (tmp_path / "any" / "config").write_text("needle\n", encoding="utf-8")
     explorer = WorkspaceExplorer.from_any(tmp_path, excludes=[])
 
-    found = explorer.discovery.workspace_find_directories_and_files(".", patterns="ignored/*")
+    found = explorer.discovery.workspace_find_directories_and_files(".", patterns="any/*")
 
     assert not isinstance(found, ToolError)
-    assert any(item.workspace_file_path == "ignored/config" for item in found)
+    assert "any/config" in set(
+        elem.workspace_file_path for elem in found if isinstance(elem, FileInfo)
+    )
+    assert "any" not in set(
+        elem.workspace_directory_path for elem in found if isinstance(elem, DirectoryInfo)
+    )
+    assert "any/sub" in set(
+        elem.workspace_directory_path for elem in found if isinstance(elem, DirectoryInfo)
+    )
 
 
 def test_inspection_returns_resource_limit_for_oversized_file(tmp_path: Path) -> None:
