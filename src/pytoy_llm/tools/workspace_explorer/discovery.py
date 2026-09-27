@@ -6,17 +6,12 @@ from pydantic import Field
 from pytoy_llm.foundation.paths import PathGatherer, PathTree
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import DirectoryInfo, FileInfo, WorkspaceAccess
-from pytoy_llm.tools.workspace_explorer.semantic_types import GlobPattern, MaxResults, WorkspacePath
-
-DEFAULT_EXCLUDE_PATTERNS = [
-    ".venv",
-    "node_modules",
-    ".git",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    "__pycache__",
-]
+from pytoy_llm.tools.workspace_explorer.semantic_types import (
+    GlobPattern,
+    MaxResults,
+    WorkspaceDirectoryPath,
+    WorkspaceDirectoryPivot,
+)
 
 
 class WorkspaceDiscovery:
@@ -43,38 +38,21 @@ class WorkspaceDiscovery:
     def tools(
         self,
     ):
-        return [self.find_paths, self.tree, self.recent_files]
+        return [self.workspace_find_directories_and_files, self.workspace_tree, self.recent_files]
 
-    def find_paths(
+    def workspace_find_directories_and_files(
         self,
-        collection_root: WorkspacePath,
+        collection_root: WorkspaceDirectoryPivot,
         patterns: Annotated[
             GlobPattern | Sequence[GlobPattern],
             Field(description="Glob pattern matched against paths relative to `collection_root`."),
         ] = ("*",),
-    ) -> list[FileInfo | DirectoryInfo] | ToolError:
+    ) -> list[DirectoryInfo | FileInfo] | ToolError:
+        """Find directories and files matching glob patterns under a directory.
+
+        Returns metadata for matching paths without reading file contents.
         """
-        Find files and directories matching a glob pattern within the workspace.
 
-        Use this tool to discover candidate paths before inspecting their contents.
-        It returns path metadata only; file contents are not read or included.
-
-        Args:
-            collection_root:
-                Directory relative to the workspace root from which the search starts.
-                Returned paths are relative to the workspace root.
-
-            patterns:
-                Glob pattern or glob patterns matched against paths relative to `collection_root`.
-
-        Returns:
-            A list of `FileInfo` and `DirectoryInfo` objects matching the pattern.
-
-        Notes:
-            - Paths outside the workspace are never accessible.
-            - The search traverses the collection root recursively.
-            - File contents are never read or included.
-        """
         if isinstance(patterns, str):
             patterns = [patterns]
 
@@ -128,18 +106,13 @@ class WorkspaceDiscovery:
                 msg=f"Could not read metadata under `{collection_root}`: {e}",
             )
 
-    def tree(
+    def workspace_tree(
         self,
-        collection_root: WorkspacePath = ".",
+        collection_root: WorkspaceDirectoryPath = ".",
     ) -> str | ToolError:
-        """
-        Render a workspace-relative tree for paths under a collection root.
+        """Render the directory and file structure under a workspace directory.
 
-        Paths are collected recursively from `collection_root`, while the
-        resulting tree is structured relative to the workspace root.
-
-        Use this tool to understand the structure of a workspace or a specific
-        directory before investigating individual files.
+        Use this to inspect workspace structure without reading file contents.
 
         Args:
             collection_root:
@@ -150,19 +123,10 @@ class WorkspaceDiscovery:
             A plain-text directory tree containing paths under `collection_root`,
             represented relative to the workspace root, or a `ToolError` if the
             collection root is invalid.
-
-        Notes:
-            - Paths outside the workspace are never accessible.
-            - File contents are never read or included.
         """
-        try:
-            root = self.access.resolve(collection_root)
-            if isinstance(root, ToolError):
-                return root
-        except Exception as e:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT, msg=f"Invalid `{collection_root=}`; {e}"
-            )
+        root = self.access.resolve(collection_root)
+        if isinstance(root, ToolError):
+            return root
 
         try:
             paths = tuple(
@@ -222,28 +186,13 @@ class WorkspaceDiscovery:
 
     def recent_files(
         self,
-        collection_root: WorkspacePath = ".",
+        collection_root: WorkspaceDirectoryPath = ".",
         max_results: MaxResults = 10,
     ) -> list[FileInfo] | ToolError:
+        """Find the most recently modified files under a workspace directory.
+
+        Results are sorted by modification time, newest first.
         """
-        Find recently modified files within the workspace.
-
-        Use this tool to identify files that have been modified most recently,
-        especially when investigating recent work or deciding where to inspect first.
-
-        FileInfos are sorted by last modification time in descending order.
-
-        Args:
-            collection_root:
-                Directory relative to the workspace root from which the search starts.
-
-            max_results:
-                Maximum number of files to return.
-
-        Returns:
-            FileInfo objects sorted from newest to oldest by modification time.
-        """
-
         root = self.access.resolve(collection_root)
         if isinstance(root, ToolError):
             return root
@@ -273,7 +222,7 @@ class WorkspaceDiscovery:
         try:
             file_infos = sorted(
                 (FileInfo.from_absolute_path(path, self.workspace) for path in paths),
-                key=lambda file_info: file_info.modified,
+                key=lambda file_info: file_info.modified_at,
                 reverse=True,
             )
         except PermissionError as e:
@@ -292,4 +241,4 @@ class WorkspaceDiscovery:
 
 if __name__ == "__main__":
     explorer = WorkspaceDiscovery.from_any(Path("../../../../"))
-    print(explorer.tree("."))
+    print(explorer.workspace_tree("."))

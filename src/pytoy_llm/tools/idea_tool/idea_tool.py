@@ -66,7 +66,8 @@ def build_idea_note_model(
                         reference_path = target_file_path.relative_to(workspace_root).as_posix()
                         local_links.append(
                             LocalLinkModel(
-                                idea_note_path=idea_note.idea_path, workspace_path=reference_path
+                                idea_note_path=idea_note.idea_path,
+                                workspace_file_path=reference_path,
                             )
                         )
                     else:

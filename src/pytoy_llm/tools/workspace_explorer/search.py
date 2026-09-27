@@ -12,7 +12,8 @@ from pytoy_llm.tools.workspace_explorer.semantic_types import (
     MaxBytes,
     MaxResults,
     SearchPattern,
-    WorkspacePath,
+    WorkspaceDirectoryPivot,
+    WorkspaceFilePath,
 )
 
 
@@ -40,15 +41,15 @@ class WorkspaceSearch:
     def tools(
         self,
     ):
-        return [self.grep_context]
+        return [self.workspace_grep_context]
 
-    def grep_context(
+    def workspace_grep_context(
         self,
         search_patterns: Annotated[
             SearchPattern | Sequence[SearchPattern],
             Field(description="Search patterns are combined with OR semantics."),
         ],
-        collection_root: WorkspacePath = ".",
+        collection_root: WorkspaceDirectoryPivot = ".",
         file_patterns: Annotated[
             GlobPattern | Sequence[GlobPattern],
             Field(description="Glob patterns matched against paths relative to `collection_root`."),
@@ -110,7 +111,7 @@ class WorkspaceSearch:
                 Overlapping or adjacent context ranges are merged.
 
             max_results:
-                Maximum number of matching lines to include in the result.
+                Maximum number of matching lines to include before grouping them into context ranges.
                 The limit is applied before matching lines are grouped into
                 GrepMatchContext objects, so the number of returned contexts may
                 be smaller than max_results.
@@ -164,14 +165,14 @@ class WorkspaceSearch:
             return file_paths
 
         if regex:
-            matches = self._grep_context_by_regex(
+            matches = self._grep_by_regex(
                 search_patterns=search_patterns,
                 paths=file_paths,
                 case_sensitive=case_sensitive,
                 max_file_bytes=max_file_bytes,
             )
         else:
-            matches = self._grep_context_by_text(
+            matches = self._grep_by_text(
                 search_patterns=search_patterns,
                 paths=file_paths,
                 case_sensitive=case_sensitive,
@@ -183,13 +184,13 @@ class WorkspaceSearch:
             matches[:max_results], context_lines=context_lines, max_file_bytes=max_file_bytes
         )
 
-    def _grep_context_by_regex(
+    def _grep_by_regex(
         self,
         search_patterns: Annotated[
             Sequence[SearchPattern],
             Field(description="Search patterns are combined with OR semantics."),
         ],
-        paths: Sequence[WorkspacePath],
+        paths: Sequence[WorkspaceFilePath],
         case_sensitive: Annotated[
             bool,
             Field(description="Whether the search is case-sensitive."),
@@ -219,7 +220,7 @@ class WorkspaceSearch:
 
     def _get_matched_by_regex(
         self,
-        path: WorkspacePath,
+        path: WorkspaceFilePath,
         patterns: Sequence[re.Pattern[str]],
         max_file_bytes: MaxBytes | None = None,
     ) -> Sequence[GrepMatch]:
@@ -238,7 +239,7 @@ class WorkspaceSearch:
                 if match:
                     results.append(
                         GrepMatch(
-                            path=path,
+                            workspace_file_path=path,
                             line=lineno,
                             column=match.start(),
                             text=line,
@@ -247,10 +248,10 @@ class WorkspaceSearch:
                     break
         return results
 
-    def _grep_context_by_text(
+    def _grep_by_text(
         self,
         search_patterns: Sequence[SearchPattern],
-        paths: Sequence[WorkspacePath],
+        paths: Sequence[WorkspaceFilePath],
         case_sensitive: bool = False,
         max_file_bytes: MaxBytes | None = None,
     ) -> Sequence[GrepMatch]:
@@ -269,7 +270,7 @@ class WorkspaceSearch:
 
     def _get_matched_by_text(
         self,
-        path: WorkspacePath,
+        path: WorkspaceFilePath,
         patterns: Sequence[SearchPattern],
         case_sensitive: bool = False,
         max_file_bytes: MaxBytes | None = None,
@@ -291,7 +292,7 @@ class WorkspaceSearch:
                 if idx != -1:
                     results.append(
                         GrepMatch(
-                            path=path,
+                            workspace_file_path=path,
                             line=lineno,
                             column=idx,
                             text=line,
@@ -305,7 +306,7 @@ class WorkspaceSearch:
     ) -> Sequence[GrepMatchContext] | ToolError:
         matches_by_path = {}
         for match in matches:
-            matches_by_path.setdefault(match.path, []).append(match)
+            matches_by_path.setdefault(match.workspace_file_path, []).append(match)
 
         contexts: list[GrepMatchContext] = []
 
@@ -326,7 +327,7 @@ class WorkspaceSearch:
             return []
 
         matches = sorted(matches, key=lambda match: match.line)
-        workspace_path = matches[0].path
+        workspace_path = matches[0].workspace_file_path
 
         content = self.access.read_text(workspace_path, max_bytes=max_file_bytes)
         if isinstance(content, ToolError):
@@ -374,7 +375,7 @@ class WorkspaceSearch:
             content = "".join(lines[start_line:end_line])
             contexts.append(
                 GrepMatchContext(
-                    path=workspace_path,
+                    workspace_file_path=workspace_path,
                     content=content,
                     start_line=start_line,
                     end_line=end_line,

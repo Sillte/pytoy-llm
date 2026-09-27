@@ -8,7 +8,11 @@ from pytoy_llm.tools.workspace_explorer.models import (
     PartialFilesReadResult,
     WorkspaceAccess,
 )
-from pytoy_llm.tools.workspace_explorer.semantic_types import LineNumber, MaxBytes, WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import (
+    LineNumber,
+    MaxBytes,
+    WorkspaceFilePath,
+)
 
 
 class WorkspaceInspection:
@@ -33,11 +37,15 @@ class WorkspaceInspection:
 
     @property
     def tools(self):
-        return [self.read_text_file, self.read_text_files, self.read_text_file_range]
+        return [
+            self.workspace_read_text_file,
+            self.workspace_read_text_files,
+            self.workspace_read_text_file_range,
+        ]
 
-    def read_text_file(
+    def workspace_read_text_file(
         self,
-        path: WorkspacePath,
+        workspace_file_path: WorkspaceFilePath,
         max_lines: int | None = 20,
         max_bytes: MaxBytes | None = 1_000_000,
     ) -> FilePartContent | FileContent | ToolError:
@@ -48,14 +56,11 @@ class WorkspaceInspection:
         large files bounded. If the file is longer than `max_lines`, the
         result is `FilePartContent`, not the complete file.
 
-        Set `max_lines` to be `null` to request the entire file.
-
-        Use `read_text_file_range` when you need a specific line range rather
-        than the beginning of the file.
+        Set `max_lines` to `null` to request the entire file.
 
         Args:
-            path:
-                Path relative to the workspace root.
+            workspace_file_path:
+                File path relative to the workspace root.
 
             max_lines:
                 Maximum number of lines to read.
@@ -63,23 +68,14 @@ class WorkspaceInspection:
                 - null: read the entire file.
 
             max_bytes:
-                Acceptable maximum size of the file in bytes.
-                - integer: If the file exceeds `max_bytes`, return `ToolError`.
-                - null: No file-size limit is applied.
+                Maximum acceptable file size in bytes.
+                - integer: return `ToolError` if the file exceeds this limit.
+                - null: no file-size limit is applied.
 
         Returns:
-            FileContent:
-                The complete file contents.
-
-            FilePartContent:
-                The first `max_lines` lines of the file.
-
-            ToolError:
-                When the file does not exist, is outside the workspace,
-                cannot be read, or the argument is invalid.
-
-        Notes:
-            - This tool does NOT accept `start_line` nor `end_line` unlike `read_text_file_range`.
+            FileContent when the complete file is returned.
+            FilePartContent when only the first `max_lines` lines are returned.
+            ToolError when the file cannot be read or the arguments are invalid.
         """
         if max_lines is not None and max_lines < 1:
             return ToolError(
@@ -94,35 +90,36 @@ class WorkspaceInspection:
                 retry=False,
             )
 
-        text = self.access.read_text(path, max_bytes=max_bytes)
+        text = self.access.read_text(workspace_file_path, max_bytes=max_bytes)
         if isinstance(text, ToolError):
             return text
         if max_lines is None:
-            return FileContent(path=path, content=text)
+            return FileContent(workspace_file_path=workspace_file_path, content=text)
         lines = text.splitlines(keepends=True)
         if len(lines) <= max_lines:
-            return FileContent(path=path, content=text)
+            return FileContent(workspace_file_path=workspace_file_path, content=text)
         return FilePartContent(
-            path=path, content="".join(lines[:max_lines]), start_line=0, end_line=max_lines
+            workspace_file_path=workspace_file_path,
+            content="".join(lines[:max_lines]),
+            start_line=0,
+            end_line=max_lines,
         )
 
-    def read_text_files(
+    def workspace_read_text_files(
         self,
-        paths: Sequence[WorkspacePath],
+        workspace_file_paths: Sequence[WorkspaceFilePath],
         max_lines: int | None = 10,
         max_bytes: MaxBytes | None = 1_000_000,
     ) -> list[FileContent | FilePartContent] | PartialFilesReadResult | ToolError:
-        """
-        Read the beginning of multiple text files, or the entire files when requested.
+        """Read the beginning of multiple text files, or the complete files when requested.
 
-        The same `max_lines` limit is applied independently to each file.
-        If a file is longer than `max_lines`, its result is `FilePartContent`
-        rather than the complete file.
+        The `max_lines` and `max_bytes` limits are applied independently to each file.
+        If any file fails, successful and failed results are returned separately.
 
-        Set `max_lines=null` to request the complete contents of every file.
+        Set `max_lines` to `null` to request the complete contents of every file.
 
         Args:
-            paths:
+            workspace_file_paths:
                 File paths relative to the workspace root.
 
             max_lines:
@@ -130,20 +127,16 @@ class WorkspaceInspection:
                 - null: read the entire file.
 
             max_bytes:
-                Acceptable maximum size of the file in bytes.
+                Maximum acceptable file size in bytes.
                 - integer: If the file exceeds `max_bytes`, return `ToolError`.
                 - null: No file-size limit is applied.
 
         Returns:
-            A list containing FileContent or FilePartContent for each
-            requested file, in the same order as `paths`.
+            A list of file contents when all requested files are read successfully.
 
-            ToolError when:
-                - Entire operation is invalid.
+            PartialFilesReadResult when one or more files cannot be read.
 
-            PartialFilesReadResult when:
-                - At least one file failed to be read. Successful and failed
-                  file results are returned separately.
+            ToolError when the entire operation is invalid.
 
         Notes:
             - The line limit applies independently to each file.
@@ -165,11 +158,11 @@ class WorkspaceInspection:
             )
 
         successes: list[FileContent | FilePartContent] = []
-        failures: dict[WorkspacePath, ToolError] = {}
+        failures: dict[WorkspaceFilePath, ToolError] = {}
 
-        for path in paths:
-            result = self.read_text_file(
-                path=path,
+        for path in workspace_file_paths:
+            result = self.workspace_read_text_file(
+                workspace_file_path=path,
                 max_lines=max_lines,
                 max_bytes=max_bytes,
             )
@@ -184,9 +177,9 @@ class WorkspaceInspection:
         else:
             return successes
 
-    def read_text_file_range(
+    def workspace_read_text_file_range(
         self,
-        path: WorkspacePath,
+        workspace_file_path: WorkspaceFilePath,
         start_line: LineNumber,
         end_line: LineNumber,
     ) -> FilePartContent | ToolError:
@@ -200,26 +193,19 @@ class WorkspaceInspection:
         `start_line` is zero-based and inclusive.
         `end_line` is zero-based and exclusive.
 
-        Unlike `read_text_file`, this tool returns only the requested line range.
-
         Args:
-            path:
-                Path relative to the workspace root.
+            workspace_file_path:
+                File path relative to the workspace root.
 
             start_line:
-                the start line number of the range. Zero-based and inclusive.
+                Zero-based start line of the range, inclusive.
 
             end_line:
-                the end line number of the range. Zero-based and exclusive.
+                Zero-based end line of the range, exclusive.
 
         Returns:
-            FilePartContent containing the requested partial file content.
-            Start_line is inclusive and end_line is exclusive.
-
-        ToolError when:
-            - the file does not exist
-            - the file is outside the workspace
-            - the operation cannot be completed
+            FilePartContent containing the requested line range.
+            ToolError if the file cannot be read or the range is invalid.
         """
         if end_line <= start_line:
             return ToolError(
@@ -227,12 +213,7 @@ class WorkspaceInspection:
                 msg="end_line must be greater than start_line.",
                 retry=False,
             )
-        if start_line < 0:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg="start_line must be a non-negative integer.",
-            )
-        text = self.access.read_text(path, max_bytes=None)
+        text = self.access.read_text(workspace_file_path, max_bytes=None)
         if isinstance(text, ToolError):
             return text
 
@@ -243,7 +224,7 @@ class WorkspaceInspection:
                 msg=f"`{end_line=}` is out of range; the file has {len(lines)} lines.",
             )
         return FilePartContent(
-            path=path,
+            workspace_file_path=workspace_file_path,
             content="".join(lines[start_line:end_line]),
             start_line=start_line,
             end_line=end_line,

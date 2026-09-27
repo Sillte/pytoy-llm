@@ -2,13 +2,52 @@ from typing import Annotated
 
 from pydantic import Field
 
-WorkspacePath = Annotated[
+WorkspaceFilePath = Annotated[
     str,
     Field(
         description=(
-            "Path relative to the workspace root. The path must never escape the workspace."
+            "Path to a file inside the configured workspace, relative to the workspace root. "
+            "The path must not escape the workspace."
         ),
-        examples=["./", "src", "src/pytoy_llm/api.py"],
+        examples=[
+            "README.md",
+            "src/pytoy_llm/api.py",
+            "tests/test_api.py",
+        ],
+    ),
+]
+
+
+WorkspaceDirectoryPath = Annotated[
+    str,
+    Field(
+        description=(
+            "Path to a directory inside the configured workspace, relative to the workspace root. "
+            "Use `.` for the workspace root. "
+            "The path must not escape the workspace."
+        ),
+        examples=[
+            ".",
+            "src",
+            "src/pytoy_llm",
+        ],
+    ),
+]
+
+
+WorkspaceDirectoryPivot = Annotated[
+    WorkspaceDirectoryPath,
+    Field(
+        description=(
+            "Starting directory for an operation in the workspace. "
+            "The path is relative to the workspace root. "
+            "Use `.` to represent the workspace root itself."
+        ),
+        examples=[
+            ".",
+            "src",
+            "src/pytoy_llm",
+        ],
     ),
 ]
 

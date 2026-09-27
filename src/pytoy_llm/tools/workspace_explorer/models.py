@@ -1,59 +1,70 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Self, Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 from pytoy_llm.foundation.paths import PathGatherer
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
-from pytoy_llm.tools.workspace_explorer.semantic_types import MaxBytes, WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import (
+    FileGlob,
+    LineNumber,
+    MaxBytes,
+    WorkspaceDirectoryPath,
+    WorkspaceDirectoryPivot,
+    WorkspaceFilePath,
+)
 
 
 class FileInfo(BaseModel, frozen=True):
     """Metadata of a file inside the workspace."""
 
-    path: WorkspacePath = Field(description="Relative path from the workspace root.")
+    workspace_file_path: WorkspaceFilePath = Field(
+        description="Relative path from the workspace root."
+    )
     size: int = Field(description="File size in bytes.")
 
-    modified: datetime = Field(description="Last modification timestamp.")
+    modified_at: AwareDatetime = Field(description="Last modification timestamp.")
 
     @classmethod
-    def from_relative_path(cls, relative_path: WorkspacePath, workspace_root: Path) -> "FileInfo":
+    def from_relative_path(cls, relative_path: WorkspaceFilePath, workspace_root: Path) -> Self:
         abs_path = workspace_root / relative_path
         stat = abs_path.stat()
         return cls(
-            path=abs_path.relative_to(workspace_root).as_posix(),
+            workspace_file_path=abs_path.relative_to(workspace_root).as_posix(),
             size=stat.st_size,
-            modified=datetime.fromtimestamp(stat.st_mtime),
+            modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
         )
 
     @classmethod
-    def from_absolute_path(cls, absolute_path: Path, workspace_root: Path) -> "FileInfo":
+    def from_absolute_path(cls, absolute_path: Path, workspace_root: Path) -> Self:
         absolute_path = Path(absolute_path)
         stat = absolute_path.stat()
         return cls(
-            path=absolute_path.relative_to(workspace_root).as_posix(),
+            workspace_file_path=absolute_path.relative_to(workspace_root).as_posix(),
             size=stat.st_size,
-            modified=datetime.fromtimestamp(stat.st_mtime),
+            modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
         )
 
 
 class DirectoryInfo(BaseModel, frozen=True):
     """Metadata of a directory inside the workspace."""
 
-    path: WorkspacePath = Field(description="Relative path from the workspace root.")
-    modified: datetime = Field(description="Last modification timestamp.")
+    workspace_directory_path: WorkspaceDirectoryPath = Field(
+        description="Relative path from the workspace root."
+    )
+    modified_at: AwareDatetime = Field(description="Last modification timestamp.")
 
     @classmethod
     def from_relative_path(
-        cls, relative_path: WorkspacePath, workspace_root: Path
+        cls, relative_path: WorkspaceDirectoryPath, workspace_root: Path
     ) -> "DirectoryInfo":
         abs_path = workspace_root / relative_path
         stat = abs_path.stat()
         return cls(
-            path=abs_path.relative_to(workspace_root).as_posix(),
-            modified=datetime.fromtimestamp(stat.st_mtime),
+            workspace_directory_path=abs_path.relative_to(workspace_root).as_posix(),
+            modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
         )
 
     @classmethod
@@ -61,46 +72,53 @@ class DirectoryInfo(BaseModel, frozen=True):
         absolute_path = Path(absolute_path)
         stat = absolute_path.stat()
         return cls(
-            path=absolute_path.relative_to(workspace_root).as_posix(),
-            modified=datetime.fromtimestamp(stat.st_mtime),
+            workspace_directory_path=absolute_path.relative_to(workspace_root).as_posix(),
+            modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
         )
 
 
 class FileContent(BaseModel, frozen=True):
     """The content of file."""
 
-    path: WorkspacePath = Field(description="Relative path from the workspace root.")
+    workspace_file_path: WorkspaceFilePath = Field(
+        description="Relative path from the workspace root."
+    )
     content: str = Field(description="The content of the file.")
 
 
 class FilePartContent(BaseModel, frozen=True):
-    """The partial content of file, not the entire content of the file."""
+    """A portion of a file."""
 
-    path: WorkspacePath = Field(description="Relative path from the workspace root.")
+    workspace_file_path: WorkspaceFilePath = Field(
+        description="Relative path from the workspace root."
+    )
     content: str = Field(description="The content of the file.")
-    start_line: int = Field(description="The start line number of the content, inclusive.")
-    end_line: int = Field(description="The end line number of the content, exclusive.")
+    start_line: LineNumber = Field(description="The start line number of the content, inclusive.")
+    end_line: LineNumber = Field(description="The end line number of the content, exclusive.")
 
 
 class PartialFilesReadResult(BaseModel, frozen=True):
-    """The result of a batch file-read operation where some files succeeded and others failed."""
+    """The result of a batch file-read operation where one or more files failed."""
 
     status: Literal["partial-success"] = Field(
         default="partial-success",
-        description="Indicates that some requested files were read successfully while others failed.",
+        description=(
+            "Indicates that one or more requested files could not be read; "
+            "successful and failed results are returned separately."
+        ),
     )
     successes: list[FilePartContent | FileContent] = Field(
         description="Success result of file-read."
     )
-    failures: dict[WorkspacePath, ToolError] = Field(description="Failure errors of file-read.")
+    failures: dict[WorkspaceFilePath, ToolError] = Field(description="Failure errors of file-read.")
 
 
 class GrepMatch(BaseModel, frozen=True):
     """One grep match."""
 
-    path: WorkspacePath = Field(description="Relative path of the matched file.")
+    workspace_file_path: WorkspaceFilePath = Field(description="Relative path of the matched file.")
 
-    line: int = Field(description="Zero-based line number.")
+    line: LineNumber = Field(description="Zero-based line number.")
 
     column: int = Field(description="Zero-based column index.")
 
@@ -110,7 +128,7 @@ class GrepMatch(BaseModel, frozen=True):
 class GrepMatchContext(BaseModel, frozen=True):
     """A portion of a file containing one or more grep matches."""
 
-    path: WorkspacePath = Field(description="Relative path of the file.")
+    workspace_file_path: WorkspaceFilePath = Field(description="Relative path of the file.")
 
     content: str = Field(description="The portion of the file surrounding the grep matches.")
 
@@ -123,6 +141,7 @@ class GrepMatchContext(BaseModel, frozen=True):
 
 DEFAULT_EXCLUDED_PATTERNS = frozenset(
     {
+        ".pytoy",
         ".venv",
         "venv",
         "node_modules",
@@ -148,7 +167,7 @@ class WorkspaceAccess:
             excludes = DEFAULT_EXCLUDED_PATTERNS
         return cls(workspace=Path(workspace).resolve(), excludes=excludes)
 
-    def resolve(self, path: WorkspacePath) -> Path | ToolError:
+    def resolve(self, path: WorkspaceDirectoryPath | WorkspaceFilePath) -> Path | ToolError:
         abs_path = (self.workspace / path).resolve(strict=False)
         if not abs_path.is_relative_to(self.workspace):
             return ToolError(
@@ -158,13 +177,15 @@ class WorkspaceAccess:
             )
         return abs_path
 
-    def to_workspace_path(self, path: Path) -> WorkspacePath:
+    def _to_workspace_file_path(self, path: Path) -> WorkspaceFilePath:
         return path.relative_to(self.workspace).as_posix()
 
     def is_within_workspace(self, path: Path) -> bool:
         return path.resolve(strict=False).is_relative_to(self.workspace)
 
-    def read_text(self, path: WorkspacePath, max_bytes: MaxBytes | None = None) -> str | ToolError:
+    def read_text(
+        self, path: WorkspaceFilePath, max_bytes: MaxBytes | None = None
+    ) -> str | ToolError:
         abs_path = self.resolve(path)
         if isinstance(abs_path, ToolError):
             return abs_path
@@ -222,10 +243,10 @@ class WorkspaceAccess:
 
     def gather_file_paths(
         self,
-        collection_root: WorkspacePath,
-        file_patterns: Sequence[str],
+        collection_root: WorkspaceDirectoryPivot,
+        file_globs: Sequence[FileGlob],
         max_file_bytes: MaxBytes | None,
-    ) -> Sequence[WorkspacePath] | ToolError:
+    ) -> Sequence[WorkspaceFilePath] | ToolError:
         root = self.resolve(collection_root)
         if isinstance(root, ToolError):
             return root
@@ -243,15 +264,18 @@ class WorkspaceAccess:
             )
 
         def _is_target_path(path: Path) -> bool:
-            return self.is_within_workspace(path) and (
-                max_file_bytes is None or path.stat().st_size <= max_file_bytes
-            )
+            try:
+                return self.is_within_workspace(path) and (
+                    max_file_bytes is None or path.stat().st_size <= max_file_bytes
+                )
+            except OSError:
+                return False
 
         return tuple(
-            self.to_workspace_path(path)
+            self._to_workspace_file_path(path)
             for path in PathGatherer().gather(
                 root=root,
-                patterns=file_patterns,
+                patterns=file_globs,
                 excludes=self.excludes,
                 target="file",
             )

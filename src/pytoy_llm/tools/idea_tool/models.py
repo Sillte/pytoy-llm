@@ -2,7 +2,7 @@ from typing import Sequence
 
 from pydantic import AwareDatetime, BaseModel, Field
 
-from pytoy_llm.tools.workspace_explorer.semantic_types import WorkspacePath
+from pytoy_llm.tools.workspace_explorer.semantic_types import WorkspaceFilePath
 
 from .semantic_types import IdeaNoteMetadata, IdeaNotePath, IdeaSpacePath
 
@@ -14,7 +14,7 @@ class LocalLinkModel(BaseModel, frozen=True):
         description="Path of the source IdeaNote, relative to the IdeaSpace root.",
         examples=["knowledge/python.md"],
     )
-    workspace_path: WorkspacePath = Field(
+    workspace_file_path: WorkspaceFilePath = Field(
         description="Path of the referenced file, relative to the workspace root.",
         examples=["src/pytoy_llm/idea/note.py"],
     )

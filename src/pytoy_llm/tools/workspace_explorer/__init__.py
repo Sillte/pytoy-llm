@@ -1,12 +1,8 @@
-import fnmatch
-import os
-import re
 from pathlib import Path
 from typing import Annotated, Callable, Final, Self, Sequence
 
 from pydantic import Field
 
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.discovery import WorkspaceDiscovery
 from pytoy_llm.tools.workspace_explorer.inspection import WorkspaceInspection
 from pytoy_llm.tools.workspace_explorer.models import (
@@ -31,6 +27,7 @@ DEFAULT_EXCLUDE_PATTERNS = [
     ".tox",
     ".nox",
     "*.egg-info",
+    ".pytoy",
 ]
 
 
