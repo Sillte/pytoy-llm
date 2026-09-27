@@ -50,24 +50,26 @@ def build_idea_note_model(
         target_file_path = idea_link.target_file_path
         try:
             if target_file_path is not None:
-                if target_file_path.is_relative_to(idea_space.root):
-                    target_path = target_file_path.relative_to(idea_space.root).as_posix()
+                if target_file_path.is_relative_to(idea_space.root_folder_path):
+                    target_path = target_file_path.relative_to(
+                        idea_space.root_folder_path
+                    ).as_posix()
                     note_links.append(
-                        IdeaNoteLinkModel(path=idea_note.path, target_path=target_path)
+                        IdeaNoteLinkModel(path=idea_note.idea_path, target_path=target_path)
                     )
                 else:
                     if workspace_root is not None:
                         reference_path = target_file_path.relative_to(workspace_root).as_posix()
                         local_links.append(
-                            LocalLinkModel(path=idea_note.path, reference_path=reference_path)
+                            LocalLinkModel(path=idea_note.idea_path, reference_path=reference_path)
                         )
                     else:
                         raise ValueError("Workspace is not given here.")
             else:
-                remote_links.append(RemoteLinkModel(path=idea_note.path, uri=idea_link.uri))
+                remote_links.append(RemoteLinkModel(path=idea_note.idea_path, uri=idea_link.uri))
         except (ValueError, TypeError) as exc:
             unresolved_links.append(
-                UnresolvedLinkModel(path=idea_note.path, uri=idea_link.uri, reason=str(exc))
+                UnresolvedLinkModel(path=idea_note.idea_path, uri=idea_link.uri, reason=str(exc))
             )
 
     try:
@@ -84,7 +86,7 @@ def build_idea_note_model(
 
     try:
         return IdeaNoteModel(
-            path=idea_note.path,
+            path=idea_note.idea_path,
             modified_at=modified_at,
             body=idea_note.body,
             metadata=idea_note.metadata.as_dict(),
@@ -323,7 +325,7 @@ class IdeaTool:
         """
         try:
             path = self._idea_space.resolve(pivot)
-            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_folder_path)
             result_spaces = sub_space.get_subspaces(depth=depth)
         except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
@@ -437,7 +439,7 @@ class IdeaTool:
         """
         try:
             path = self._idea_space.resolve(pivot)
-            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_folder_path)
             result_notes = sub_space.get_notes(depth=depth)
         except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
@@ -484,7 +486,7 @@ class IdeaTool:
 
         try:
             path = self._idea_space.resolve(pivot)
-            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_folder_path)
             notes = sub_space.get_notes(depth=depth)
             return {
                 note.file_path.relative_to(self.ideaspace_root).as_posix(): _path_to_aware_datetime(
@@ -521,7 +523,9 @@ class IdeaTool:
                     metadata_by_path[path] = None
                     continue
 
-                idea_note = IdeaNote.from_path(file_path=file_path, root=self._idea_space.root)
+                idea_note = IdeaNote.from_path(
+                    path=file_path, root=self._idea_space.root_folder_path
+                )
             except (FileNotFoundError, OutsidePathError, MetadataDeserializationError):
                 metadata_by_path[path] = None
             except OSError as e:
@@ -553,7 +557,7 @@ class IdeaTool:
                     suggestion="Use `get_note_paths` to get the paths of `IdeaSpaceNote`.",
                 )
 
-            idea_note = IdeaNote.from_path(file_path=file_path, root=self._idea_space.root)
+            idea_note = IdeaNote.from_path(path=file_path, root=self._idea_space.root_folder_path)
             if clear:
                 idea_note.metadata.clear()
             for key, value in metadata.items():
@@ -593,7 +597,7 @@ class IdeaTool:
                     suggestion="Use `get_note_paths` to get the paths of `IdeaSpaceNote`. ",
                 )
 
-            idea_note = IdeaNote.from_path(file_path=file_path, root=self._idea_space.root)
+            idea_note = IdeaNote.from_path(path=file_path, root=self._idea_space.root_folder_path)
         except FileNotFoundError as e:
             return ToolError(
                 kind=ToolErrorKind.NOT_FOUND,
@@ -649,7 +653,9 @@ class IdeaTool:
                     retry=False,
                 )
 
-            idea_note = IdeaNote.create(file_path=file_path, body=body, root=self._idea_space.root)
+            idea_note = IdeaNote.create(
+                file_path=file_path, body=body, root=self._idea_space.root_folder_path
+            )
             for key, value in metadata.items():
                 idea_note.metadata[key] = value
             idea_note.write(self._file_writer)

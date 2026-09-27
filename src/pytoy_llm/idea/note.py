@@ -7,6 +7,7 @@ from pytoy_llm.idea.domain.exceptions import (
 )
 from pytoy_llm.idea.domain.links import LinkSource, LinkSourceExtractor
 from pytoy_llm.idea.domain.metadata import MetaDataProtocol
+from pytoy_llm.idea.domain.path import IdeaPath, resolve_absolute_path, resolve_root_folder_path
 from pytoy_llm.idea.domain.readers import (
     DiskFileReader,
     FileReaderProtocol,
@@ -139,9 +140,10 @@ class IdeaNote:
     def __init__(
         self,
         text: str,
-        path: Path,
-        root: Path,
+        path: str | Path,
+        root: Path | str | None,
         *,
+        file_reader: FileReaderProtocol | None = None,
         link_source_extractor: LinkSourceExtractor | None = None,
     ) -> None:
         """Create an IdeaNote from source text.
@@ -152,26 +154,30 @@ class IdeaNote:
                 YAML front matter.
         """
         path = Path(path)
-        root = root.resolve()
-        path = (root / path).resolve() if not path.is_absolute() else path.resolve()
-        link_source_extractor = link_source_extractor or NaiveLinkSourceExtractor()
+        root_folder_path = resolve_root_folder_path(root=root, pivot_path=path)
+        absolute_path = resolve_absolute_path(path, root_folder_path)
 
-        if not path.is_relative_to(root):
-            raise PermissionError(f"Path must be inside root: path={path}, root={root}")
-        self._relative_path = path.relative_to(root)
-        self._root = root
+        if not absolute_path.is_relative_to(root_folder_path):
+            raise PermissionError(
+                f"Path must be inside root: "
+                f"path={path}, root_folder_path={root_folder_path}, root={root}"
+            )
+        self._relative_path = absolute_path.relative_to(root_folder_path)
+        self._root_folder_path = root_folder_path
+
         interpreted_result = interpret(text)
         self._metadata = interpreted_result.metadata or YamlRockWrapper()
         self._body = interpreted_result.body
         self._body_start_line = interpreted_result.body_start_line
-        self._link_source_extractor = link_source_extractor
-        self._file_reader: FileReaderProtocol = DiskFileReader()
+
+        self._link_source_extractor = link_source_extractor or NaiveLinkSourceExtractor()
+        self._file_reader: FileReaderProtocol = file_reader or DiskFileReader()
 
     @classmethod
     def from_path(
         cls,
-        file_path: str | Path,
-        root: Path | None = None,
+        path: str | Path,
+        root: str | Path | None = None,
         *,
         link_source_extractor: LinkSourceExtractor | None = None,
         file_reader: FileReaderProtocol | None = None,
@@ -184,23 +190,25 @@ class IdeaNote:
             MetadataDeserializationError: If the document contains invalid YAML
                 front matter.
         """
-        file_path = Path(file_path)
+        path = Path(path)
         file_reader = file_reader or DiskFileReader()
-        text = file_reader.read(file_path)
-        root = root or file_path.parent
+        text = file_reader.read(path)
         note = cls(
-            text=text, path=file_path, root=root, link_source_extractor=link_source_extractor
+            text=text,
+            path=path,
+            root=root,
+            file_reader=file_reader,
+            link_source_extractor=link_source_extractor,
         )
-        note._file_reader = file_reader
         return note
 
     @classmethod
     def create(
         cls,
-        file_path: Path,
+        file_path: str | Path,
         body: str,
         metadata: MetaDataProtocol | None = None,
-        root: Path | None = None,
+        root: str | Path | None = None,
         *,
         link_source_extractor: LinkSourceExtractor | None = None,
     ) -> Self:
@@ -211,14 +219,18 @@ class IdeaNote:
         """
         metadata = metadata or YamlRockWrapper()
         text = _to_text(metadata, body)
-        root = root or file_path.parent
+        file_path = Path(file_path)
         return cls(
             text=text, path=file_path, root=root, link_source_extractor=link_source_extractor
         )
 
     @property
-    def path(self) -> str:
+    def idea_path(self) -> IdeaPath:
         return self._relative_path.as_posix()
+
+    @property
+    def path(self) -> IdeaPath:
+        return self.idea_path
 
     @property
     def file_reader(self) -> FileReaderProtocol:
@@ -226,11 +238,11 @@ class IdeaNote:
 
     @property
     def file_path(self) -> Path:
-        return self._root / self._relative_path
+        return self._root_folder_path / self._relative_path
 
     @property
-    def root(self) -> Path:
-        return self._root
+    def root_folder_path(self) -> Path:
+        return self._root_folder_path
 
     @property
     def text(self) -> str:

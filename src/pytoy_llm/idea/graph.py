@@ -16,17 +16,26 @@ from .space import IdeaSpace
 class IdeaGraph:
     def __init__(self, space: IdeaSpace) -> None:
         self._space = space
-        self._resolver = LinkSourceResolver(self._space.root)
+        self._resolver = LinkSourceResolver(self._space.root_folder_path)
         self._converter = IdeaLinkConverter()
 
     @classmethod
-    def from_root(
+    def from_path(
         cls,
-        root: Path,
+        root_path: Path,
         *,
         file_reader: FileReaderProtocol | None = None,
     ) -> Self:
-        return cls(space=IdeaSpace.from_path(path=root, root=root, file_reader=file_reader))
+        return cls(
+            space=IdeaSpace.from_path(path=root_path, root=root_path, file_reader=file_reader)
+        )
+
+    @classmethod
+    def from_space(
+        cls,
+        space: IdeaSpace,
+    ) -> Self:
+        return cls(space=space)
 
     @classmethod
     def from_note(
@@ -35,10 +44,10 @@ class IdeaGraph:
         *,
         file_reader: FileReaderProtocol | None = None,
     ) -> Self:
-        return cls(
+        return cls.from_space(
             space=IdeaSpace.from_path(
-                path=note.root,
-                root=note.root,
+                path=note.root_folder_path,
+                root=note.root_folder_path,
                 file_reader=file_reader,
             )
         )

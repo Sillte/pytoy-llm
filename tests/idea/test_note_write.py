@@ -33,7 +33,7 @@ def test_note_writes_to_disk_by_default(tmp_path: Path) -> None:
     assert note_path.read_text(encoding="utf8") == "Body\n"
 
 
-def test_set_body_invalidates_cached_link_sources() -> None:
+def test_link_sources_reflect_updated_body() -> None:
     note = IdeaNote(text="[old](old.md)", path=Path("note.md"), root=Path("."))
 
     assert [link.target for link in note.link_sources] == ["old.md"]
