@@ -5,10 +5,39 @@ from pydantic import Field, JsonValue
 IdeaSpacePath = Annotated[
     str,
     Field(
-        description=("Path inside the configured IdeaSpace. `.` means the IdeaSpace root itself."),
-        examples=[".", "./knowledge", "./history/note.md"],
+        description=(
+            "Directory path inside the configured IdeaSpace, relative to the IdeaSpace root. "
+            "Use `.` for the IdeaSpace root. "
+            "The canonical form uses `/` as the separator, does not start with `./`, "
+            "and does not end with `/`."
+        ),
+        examples=[
+            ".",
+            "knowledge",
+            "2026/February",
+            "subspace1",
+            "subspace1/subsubspace2",
+        ],
     ),
 ]
+
+
+IdeaNotePath = Annotated[
+    str,
+    Field(
+        description=(
+            "Path to an IdeaNote inside the configured IdeaSpace, relative to the IdeaSpace root. "
+            "The canonical form uses `/` as the separator, does not start with `./`, "
+            "and must end with `.md`."
+        ),
+        examples=[
+            "index.md",
+            "knowledge/insight.md",
+            "history/Japan/note.md",
+        ],
+    ),
+]
+
 
 IdeaSpacePivot = Annotated[
     IdeaSpacePath,
@@ -16,11 +45,14 @@ IdeaSpacePivot = Annotated[
         description=(
             "Starting directory for an operation in this IdeaSpace. "
             "The path is relative to the IdeaSpace root. "
-            "Use '.' to represent the IdeaSpace root itself. "
-            "Use a subdirectory such as './architecture' "
-            "to restrict the operation to that directory and its descendants."
+            "Use `.` to represent the IdeaSpace root itself. "
+            "The path identifies the directory whose descendants are inspected."
         ),
-        examples=[".", "./architecture", "./history"],
+        examples=[
+            ".",
+            "subspace",
+            "subspace/subsubspace",
+        ],
     ),
 ]
 
@@ -29,18 +61,20 @@ IdeaSpaceDepth = Annotated[
     int | None,
     Field(
         description=(
-            "Number of descendant levels to explore. "
-            "0 returns only immediate subspaces or notes. "
+            "Number of descendant levels to inspect below the pivot directory. "
+            "`0` inspects only entries directly contained in the pivot directory. "
+            "Larger values include entries in deeper descendant directories. "
             "`null` explores all descendant levels."
         ),
         ge=0,
     ),
 ]
 
+
 IdeaNoteBody = Annotated[
     str,
     Field(
-        description=("Markdown body of the IdeaNote, excluding YAML frontmatter."),
+        description="Markdown body of the IdeaNote, excluding YAML frontmatter.",
     ),
 ]
 
@@ -54,11 +88,3 @@ IdeaNoteMetadata = Annotated[
         ),
     ),
 ]
-
-if __name__ == "__main__":
-    from pydantic import BaseModel
-
-    class T(BaseModel):
-        pivot: IdeaSpacePivot
-
-    print(T.model_json_schema())
