@@ -8,6 +8,7 @@ from pytoy_llm.idea.domain.links import (
     TextRange,
     WikiLinkSource,
 )
+from pytoy_llm.idea.domain.uri import Uri
 
 
 def position_at(text: str, offset: int) -> TextPosition:
@@ -59,7 +60,7 @@ class NaiveWikiLinkSourceExtractor:
                     match.start(),
                     match.end(),
                 ),
-                target=target,
+                target=Uri.from_any(target),
                 caption=(wiki_caption.strip() if wiki_caption is not None else None),
                 fragment=(fragment if seq else None),
             )
@@ -93,7 +94,7 @@ class NaiveMarkdownLinkSourceExtractor:
                     match.start(),
                     match.end(),
                 ),
-                target=target,
+                target=Uri.from_any(target),
                 caption=(markdown_caption if markdown_caption is not None else None),
                 fragment=(fragment if seq else None),
             )

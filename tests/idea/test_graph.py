@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pytoy_llm.idea import AnchorLocation, IdeaGraph, IdeaLink, IdeaNote, IdeaSpace, LineLocation
+from pytoy_llm.idea.domain.uri import Uri
 
 
 def test_graph_resolves_markdown_and_wiki_links(tmp_path: Path) -> None:
@@ -16,7 +17,7 @@ def test_graph_resolves_markdown_and_wiki_links(tmp_path: Path) -> None:
 
     assert len(links) == 2
     assert isinstance(links[0], IdeaLink)
-    assert links[0].target_file_path == target_path
+    assert links[0].uri == Uri.from_any(target_path.as_uri())
     assert links[0].target_location == LineLocation(line=2)
     assert isinstance(links[1].target_location, AnchorLocation) is False
 

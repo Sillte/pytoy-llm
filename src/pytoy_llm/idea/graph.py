@@ -7,6 +7,7 @@ from .domain.links import (
     UnresolvedLink,
 )
 from .domain.readers import FileReaderProtocol
+from .domain.uri import Uri
 from .link_converter import IdeaLinkConverter
 from .link_resolvers import LinkSourceResolver
 from .note import IdeaNote
@@ -91,10 +92,9 @@ class IdeaGraph:
 
     def get_backlinks(self, destination_note: IdeaNote) -> Sequence[IdeaLink]:
         result = []
+        destination_uri = Uri.from_any(destination_note.file_path.as_uri())
         for note in self._space.get_notes(depth=None):
             links = self.resolve_links(note, only_valid=True)
-            result += [
-                link for link in links if link.target_file_path == destination_note.file_path
-            ]
+            result += [link for link in links if link.uri == destination_uri]
 
         return result

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from posixpath import normpath
 from typing import Callable, Self, Sequence
+from urllib.parse import unquote
 
 from pydantic import AwareDatetime
 
@@ -22,9 +24,9 @@ from .models import (
     IdeaSpaceConventionModel,
     IdeaSpaceToolMetaModel,
     IdeaSpaceToolWorkingContextModel,
-    LocalLinkModel,
     RemoteLinkModel,
     UnresolvedLinkModel,
+    WorkspaceLinkModel,
 )
 from .semantic_types import (
     IdeaNoteBody,
@@ -48,38 +50,43 @@ def build_idea_note_model(
     unresolved_links = []
 
     for idea_link in idea_links:
-        target_file_path = idea_link.target_file_path
         try:
-            if target_file_path is not None:
-                if target_file_path.is_relative_to(idea_space.root_folder_path):
-                    target_path = target_file_path.relative_to(
-                        idea_space.root_folder_path
-                    ).as_posix()
-                    note_links.append(
-                        IdeaNoteLinkModel(
-                            source_idea_note_path=idea_note.idea_path,
-                            target_idea_note_path=target_path,
+            if idea_link.uri.scheme == "idea":
+                target_path = _relative_path_from_uri(idea_link.uri.path, idea_link.uri.authority)
+                note_links.append(
+                    IdeaNoteLinkModel(
+                        source_idea_note_path=idea_note.idea_path,
+                        target_idea_note_path=target_path,
+                        idea_space_root_folder=idea_space.root_folder_path,
+                    )
+                )
+            elif idea_link.uri.scheme == "workspace":
+                if workspace_root is not None:
+                    workspace_path = _relative_path_from_uri(
+                        idea_link.uri.path, idea_link.uri.authority
+                    )
+                    local_links.append(
+                        WorkspaceLinkModel(
+                            idea_note_path=idea_note.idea_path,
+                            workspace_file_path=workspace_path,
+                            workspace_root_folder=workspace_root,
                         )
                     )
                 else:
-                    if workspace_root is not None:
-                        reference_path = target_file_path.relative_to(workspace_root).as_posix()
-                        local_links.append(
-                            LocalLinkModel(
-                                idea_note_path=idea_note.idea_path,
-                                workspace_file_path=reference_path,
-                            )
-                        )
-                    else:
-                        raise ValueError("Workspace is not given here.")
+                    raise ValueError("Workspace is not given here.")
             else:
                 remote_links.append(
-                    RemoteLinkModel(idea_note_path=idea_note.idea_path, uri=idea_link.uri)
+                    RemoteLinkModel(
+                        idea_note_path=idea_note.idea_path,
+                        uri=idea_link.uri,
+                    )
                 )
         except (ValueError, TypeError) as exc:
             unresolved_links.append(
                 UnresolvedLinkModel(
-                    idea_note_path=idea_note.idea_path, uri=idea_link.uri, reason=str(exc)
+                    idea_note_path=idea_note.idea_path,
+                    uri=idea_link.uri,
+                    reason=str(exc),
                 )
             )
 
@@ -111,6 +118,16 @@ def build_idea_note_model(
             kind=ToolErrorKind.INVALID_ARGUMENT,
             msg=str(exc),
         )
+
+
+def _relative_path_from_uri(path: str, authority: str) -> str:
+    if authority:
+        raise ValueError(f"URI authority is not supported: {authority}")
+
+    normalized_path = normpath(unquote(path).lstrip("/"))
+    if normalized_path == ".." or normalized_path.startswith("../"):
+        raise ValueError("URI path must stay relative to its registered root.")
+    return normalized_path
 
 
 class IdeaTool:

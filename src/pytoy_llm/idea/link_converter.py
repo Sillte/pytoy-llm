@@ -8,20 +8,24 @@ from .domain.links import (
     UnresolvedIdeaLink,
     UnresolvedLink,
 )
+from .domain.uri import Uri
 
 
 class IdeaLinkConverter:
     def __init__(self):
         pass
 
-    def convert(self, inner_link: ResolvedLink | UnresolvedLink) -> IdeaLink | UnresolvedIdeaLink:
+    def convert(
+        self,
+        inner_link: ResolvedLink | UnresolvedLink,
+    ) -> IdeaLink | UnresolvedIdeaLink:
         match inner_link:
             case ResolvedLocalLink():
                 uri = inner_link.target_uri
                 link = IdeaLink(
                     source_path=inner_link.source_path,
                     source_text_range=inner_link.link_source.text_range,
-                    uri=uri,
+                    uri=Uri.from_any(uri),
                     target_location=inner_link.location,
                 )
                 return link
@@ -29,7 +33,7 @@ class IdeaLinkConverter:
                 link = IdeaLink(
                     source_path=inner_link.source_path,
                     source_text_range=inner_link.link_source.text_range,
-                    uri=inner_link.url,
+                    uri=Uri.from_any(inner_link.url),
                 )
             case UnresolvedLink():
                 link = UnresolvedIdeaLink(

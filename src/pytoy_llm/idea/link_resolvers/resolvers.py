@@ -1,8 +1,10 @@
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
-from urllib.parse import urlparse
+from types import MappingProxyType
+from urllib.parse import unquote
 
-from ..domain.links import (
+from pytoy_llm.idea.domain.links import (
     AnchorLocation,
     LineLocation,
     LinkSource,
@@ -14,6 +16,7 @@ from ..domain.links import (
     UnresolvedLink,
     WikiLinkSource,
 )
+from pytoy_llm.idea.domain.uri import Uri
 
 
 def location_from_fragment(
@@ -63,28 +66,26 @@ class MarkdownLinkResolver:
         self, file_path: Path, link_source: MarkdownLinkSource
     ) -> ResolvedLink | UnresolvedLink:
         target = link_source.target
-        parsed = urlparse(target)
-        if parsed.scheme == "repo":
-            if not target.startswith("repo://"):
+        if target.scheme == "repo":
+            if not target.authority:
                 return UnresolvedLink(
                     link_source=link_source, source_path=file_path, reason="Invalid repo URI"
                 )
             base_path = _get_repo_folder(file_path)
-            _, _, target = target.partition("repo://")
 
             return ResolvedLocalLink.from_any(
-                file_path=base_path / target,
+                file_path=base_path / target.authority / target.path.lstrip("/"),
                 location=location_from_fragment(link_source.fragment),
                 link_source=link_source,
                 source_path=file_path,
                 root=self.root,
             )
-        elif parsed.scheme in {"http", "https"}:
+        elif target.scheme in {"http", "https"}:
             return ResolvedRemoteLink.from_any(
-                url=target, link_source=link_source, source_path=file_path
+                url=str(target), link_source=link_source, source_path=file_path
             )
-        elif not parsed.scheme:
-            path = (file_path.parent / target).resolve()
+        elif not target.scheme:
+            path = (file_path.parent / target.path).resolve()
             return ResolvedLocalLink.from_any(
                 file_path=path,
                 location=location_from_fragment(link_source.fragment),
@@ -96,7 +97,7 @@ class MarkdownLinkResolver:
         return UnresolvedLink(
             link_source=link_source,
             source_path=file_path,
-            reason=f"Unknown `scheme={parsed.scheme=}`. {parsed=}",
+            reason=f"Unknown `scheme={target.scheme=}`. {target=}",
         )
 
 
@@ -115,14 +116,14 @@ class WikiLinkResolver:
     ) -> ResolvedLink | UnresolvedLink:
         target = link_source.target
 
-        if not target:
+        if not target.path and not target.authority:
             return UnresolvedLink(
                 link_source=link_source,
                 source_path=file_path,
                 reason="Empty WikiLink target",
             )
 
-        relative_path = Path(target)
+        relative_path = Path(target.path or target.authority)
 
         if relative_path.suffix == "":
             relative_path = relative_path.with_suffix(".md")
@@ -157,3 +158,56 @@ class LinkSourceResolver:
                 )
             case _:
                 return UnresolvedLink(link_source=link_source, source_path=file_path)
+
+
+class UriLocalPathResolver:
+    def __init__(self, scheme_to_folder_path: Mapping[str, str | Path]):
+        paths: dict[str, Path] = {}
+        for scheme, folder_path in scheme_to_folder_path.items():
+            normalized_scheme = scheme.lower()
+            path = Path(folder_path)
+            if not path.is_absolute():
+                raise ValueError(f"Relative path is not accepted. {scheme=}, {path=}")
+            if normalized_scheme in paths:
+                raise ValueError(f"Duplicate URI scheme: {scheme}")
+            paths[normalized_scheme] = path.resolve()
+        self._scheme_to_folder_path = MappingProxyType(paths)
+
+    @property
+    def scheme_to_folder_path(self) -> Mapping[str, Path]:
+        return self._scheme_to_folder_path
+
+    def is_target_scheme(self, scheme: str) -> bool:
+        return scheme.lower() in self._scheme_to_folder_path
+
+    def resolve(self, uri: Uri, source_base_directory: str | Path | None = None) -> Path:
+        """Return the absolute path in the file system."""
+        path = unquote(uri.path)
+        scheme = uri.scheme.lower()
+
+        if scheme:
+            if scheme not in self._scheme_to_folder_path:
+                raise ValueError(
+                    f"The scheme `{uri.scheme=}` is not registered, {self.scheme_to_folder_path=}"
+                )
+            if uri.authority:
+                raise ValueError(f"URI authority is not supported for {uri.scheme=}: {uri}")
+
+            root = self._scheme_to_folder_path[scheme]
+            target_path = (root / path.lstrip("/")).resolve()
+            if not target_path.is_relative_to(root):
+                raise ValueError(f"URI target is outside its registered root: {uri}")
+            return target_path
+
+        if uri.authority:
+            raise ValueError(f"URI authority is not supported without a scheme: {uri}")
+        if source_base_directory is None:
+            raise ValueError("source_base_directory is required for a URI without a scheme.")
+
+        base_directory = Path(source_base_directory)
+        if not base_directory.is_absolute():
+            raise ValueError("source_base_directory must be an absolute path.")
+        relative_path = Path(path)
+        if relative_path.is_absolute():
+            raise ValueError(f"uri.path must be relative when the URI has no scheme: {uri}")
+        return (base_directory / relative_path).resolve()

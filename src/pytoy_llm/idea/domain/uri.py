@@ -1,18 +1,29 @@
-from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from typing import Self
+from urllib.parse import urlsplit, urlunsplit
+
+from pydantic import BaseModel
 
 
-def path_from_file_uri(uri: str) -> Path | None:
-    parsed = urlsplit(uri)
-    if parsed.scheme.lower() != "file":
-        return None
+class Uri(BaseModel, frozen=True):
+    scheme: str
+    authority: str
+    path: str
+    query: str | None = None
+    fragment: str | None = None
 
-    path = unquote(parsed.path)
+    @classmethod
+    def from_any(cls, arg: str) -> Self:
+        result = urlsplit(arg)
 
-    if parsed.netloc and parsed.netloc.lower() != "localhost":
-        path = f"//{parsed.netloc}{path}"
+        return cls(
+            scheme=result.scheme,
+            authority=result.netloc,
+            path=result.path,
+            query=result.query or None,
+            fragment=result.fragment or None,
+        )
 
-    if len(path) >= 3 and path[0] == "/" and path[2] == ":":  # Window Driver letter.
-        path = path[1:]
-
-    return Path(path)
+    def __str__(self) -> str:
+        return urlunsplit(
+            (self.scheme, self.authority, self.path, self.query or "", self.fragment or "")
+        )

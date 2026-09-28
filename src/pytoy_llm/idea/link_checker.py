@@ -1,29 +1,23 @@
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .domain.links import IdeaLink
-from .domain.uri import path_from_file_uri
+from .domain.uri import Uri
 
 
 class UriExistenceTester:
     def __init__(self, *, timeout: float = 1.0):
         self._timeout = timeout
 
-    def test(self, uri: str) -> bool | None:
+    def test(self, uri: Uri) -> bool | None:
         """Return whether a URI is reachable.
 
         Returns ``True`` when the target responds successfully, ``False`` when
         it is known not to exist, and ``None`` when the URI is unsupported or
         reachability cannot be determined.
         """
-        path = path_from_file_uri(uri)
-        if path is not None:
-            return path.exists()
-
-        parsed = urlparse(uri)
-        if parsed.scheme in {"http", "https"}:
-            return self._test_http(uri)
+        if uri.scheme in {"http", "https"}:
+            return self._test_http(str(uri))
 
         return None
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pytoy_llm.idea import FileWriterProtocol, IdeaNote
+from pytoy_llm.idea.domain.uri import Uri
 
 
 class MemoryFileWriter(FileWriterProtocol):
@@ -36,8 +37,8 @@ def test_note_writes_to_disk_by_default(tmp_path: Path) -> None:
 def test_link_sources_reflect_updated_body() -> None:
     note = IdeaNote(text="[old](old.md)", path=Path("note.md"), root=Path("."))
 
-    assert [link.target for link in note.link_sources] == ["old.md"]
+    assert [link.target for link in note.link_sources] == [Uri.from_any("old.md")]
 
     note.set_body("[new](new.md)")
 
-    assert [link.target for link in note.link_sources] == ["new.md"]
+    assert [link.target for link in note.link_sources] == [Uri.from_any("new.md")]

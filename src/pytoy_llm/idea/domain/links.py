@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Protocol, Self
 
-from .uri import path_from_file_uri
+from .uri import Uri
 
 
 @dataclass(frozen=True, order=True)
@@ -26,7 +26,7 @@ class TextRange:
 @dataclass(frozen=True)
 class MarkdownLinkSource:
     text_range: TextRange
-    target: str
+    target: Uri
     caption: str | None = None
     fragment: str | None = None
 
@@ -38,7 +38,7 @@ class MarkdownLinkSource:
 @dataclass(frozen=True)
 class WikiLinkSource:
     text_range: TextRange
-    target: str
+    target: Uri
     caption: str | None = None
     fragment: str | None = None
 
@@ -140,12 +140,8 @@ class LinkSourceExtractor(Protocol):
 class IdeaLink:
     source_path: Path
     source_text_range: TextRange
-    uri: str
+    uri: Uri
     target_location: Location | None = None
-
-    @property
-    def target_file_path(self) -> Path | None:
-        return path_from_file_uri(self.uri)
 
 
 @dataclass(frozen=True)

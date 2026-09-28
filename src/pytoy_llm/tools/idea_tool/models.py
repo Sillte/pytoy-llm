@@ -1,13 +1,15 @@
+from pathlib import Path
 from typing import Sequence
 
 from pydantic import AwareDatetime, BaseModel, Field
 
+from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.tools.workspace_explorer.semantic_types import WorkspaceFilePath
 
 from .semantic_types import IdeaNoteMetadata, IdeaNotePath, IdeaSpacePath
 
 
-class LocalLinkModel(BaseModel, frozen=True):
+class WorkspaceLinkModel(BaseModel, frozen=True):
     """A link from an IdeaNote to a local workspace file."""
 
     idea_note_path: IdeaNotePath = Field(
@@ -19,6 +21,12 @@ class LocalLinkModel(BaseModel, frozen=True):
         examples=["src/pytoy_llm/idea/note.py"],
     )
 
+    workspace_root_folder: Path = Field(description="Root folder of Workspace")
+
+    @property
+    def uri_string(self) -> str:
+        return f"workspace:///{self.workspace_file_path.strip('/')}"
+
 
 class RemoteLinkModel(BaseModel, frozen=True):
     """A link from an IdeaNote to a remote resource."""
@@ -27,10 +35,14 @@ class RemoteLinkModel(BaseModel, frozen=True):
         description="Path of the source IdeaNote, relative to the IdeaSpace root.",
         examples=["knowledge/python.md"],
     )
-    uri: str = Field(
+    uri: Uri = Field(
         description="URI of the referenced remote resource.",
         examples=["https://example.com/reference"],
     )
+
+    @property
+    def uri_string(self) -> str:
+        return str(self.uri)
 
 
 class IdeaNoteLinkModel(BaseModel, frozen=True):
@@ -45,6 +57,12 @@ class IdeaNoteLinkModel(BaseModel, frozen=True):
         examples=["knowledge/programming.md"],
     )
 
+    idea_space_root_folder: Path = Field(description="Root folder of IdeaSpace")
+
+    @property
+    def uri_string(self) -> str:
+        return f"idea:///{self.target_idea_note_path}"
+
 
 class UnresolvedLinkModel(BaseModel, frozen=True):
     """A link which is not available."""
@@ -53,7 +71,7 @@ class UnresolvedLinkModel(BaseModel, frozen=True):
         description="Path of the source IdeaNote, relative to the IdeaSpace root.",
         examples=["knowledge/python.md"],
     )
-    uri: str = Field(
+    uri: Uri = Field(
         description="The original link target that could not be resolved.",
         examples=["../../non-existent-folder/src/note.md"],
     )
@@ -85,7 +103,7 @@ class IdeaNoteModel(BaseModel, frozen=True):
         description="Links from this note to other IdeaNotes.",
     )
 
-    workspace_local_links: Sequence[LocalLinkModel] = Field(
+    workspace_local_links: Sequence[WorkspaceLinkModel] = Field(
         default=(),
         description="Links from this note to local workspace files.",
     )
