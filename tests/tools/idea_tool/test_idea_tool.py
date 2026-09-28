@@ -1,8 +1,24 @@
 from pathlib import Path
 
 from pytoy_llm.idea import IdeaSpace
+from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.idea_tool import IdeaTool
+from pytoy_llm.tools.idea_tool.models import RemoteLinkModel
+
+
+def test_remote_link_model_serializes_uri_dataclass() -> None:
+    uri = Uri.from_any("https://example.com/reference?q=python#install")
+    model = RemoteLinkModel(idea_note_path="knowledge/python.md", uri=uri)
+
+    assert model.model_dump()["uri"] == {
+        "scheme": "https",
+        "authority": "example.com",
+        "path": "/reference",
+        "query": "q=python",
+        "fragment": "install",
+    }
+    assert RemoteLinkModel.model_validate(model.model_dump()).uri == uri
 
 
 def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(

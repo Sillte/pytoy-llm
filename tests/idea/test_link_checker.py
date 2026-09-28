@@ -6,7 +6,7 @@ import pytest
 
 from pytoy_llm.idea import IdeaLink, LinkReachabilityChecker, TextPosition, TextRange
 from pytoy_llm.idea.domain.uri import Uri
-from pytoy_llm.idea.link_resolvers.resolvers import UriLocalPathResolver
+from pytoy_llm.idea.link_resolvers.resolvers import SchemeDirectory, UriLocalPathResolver
 
 
 class FakeResponse:
@@ -31,7 +31,7 @@ def make_link(uri: str) -> IdeaLink:
 def test_registered_scheme_decodes_path_under_its_root(tmp_path: Path) -> None:
     root = tmp_path / "idea"
     root.mkdir()
-    resolver = UriLocalPathResolver({"idea": root})
+    resolver = UriLocalPathResolver([SchemeDirectory(root, "idea")])
 
     assert resolver.resolve(Uri.from_any("idea:///notes/a%20b.md")) == (root / "notes" / "a b.md")
 
@@ -39,14 +39,14 @@ def test_registered_scheme_decodes_path_under_its_root(tmp_path: Path) -> None:
 def test_registered_scheme_rejects_targets_outside_its_root(tmp_path: Path) -> None:
     root = tmp_path / "idea"
     root.mkdir()
-    resolver = UriLocalPathResolver({"idea": root})
+    resolver = UriLocalPathResolver([SchemeDirectory(root, "idea")])
 
     with pytest.raises(ValueError, match="outside its registered root"):
         resolver.resolve(Uri.from_any("idea:///%2e%2e/outside.md"))
 
 
 def test_relative_uri_requires_absolute_base_and_decodes_path(tmp_path: Path) -> None:
-    resolver = UriLocalPathResolver({})
+    resolver = UriLocalPathResolver([])
     uri = Uri.from_any("./relative/a%20b.md")
 
     with pytest.raises(ValueError, match="must be an absolute path"):
@@ -56,13 +56,32 @@ def test_relative_uri_requires_absolute_base_and_decodes_path(tmp_path: Path) ->
 
 
 def test_file_scheme_is_not_supported_yet() -> None:
-    resolver = UriLocalPathResolver({})
+    resolver = UriLocalPathResolver([])
     uri = Uri.from_any("file:///tmp/example.md")
 
     assert not resolver.is_target_scheme(uri.scheme)
     with pytest.raises(ValueError, match="not registered"):
         resolver.resolve(uri)
     assert LinkReachabilityChecker().check(make_link(str(uri))) is None
+
+
+def test_authority_selects_scheme_directory(tmp_path: Path) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    first_root.mkdir()
+    second_root.mkdir()
+    resolver = UriLocalPathResolver(
+        [
+            SchemeDirectory(first_root, "repo", "first"),
+            SchemeDirectory(second_root, "repo", "second"),
+        ]
+    )
+
+    first_uri = Uri.from_any("repo://first/notes/a.md")
+    second_uri = Uri.from_any("repo://second/notes/a.md")
+
+    assert resolver.resolve(first_uri) == first_root / "notes" / "a.md"
+    assert resolver.resolve(second_uri) == second_root / "notes" / "a.md"
 
 
 def test_http_success_is_true(monkeypatch) -> None:

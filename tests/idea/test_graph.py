@@ -6,9 +6,9 @@ from pytoy_llm.idea.domain.uri import Uri
 
 def test_graph_resolves_markdown_and_wiki_links(tmp_path: Path) -> None:
     source_path = tmp_path / "source.md"
-    target_path = tmp_path / "target.md"
-    other_path = tmp_path / "other.md"
-    source_path.write_text("[target](target.md#L3) [[other]]", encoding="utf-8")
+    target_path = tmp_path / "target file.md"
+    other_path = tmp_path / "other file.md"
+    source_path.write_text("[target](target%20file.md#L3) [[other%20file]]", encoding="utf-8")
     target_path.write_text("target", encoding="utf-8")
     other_path.write_text("other", encoding="utf-8")
     source = IdeaNote.from_path(source_path, root=tmp_path)

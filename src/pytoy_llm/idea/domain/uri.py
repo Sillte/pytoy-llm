@@ -1,10 +1,10 @@
+from dataclasses import dataclass
 from typing import Self
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel
 
-
-class Uri(BaseModel, frozen=True):
+@dataclass(frozen=True)
+class Uri:
     scheme: str
     authority: str
     path: str
