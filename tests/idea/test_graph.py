@@ -1,25 +1,22 @@
 from pathlib import Path
 
-from pytoy_llm.idea import AnchorLocation, IdeaGraph, IdeaLink, IdeaNote, IdeaSpace, LineLocation
+from pytoy_llm.idea import IdeaGraph, IdeaLink, IdeaNote, IdeaSpace, LineLocation
 from pytoy_llm.idea.domain.uri import Uri
 
 
-def test_graph_resolves_markdown_and_wiki_links(tmp_path: Path) -> None:
+def test_graph_resolves_markdown_links(tmp_path: Path) -> None:
     source_path = tmp_path / "source.md"
     target_path = tmp_path / "target file.md"
-    other_path = tmp_path / "other file.md"
-    source_path.write_text("[target](target%20file.md#L3) [[other%20file]]", encoding="utf-8")
+    source_path.write_text("[target](target%20file.md#L3)", encoding="utf-8")
     target_path.write_text("target", encoding="utf-8")
-    other_path.write_text("other", encoding="utf-8")
     source = IdeaNote.from_path(source_path, root=tmp_path)
 
     links = IdeaGraph(IdeaSpace(tmp_path)).resolve_links(source)
 
-    assert len(links) == 2
+    assert len(links) == 1
     assert isinstance(links[0], IdeaLink)
     assert links[0].uri == Uri.from_any(target_path.as_uri())
     assert links[0].target_location == LineLocation(line=2)
-    assert isinstance(links[1].target_location, AnchorLocation) is False
 
 
 def test_graph_returns_unresolved_link_for_target_outside_root(tmp_path: Path) -> None:

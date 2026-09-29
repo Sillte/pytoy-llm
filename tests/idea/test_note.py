@@ -26,12 +26,12 @@ def test_note_parses_front_matter_and_preserves_body_offset() -> None:
 
 def test_note_extracts_link_sources_with_source_ranges() -> None:
     note = IdeaNote(
-        text="See [target](target.md#L3) and [[other]].",
+        text="See [target](target.md#L3).",
         path=Path("note.md"),
         root=Path("."),
     )
 
-    assert len(note.link_sources) == 2
+    assert len(note.link_sources) == 1
     assert note.link_sources[0].start == TextPosition(0, 4)
     assert note.link_sources[0].text_range.end.col > note.link_sources[0].start.col
 

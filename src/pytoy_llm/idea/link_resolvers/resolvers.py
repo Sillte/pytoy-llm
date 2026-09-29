@@ -17,7 +17,6 @@ from pytoy_llm.idea.domain.links import (
     ResolvedLocalLink,
     ResolvedRemoteLink,
     UnresolvedLink,
-    WikiLinkSource,
 )
 from pytoy_llm.idea.domain.uri import Uri
 
@@ -108,52 +107,11 @@ class MarkdownLinkResolver:
         )
 
 
-class WikiLinkResolver:
-    """
-    TODO: Correspondence of `target` and the actual path should be revised later.
-    """
-
-    def __init__(self, root: Path, local_path_resolver: UriLocalPathResolver):
-        self.root = root
-        self.local_path_resolver = local_path_resolver
-
-    def resolve(
-        self,
-        file_path: Path,
-        link_source: WikiLinkSource,
-    ) -> ResolvedLink | UnresolvedLink:
-        target = link_source.target
-
-        if not target.path and not target.authority:
-            return UnresolvedLink(
-                link_source=link_source,
-                source_path=file_path,
-                reason="Empty WikiLink target",
-            )
-
-        relative_path = Path(target.path or target.authority)
-
-        if relative_path.suffix == "":
-            relative_path = relative_path.with_suffix(".md")
-
-        return ResolvedLocalLink.from_any(
-            file_path=self.local_path_resolver.resolve(
-                Uri(scheme="", authority="", path=relative_path.as_posix()),
-                source_base_directory=self.root,
-            ),
-            location=location_from_fragment(link_source.fragment),
-            link_source=link_source,
-            source_path=file_path,
-            root=self.root,
-        )
-
-
 class LinkSourceResolver:
     def __init__(self, root: Path):
         self.root = root
         local_path_resolver = UriLocalPathResolver([])
         self.markdown_resolver = MarkdownLinkResolver(root, local_path_resolver)
-        self.wiki_resolver = WikiLinkResolver(root, local_path_resolver)
 
     def resolve(
         self,
@@ -161,8 +119,6 @@ class LinkSourceResolver:
         link_source: LinkSource,
     ) -> ResolvedLink | UnresolvedLink:
         match link_source:
-            case WikiLinkSource():
-                return self.wiki_resolver.resolve(file_path, link_source)
             case MarkdownLinkSource():
                 return self.markdown_resolver.resolve(
                     file_path,

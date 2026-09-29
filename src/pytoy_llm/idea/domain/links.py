@@ -35,19 +35,7 @@ class MarkdownLinkSource:
         return self.text_range.start
 
 
-@dataclass(frozen=True)
-class WikiLinkSource:
-    text_range: TextRange
-    target: Uri
-    caption: str | None = None
-    fragment: str | None = None
-
-    @property
-    def start(self) -> TextPosition:
-        return self.text_range.start
-
-
-type LinkSource = MarkdownLinkSource | WikiLinkSource
+type LinkSource = MarkdownLinkSource
 
 
 @dataclass(frozen=True)

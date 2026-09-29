@@ -20,8 +20,8 @@ Parser, resolver, converter, infrastructure, and URI helper modules are
 implementation details and should not be imported by ordinary consumers.
 
 Link resolution implementations belong under `link_resolvers`. `IdeaGraph`
-coordinates graph operations but does not own Markdown, WikiLink, or URI
-resolution algorithms.
+coordinates graph operations but does not own Markdown-link or URI resolution
+algorithms.
 
 ## Responsibilities
 
