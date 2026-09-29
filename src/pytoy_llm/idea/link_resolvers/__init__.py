@@ -1,3 +1,7 @@
-from .resolvers import LinkSourceResolver
+from .resolvers import (
+    MarkdownLinkResolver,
+    SchemeDirectory,
+    UriLocalPathResolver,
+)
 
-__all__ = ["LinkSourceResolver"]
+__all__ = ["MarkdownLinkResolver", "UriLocalPathResolver", "SchemeDirectory"]

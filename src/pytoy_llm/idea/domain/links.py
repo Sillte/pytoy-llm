@@ -58,36 +58,31 @@ type Location = LineLocation | AnchorLocation
 
 @dataclass(frozen=True)
 class ResolvedLocalLink:
-    file_path: Path
-    location: Location
+    target_path: Path
+    target_location: Location
     link_source: LinkSource
     source_path: Path
 
     @classmethod
     def from_any(
         cls,
-        file_path: Path,
-        location: Location,
+        target_path: Path,
+        target_location: Location,
         link_source: LinkSource,
         source_path: Path,
-        *,
-        root: Path,
     ) -> Self:
-        file_path = file_path.resolve()
-        root = root.resolve()
+        target_path = target_path.resolve()
         source_path = source_path.resolve()
-        if file_path.is_relative_to(root):
-            return cls(
-                file_path=file_path,
-                location=location,
-                link_source=link_source,
-                source_path=source_path,
-            )
-        raise ValueError(f"Given `{file_path=}` is outside of `{root=}`")
+        return cls(
+            target_path=target_path,
+            target_location=target_location,
+            link_source=link_source,
+            source_path=source_path,
+        )
 
     @property
     def target_uri(self) -> str:
-        return self.file_path.resolve().as_uri()
+        return self.target_path.resolve().as_uri()
 
 
 @dataclass(frozen=True)
@@ -130,6 +125,7 @@ class IdeaLink:
     source_text_range: TextRange
     uri: Uri
     target_location: Location | None = None
+    target_path: Path | None = None
 
 
 @dataclass(frozen=True)

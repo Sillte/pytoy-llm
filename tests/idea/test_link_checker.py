@@ -5,6 +5,7 @@ from urllib.error import HTTPError, URLError
 import pytest
 
 from pytoy_llm.idea import IdeaLink, LinkReachabilityChecker, TextPosition, TextRange
+from pytoy_llm.idea.domain.exceptions import OutsidePathError
 from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.idea.link_resolvers.resolvers import SchemeDirectory, UriLocalPathResolver
 
@@ -41,7 +42,7 @@ def test_registered_scheme_rejects_targets_outside_its_root(tmp_path: Path) -> N
     root.mkdir()
     resolver = UriLocalPathResolver([SchemeDirectory(root, "idea")])
 
-    with pytest.raises(ValueError, match="outside its registered root"):
+    with pytest.raises(OutsidePathError, match="outside its registered root"):
         resolver.resolve(Uri.from_any("idea:///%2e%2e/outside.md"))
 
 
@@ -59,7 +60,7 @@ def test_file_scheme_is_not_supported_yet() -> None:
     resolver = UriLocalPathResolver([])
     uri = Uri.from_any("file:///tmp/example.md")
 
-    assert not resolver.is_target_scheme(uri.scheme)
+    assert not resolver.is_registered(uri.scheme)
     with pytest.raises(ValueError, match="not registered"):
         resolver.resolve(uri)
     assert LinkReachabilityChecker().check(make_link(str(uri))) is None

@@ -5,7 +5,7 @@ from .domain.links import IdeaLink
 from .domain.uri import Uri
 
 
-class UriExistenceTester:
+class HttpExistenceTester:
     def __init__(self, *, timeout: float = 1.0):
         self._timeout = timeout
 
@@ -63,7 +63,7 @@ class UriExistenceTester:
 
 class LinkReachabilityChecker:
     def __init__(self, *, timeout: float = 1.0):
-        self._tester = UriExistenceTester(timeout=timeout)
+        self._tester = HttpExistenceTester(timeout=timeout)
 
     def check(self, link: IdeaLink) -> bool | None:
         """Check whether an idea link target is reachable.
@@ -73,4 +73,7 @@ class LinkReachabilityChecker:
         cannot be determined. HTTP checks may perform synchronous I/O and are
         bounded by the configured timeout.
         """
-        return self._tester.test(link.uri)
+        if link.target_path:
+            return link.target_path.exists()
+        else:
+            return self._tester.test(link.uri)

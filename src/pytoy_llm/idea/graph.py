@@ -9,7 +9,7 @@ from .domain.links import (
 from .domain.readers import FileReaderProtocol
 from .domain.uri import Uri
 from .link_converter import IdeaLinkConverter
-from .link_resolvers import LinkSourceResolver
+from .link_resolvers import MarkdownLinkResolver, SchemeDirectory, UriLocalPathResolver
 from .note import IdeaNote
 from .space import IdeaSpace
 
@@ -17,7 +17,13 @@ from .space import IdeaSpace
 class IdeaGraph:
     def __init__(self, space: IdeaSpace) -> None:
         self._space = space
-        self._resolver = LinkSourceResolver(self._space.root_folder_path)
+        scheme_directories = [
+            SchemeDirectory.from_any(root_directory=self._space.root_folder_path, scheme="idea")
+        ]
+        self._path_resolver = UriLocalPathResolver(
+            scheme_directories, default_root_directory=self._space.root_folder_path
+        )
+        self._link_resolver = MarkdownLinkResolver(self._path_resolver)
         self._converter = IdeaLinkConverter()
 
     @classmethod
@@ -74,7 +80,7 @@ class IdeaGraph:
         inaccessible are returned as ``UnresolvedIdeaLink`` values. They do
         not raise an exception.
         """
-        resolver = self._resolver
+        resolver = self._link_resolver
         inner_links = []
         for link_source in source_note.link_sources:
             try:

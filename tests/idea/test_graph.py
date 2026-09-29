@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from pytoy_llm.idea import IdeaGraph, IdeaLink, IdeaNote, IdeaSpace, LineLocation
+from pytoy_llm.idea import (
+    IdeaGraph,
+    IdeaLink,
+    IdeaNote,
+    IdeaSpace,
+    LineLocation,
+    UnresolvedIdeaLink,
+)
 from pytoy_llm.idea.domain.uri import Uri
 
 
@@ -27,7 +34,18 @@ def test_graph_returns_unresolved_link_for_target_outside_root(tmp_path: Path) -
     links = IdeaGraph(IdeaSpace(tmp_path)).resolve_links(source, only_valid=False)
 
     assert len(links) == 1
-    assert links[0].__class__.__name__ == "UnresolvedIdeaLink"
+    assert isinstance(links[0], UnresolvedIdeaLink)
+
+
+def test_graph_returns_unresolved_link_for_retired_repo_scheme(tmp_path: Path) -> None:
+    source_path = tmp_path / "source.md"
+    source_path.write_text("[unknown](unknown://project/notes.md)", encoding="utf-8")
+    source = IdeaNote.from_path(source_path, root=tmp_path)
+
+    links = IdeaGraph(IdeaSpace(tmp_path)).resolve_links(source, only_valid=False)
+
+    assert len(links) == 1
+    assert isinstance(links[0], UnresolvedIdeaLink)
 
 
 def test_graph_finds_backlinks(tmp_path: Path) -> None:

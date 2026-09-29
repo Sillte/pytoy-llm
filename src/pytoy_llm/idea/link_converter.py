@@ -26,7 +26,8 @@ class IdeaLinkConverter:
                     source_path=inner_link.source_path,
                     source_text_range=inner_link.link_source.text_range,
                     uri=Uri.from_any(uri),
-                    target_location=inner_link.location,
+                    target_location=inner_link.target_location,
+                    target_path=inner_link.target_path,
                 )
                 return link
             case ResolvedRemoteLink():
@@ -34,6 +35,7 @@ class IdeaLinkConverter:
                     source_path=inner_link.source_path,
                     source_text_range=inner_link.link_source.text_range,
                     uri=Uri.from_any(inner_link.url),
+                    target_path=None,
                 )
             case UnresolvedLink():
                 link = UnresolvedIdeaLink(
