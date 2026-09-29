@@ -5,11 +5,17 @@ from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.idea_tool import IdeaTool
 from pytoy_llm.tools.idea_tool.models import RemoteLinkModel
+from pytoy_llm.tools.idea_tool.semantic_types import IdeaNoteReference
 
 
 def test_remote_link_model_serializes_uri_dataclass() -> None:
     uri = Uri.from_any("https://example.com/reference?q=python#install")
-    model = RemoteLinkModel(idea_note_path="knowledge/python.md", uri=uri)
+    model = RemoteLinkModel(
+        source_idea_note_reference=IdeaNoteReference(
+            idea_note_path="knowledge/python.md", namespace="research"
+        ),
+        uri=uri,
+    )
 
     assert model.model_dump()["uri"] == {
         "scheme": "https",
@@ -18,7 +24,37 @@ def test_remote_link_model_serializes_uri_dataclass() -> None:
         "query": "q=python",
         "fragment": "install",
     }
+    assert model.model_dump()["source_idea_note_reference"] == {
+        "namespace": "research",
+        "idea_note_path": "knowledge/python.md",
+    }
     assert RemoteLinkModel.model_validate(model.model_dump()).uri == uri
+
+
+def test_idea_note_operations_use_selected_namespace(tmp_path: Path) -> None:
+    drafts_root = tmp_path / "drafts"
+    archive_root = tmp_path / "archive"
+    drafts_root.mkdir()
+    archive_root.mkdir()
+    (drafts_root / "shared.md").write_text("draft note\n", encoding="utf-8")
+    (archive_root / "shared.md").write_text("archived note\n", encoding="utf-8")
+    tool = IdeaTool(
+        {
+            "drafts": IdeaSpace(drafts_root),
+            "archive": IdeaSpace(archive_root),
+        },
+        default_namespace="drafts",
+    )
+
+    default_note = tool.get_idea_note("shared.md")
+    archive_note = tool.get_idea_note("shared.md", idea_namespace="archive")
+    written_path = tool.write_idea_note("new.md", "new archived note", {}, idea_namespace="archive")
+
+    assert default_note.body == "draft note\n"
+    assert archive_note.body == "archived note\n"
+    assert written_path == "new.md"
+    assert (archive_root / "new.md").read_text(encoding="utf-8") == "new archived note"
+    assert not (drafts_root / "new.md").exists()
 
 
 def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(

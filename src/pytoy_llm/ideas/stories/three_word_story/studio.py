@@ -50,7 +50,7 @@ class ThreeWordStoryStudio:
         self._prepare_convention()
         usage_limit = usage_limit or UsageLimit(max_total_tokens=2000000, max_requests=50)
         idea_tool = IdeaTool.from_any(
-            idea_space_root=self.folder_path, workspace_root=self.folder_path
+            idea_space_roots=self.folder_path, workspace_root=self.folder_path
         )
 
         return AgentInvocationSpec.from_any(

@@ -1,6 +1,21 @@
 from typing import Annotated
 
-from pydantic import Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue
+
+Namespace = Annotated[
+    str,
+    Field(
+        description=(
+            "Name of the Namespace containing the target IdeaSpace. "
+            "Use an empty string to refer to the default Namespace."
+        ),
+        examples=[
+            "",
+            "research",
+            "archive",
+        ],
+    ),
+]
 
 IdeaSpacePath = Annotated[
     str,
@@ -88,3 +103,18 @@ IdeaNoteMetadata = Annotated[
         ),
     ),
 ]
+
+
+class IdeaNoteReference(BaseModel, frozen=True):
+    """A reference to an IdeaNote within a Namespace."""
+
+    namespace: Namespace = Field(
+        description="Namespace containing the referenced IdeaNote.",
+    )
+    idea_note_path: IdeaNotePath = Field(
+        description="Path of the IdeaNote, relative to the Namespace's IdeaSpace root.",
+        examples=[
+            "knowledge/python.md",
+            "history/Japan/note.md",
+        ],
+    )
