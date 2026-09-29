@@ -27,7 +27,7 @@ class ThreeWordStoryStudio:
 
     @property
     def folder_path(self) -> Path:
-        return self.idea_space.folder_path
+        return self.idea_space.directory_path
 
     def _prepare_convention(self) -> None:
         convention_path = self.folder_path / ".convention.md"

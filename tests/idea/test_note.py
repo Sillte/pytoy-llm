@@ -22,6 +22,7 @@ def test_note_parses_front_matter_and_preserves_body_offset() -> None:
     assert note.metadata is not None
     assert note.metadata["id"] == "example"
     assert note.to_text().startswith("---\n")
+    assert note.root_folder_path == note.root_directory_path
 
 
 def test_note_extracts_link_sources_with_source_ranges() -> None:

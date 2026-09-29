@@ -7,7 +7,7 @@ from pytoy_llm.idea.domain.exceptions import (
 )
 from pytoy_llm.idea.domain.links import LinkSource, LinkSourceExtractor
 from pytoy_llm.idea.domain.metadata import MetaDataProtocol
-from pytoy_llm.idea.domain.path import IdeaPath, resolve_absolute_path, resolve_root_folder_path
+from pytoy_llm.idea.domain.path import IdeaPath, resolve_absolute_path, resolve_root_directory_path
 from pytoy_llm.idea.domain.readers import (
     DiskFileReader,
     FileReaderProtocol,
@@ -154,16 +154,16 @@ class IdeaNote:
                 YAML front matter.
         """
         path = Path(path)
-        root_folder_path = resolve_root_folder_path(root=root, pivot_path=path)
-        absolute_path = resolve_absolute_path(path, root_folder_path)
+        root_directory_path = resolve_root_directory_path(root=root, pivot_path=path)
+        absolute_path = resolve_absolute_path(path, root_directory_path)
 
-        if not absolute_path.is_relative_to(root_folder_path):
+        if not absolute_path.is_relative_to(root_directory_path):
             raise PermissionError(
                 f"Path must be inside root: "
-                f"path={path}, root_folder_path={root_folder_path}, root={root}"
+                f"path={path}, root_directory_path={root_directory_path}, root={root}"
             )
-        self._relative_path = absolute_path.relative_to(root_folder_path)
-        self._root_folder_path = root_folder_path
+        self._relative_path = absolute_path.relative_to(root_directory_path)
+        self._root_directory_path = root_directory_path
 
         interpreted_result = interpret(text)
         self._metadata = interpreted_result.metadata or YamlRockWrapper()
@@ -238,11 +238,16 @@ class IdeaNote:
 
     @property
     def file_path(self) -> Path:
-        return self._root_folder_path / self._relative_path
+        return self._root_directory_path / self._relative_path
+
+    @property
+    def root_directory_path(self) -> Path:
+        return self._root_directory_path
 
     @property
     def root_folder_path(self) -> Path:
-        return self._root_folder_path
+        """Compatibility alias for :attr:`root_directory_path`."""
+        return self.root_directory_path
 
     @property
     def text(self) -> str:

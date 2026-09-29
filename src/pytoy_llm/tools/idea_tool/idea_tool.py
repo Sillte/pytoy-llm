@@ -57,7 +57,7 @@ def build_idea_note_model(
                     IdeaNoteLinkModel(
                         source_idea_note_path=idea_note.idea_path,
                         target_idea_note_path=target_path,
-                        idea_space_root_folder=idea_space.root_folder_path,
+                        idea_space_directory_folder=idea_space.root_directory_path,
                     )
                 )
             elif idea_link.uri.scheme == "workspace":
@@ -191,11 +191,11 @@ class IdeaTool:
 
     @property
     def ideaspace_root(self) -> Path:
-        return self._idea_space.folder_path
+        return self._idea_space.directory_path
 
     @property
     def tool_context_path(self) -> Path:
-        return self._idea_space.space_meta_folder / "tool_context.json"
+        return self._idea_space.space_meta_directory / "tool_context.json"
 
     @property
     def tools(self) -> Sequence[Callable]:
@@ -346,7 +346,7 @@ class IdeaTool:
         """
         try:
             path = self._idea_space.resolve(idea_space_pivot)
-            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_folder_path)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_directory_path)
             result_spaces = sub_space.get_subspaces(depth=depth)
         except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
@@ -363,19 +363,19 @@ class IdeaTool:
         metadata directories are not treated as successful creation.
         """
         try:
-            folder_path = self._idea_space.resolve(idea_space_path)
-            if folder_path == self.ideaspace_root:
+            directory_path = self._idea_space.resolve(idea_space_path)
+            if directory_path == self.ideaspace_root:
                 return ToolError(
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg="The IdeaSpace root already exists and cannot be created as a subspace.",
                 )
-            if folder_path.name == IdeaSpace.SPACE_META_NAME:
+            if directory_path.name == IdeaSpace.SPACE_META_NAME:
                 return ToolError(
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg=f"`{idea_space_path}` is reserved for IdeaSpace tool metadata.",
                 )
-            if folder_path.exists():
-                if folder_path.is_dir():
+            if directory_path.exists():
+                if directory_path.is_dir():
                     msg = f"IdeaSpace already exists at `{idea_space_path}`."
                 else:
                     msg = f"`{idea_space_path}` already exists and is not a directory."
@@ -383,13 +383,13 @@ class IdeaTool:
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg=msg,
                 )
-            if not folder_path.parent.is_dir():
+            if not directory_path.parent.is_dir():
                 return ToolError(
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg=f"Parent of `{idea_space_path}` does not exist.",
                     suggestion=f"How about creating a subspace at `{Path(idea_space_path).parent.as_posix()}`",
                 )
-            folder_path.mkdir()
+            directory_path.mkdir()
         except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
         except FileNotFoundError as e:
@@ -405,23 +405,23 @@ class IdeaTool:
         directories cannot be deleted by this operation.
         """
         try:
-            folder_path = self._idea_space.resolve(idea_space_path)
-            if folder_path == self.ideaspace_root:
+            directory_path = self._idea_space.resolve(idea_space_path)
+            if directory_path == self.ideaspace_root:
                 return ToolError(
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg="The IdeaSpace root cannot be deleted.",
                 )
-            if folder_path.name == IdeaSpace.SPACE_META_NAME:
+            if directory_path.name == IdeaSpace.SPACE_META_NAME:
                 return ToolError(
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg=f"`{idea_space_path}` is reserved for IdeaSpace tool metadata.",
                 )
-            if not folder_path.is_dir():
+            if not directory_path.is_dir():
                 return ToolError(
                     kind=ToolErrorKind.INVALID_ARGUMENT,
                     msg=f"`{idea_space_path}` does not identify an IdeaSpace directory.",
                 )
-            folder_path.rmdir()
+            directory_path.rmdir()
         except FileNotFoundError as e:
             return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(e), retry=False)
         except OutsidePathError as e:
@@ -453,7 +453,7 @@ class IdeaTool:
         """
         try:
             path = self._idea_space.resolve(idea_space_pivot)
-            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_folder_path)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_directory_path)
             result_notes = sub_space.get_notes(depth=depth)
         except OutsidePathError as e:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(e), retry=False)
@@ -494,7 +494,7 @@ class IdeaTool:
 
         try:
             path = self._idea_space.resolve(idea_space_pivot)
-            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_folder_path)
+            sub_space = IdeaSpace.from_path(path, root=self._idea_space.root_directory_path)
             notes = sub_space.get_notes(depth=depth)
             return {note.idea_path: _path_to_aware_datetime(note.file_path) for note in notes}
 
@@ -527,7 +527,7 @@ class IdeaTool:
                     continue
 
                 idea_note = IdeaNote.from_path(
-                    path=file_path, root=self._idea_space.root_folder_path
+                    path=file_path, root=self._idea_space.root_directory_path
                 )
             except (FileNotFoundError, OutsidePathError, MetadataDeserializationError):
                 metadata_by_path[path] = None
@@ -563,7 +563,9 @@ class IdeaTool:
                     suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`.",
                 )
 
-            idea_note = IdeaNote.from_path(path=file_path, root=self._idea_space.root_folder_path)
+            idea_note = IdeaNote.from_path(
+                path=file_path, root=self._idea_space.root_directory_path
+            )
             if clear:
                 idea_note.metadata.clear()
             for key, value in idea_note_metadata.items():
@@ -603,7 +605,9 @@ class IdeaTool:
                     suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`. ",
                 )
 
-            idea_note = IdeaNote.from_path(path=file_path, root=self._idea_space.root_folder_path)
+            idea_note = IdeaNote.from_path(
+                path=file_path, root=self._idea_space.root_directory_path
+            )
         except FileNotFoundError as e:
             return ToolError(
                 kind=ToolErrorKind.NOT_FOUND,
@@ -660,7 +664,7 @@ class IdeaTool:
                 )
 
             idea_note = IdeaNote.create(
-                file_path=file_path, body=idea_note_body, root=self._idea_space.root_folder_path
+                file_path=file_path, body=idea_note_body, root=self._idea_space.root_directory_path
             )
             for key, value in idea_note_metadata.items():
                 idea_note.metadata[key] = value

@@ -125,7 +125,7 @@ class UriLocalPathResolver:
             ValueError:
                 If `Uri` cannot be converted to `local_path`.(Physical path in the file system.)
             PermissionError:
-                If `Uri` is outside of `root_folder`.
+                If `Uri` is outside of the root directory.
         """
         path = unquote(uri.path)
         scheme = uri.scheme.lower()

@@ -7,7 +7,7 @@ from pytoy_llm.idea.domain.path import (
     ROOT_MARKER_FILE_NAME,
     IdeaPath,
     resolve_absolute_path,
-    resolve_root_folder_path,
+    resolve_root_directory_path,
 )
 
 from .domain.exceptions import OutsidePathError
@@ -33,17 +33,19 @@ class IdeaSpace:
         ensure_root_marker: bool = False,
     ) -> None:
 
-        root_folder_path = resolve_root_folder_path(root, path)
-        absolute_path = resolve_absolute_path(path, root_folder_path)
+        root_directory_path = resolve_root_directory_path(root, path)
+        absolute_path = resolve_absolute_path(path, root_directory_path)
         file_reader = file_reader or DiskFileReader()
 
-        if not absolute_path.is_relative_to(root_folder_path):
+        if not absolute_path.is_relative_to(root_directory_path):
             raise OutsidePathError(f"Space must be inside root: path={path}, root={root}")
         if absolute_path.exists() and not absolute_path.is_dir():
-            raise ValueError(f"Space path must be a folder, not a: `{path=}`, `{absolute_path=}`")
+            raise ValueError(
+                f"Space path must be a directory, not a: `{path=}`, `{absolute_path=}`"
+            )
 
-        self._root_folder_path = root_folder_path
-        self._relative_path = absolute_path.relative_to(self._root_folder_path)
+        self._root_directory_path = root_directory_path
+        self._relative_path = absolute_path.relative_to(self._root_directory_path)
         self._file_reader = file_reader
         self._note_predicator = note_predicator_v1
 
@@ -83,7 +85,7 @@ class IdeaSpace:
             note_or_path = IdeaNote.from_path(note_or_path)
         return cls.from_path(
             path=note_or_path.file_path.parent,
-            root=note_or_path.root_folder_path,
+            root=note_or_path.root_directory_path,
             file_reader=note_or_path.file_reader,
             ensure_root_marker=ensure_root_marker,
         )
@@ -93,9 +95,9 @@ class IdeaSpace:
 
         Raises `OutsidePathError` if the given path is outside of `IdeaSpace`.
         """
-        absolute_path = resolve_absolute_path(path, self._root_folder_path)
+        absolute_path = resolve_absolute_path(path, self._root_directory_path)
 
-        if not absolute_path.is_relative_to(self._root_folder_path):
+        if not absolute_path.is_relative_to(self._root_directory_path):
             raise OutsidePathError(f"`{absolute_path}` is outside of `IdeaSpace`.")
         return absolute_path
 
@@ -108,18 +110,28 @@ class IdeaSpace:
         return self.idea_path
 
     @property
+    def directory_path(self) -> Path:
+        return self._root_directory_path / self._relative_path
+
+    @property
     def folder_path(self) -> Path:
-        return self._root_folder_path / self._relative_path
+        """Compatibility alias for :attr:`directory_path`."""
+        return self.directory_path
+
+    @property
+    def root_directory_path(self) -> Path:
+        return self._root_directory_path
 
     @property
     def root_folder_path(self) -> Path:
-        return self._root_folder_path
+        """Compatibility alias for :attr:`root_directory_path`."""
+        return self.root_directory_path
 
     @property
     def root_space(self) -> Self:
         return self.from_path(
-            path=self.root_folder_path,
-            root=self.root_folder_path,
+            path=self.root_directory_path,
+            root=self.root_directory_path,
             file_reader=self._file_reader,
         )
 
@@ -127,7 +139,7 @@ class IdeaSpace:
     def parent(self) -> Self:
         return self.from_path(
             path=self._relative_path.parent,
-            root=self._root_folder_path,
+            root=self._root_directory_path,
             file_reader=self._file_reader,
         )
 
@@ -138,17 +150,22 @@ class IdeaSpace:
     @property
     def convention(self) -> IdeaNote | None:
         for cand in self.CONVENTION_CANDIDATES:
-            if (self.folder_path / cand).exists():
+            if (self.directory_path / cand).exists():
                 return IdeaNote.from_path(
-                    path=self.folder_path / cand,
-                    root=self.root_folder_path,
+                    path=self.directory_path / cand,
+                    root=self.root_directory_path,
                     file_reader=self._file_reader,
                 )
         return None
 
     @property
+    def space_meta_directory(self) -> Path:
+        return self.directory_path / self.SPACE_META_NAME
+
+    @property
     def space_meta_folder(self) -> Path:
-        return self.folder_path / self.SPACE_META_NAME
+        """Compatibility alias for :attr:`space_meta_directory`."""
+        return self.space_meta_directory
 
     def get_subspaces(self, depth: int | None = 0) -> Sequence["IdeaSpace"]:
         spaces: list[IdeaSpace] = []
@@ -159,18 +176,18 @@ class IdeaSpace:
 
             for child in path.iterdir():
                 if child.is_dir():
-                    if self._is_meta_folder(child):
+                    if self._is_meta_directory(child):
                         continue
                     spaces.append(
                         self.from_path(
                             path=child,
-                            root=self.root_folder_path,
+                            root=self.root_directory_path,
                             file_reader=self._file_reader,
                         )
                     )
                     visit(child, current_depth + 1)
 
-        visit(self.folder_path, 0)
+        visit(self.directory_path, 0)
 
         return sorted(tuple(spaces), key=lambda space: space.idea_path)
 
@@ -190,22 +207,22 @@ class IdeaSpace:
                     if self._is_note_path(child):
                         notes.append(
                             IdeaNote.from_path(
-                                child, root=self.root_folder_path, file_reader=self._file_reader
+                                child, root=self.root_directory_path, file_reader=self._file_reader
                             )
                         )
                 elif child.is_dir():
-                    if not self._is_meta_folder(child):
+                    if not self._is_meta_directory(child):
                         visit(child, current_depth + 1)
 
-        visit(self.folder_path, 0)
+        visit(self.directory_path, 0)
 
         return sorted(tuple(notes), key=lambda note: note.idea_path)
 
     def _is_note_path(self, file_path: Path) -> bool:
         return self._note_predicator(file_path)
 
-    def _is_meta_folder(self, folder_path: Path) -> bool:
-        return folder_path.name == self.SPACE_META_NAME
+    def _is_meta_directory(self, directory_path: Path) -> bool:
+        return directory_path.name == self.SPACE_META_NAME
 
     def ensure_root_marker(self) -> None:
-        (self.root_folder_path / self.ROOT_MARKER_FILE_NAME).touch()
+        (self.root_directory_path / self.ROOT_MARKER_FILE_NAME).touch()

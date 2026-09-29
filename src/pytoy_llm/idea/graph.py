@@ -18,10 +18,10 @@ class IdeaGraph:
     def __init__(self, space: IdeaSpace) -> None:
         self._space = space
         scheme_directories = [
-            SchemeDirectory.from_any(root_directory=self._space.root_folder_path, scheme="idea")
+            SchemeDirectory.from_any(root_directory=self._space.root_directory_path, scheme="idea")
         ]
         self._path_resolver = UriLocalPathResolver(
-            scheme_directories, default_root_directory=self._space.root_folder_path
+            scheme_directories, default_root_directory=self._space.root_directory_path
         )
         self._link_resolver = MarkdownLinkResolver(self._path_resolver)
         self._converter = IdeaLinkConverter()
@@ -53,8 +53,8 @@ class IdeaGraph:
     ) -> Self:
         return cls.from_space(
             space=IdeaSpace.from_path(
-                path=note.root_folder_path,
-                root=note.root_folder_path,
+                path=note.root_directory_path,
+                root=note.root_directory_path,
                 file_reader=file_reader,
             )
         )

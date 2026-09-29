@@ -33,8 +33,10 @@ def test_root_space_returns_root_level_space_without_creating_it(tmp_path: Path)
 
     root_space = space.root_space
 
-    assert root_space.root_folder_path == tmp_path
-    assert root_space.folder_path == tmp_path
+    assert root_space.root_directory_path == tmp_path
+    assert root_space.directory_path == tmp_path
+    assert root_space.root_folder_path == root_space.root_directory_path
+    assert root_space.folder_path == root_space.directory_path
     assert root_space.path == "."
     assert nested.exists()
     assert not (tmp_path / IdeaSpace.ROOT_MARKER_FILE_NAME).exists()

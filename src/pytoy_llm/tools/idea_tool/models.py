@@ -57,7 +57,7 @@ class IdeaNoteLinkModel(BaseModel, frozen=True):
         examples=["knowledge/programming.md"],
     )
 
-    idea_space_root_folder: Path = Field(description="Root folder of IdeaSpace")
+    idea_space_directory_folder: Path = Field(description="Root directory of IdeaSpace")
 
     @property
     def uri_string(self) -> str:
