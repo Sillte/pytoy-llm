@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from functools import wraps
 from pathlib import Path
 from posixpath import normpath
 from typing import Callable, Mapping, Self, Sequence
@@ -38,6 +39,71 @@ from .semantic_types import (
     IdeaSpacePivot,
     Namespace,
 )
+
+# TODO:
+# We have to consider the contract of tools.
+# We preapre the contract in minimum way, i.e,
+# WET - style is acccepted to represent the contract of `ToolError`.
+
+
+def tool_discovery_boundary[R](
+    func: Callable[..., R],
+) -> Callable[..., R | ToolError]:
+    @wraps(func)
+    def wrapper(*args, **kwargs) -> R | ToolError:
+        try:
+            return func(*args, **kwargs)
+        except OutsidePathError as exc:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=str(exc),
+                retry=False,
+            )
+        except OSError as exc:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=str(exc),
+                retry=False,
+            )
+
+    return wrapper
+
+
+def tool_inspection_boundary[R](
+    func: Callable[..., R],
+) -> Callable[..., R | ToolError]:
+    @wraps(func)
+    def wrapper(*args, **kwargs) -> R | ToolError:
+        try:
+            return func(*args, **kwargs)
+        except MetadataDeserializationError:
+            return ToolError(
+                kind=ToolErrorKind.PARSE_ERROR,
+                msg="The specified IdeaNote is broken.",
+                retry=False,
+            )
+        except ValueError as exc:
+            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=str(exc))
+        except FileNotFoundError as exc:
+            return ToolError(
+                kind=ToolErrorKind.NOT_FOUND,
+                msg=str(exc),
+                retry=False,
+            )
+        except OutsidePathError as exc:
+            return ToolError(
+                kind=ToolErrorKind.PERMISSION_DENIED,
+                msg=str(exc),
+                retry=False,
+            )
+        except OSError as exc:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=str(exc),
+                retry=False,
+            )
+
+    return wrapper
 
 
 def build_idea_note_model(
@@ -99,34 +165,20 @@ def build_idea_note_model(
                 )
             )
 
-    try:
-        modified_at = datetime.fromtimestamp(
-            idea_note.file_path.stat().st_mtime,
-            timezone.utc,
-        )
-    except OSError as exc:
-        return ToolError(
-            kind=ToolErrorKind.IO_ERROR,
-            msg=str(exc),
-            retry=False,
-        )
-
-    try:
-        return IdeaNoteModel(
-            idea_note_path=idea_note.idea_path,
-            modified_at=modified_at,
-            body=idea_note.body,
-            metadata=idea_note.metadata.as_dict(),
-            idea_note_links=idea_note_links,
-            remote_links=remote_links,
-            workspace_local_links=workspace_links,
-            unresolved_links=unresolved_links,
-        )
-    except ValueError as exc:
-        return ToolError(
-            kind=ToolErrorKind.INVALID_ARGUMENT,
-            msg=str(exc),
-        )
+    modified_at = datetime.fromtimestamp(
+        idea_note.file_path.stat().st_mtime,
+        timezone.utc,
+    )
+    return IdeaNoteModel(
+        idea_note_path=idea_note.idea_path,
+        modified_at=modified_at,
+        body=idea_note.body,
+        metadata=idea_note.metadata.as_dict(),
+        idea_note_links=idea_note_links,
+        remote_links=remote_links,
+        workspace_local_links=workspace_links,
+        unresolved_links=unresolved_links,
+    )
 
 
 def _relative_path_from_uri(path: str, authority: str) -> str:
@@ -371,6 +423,7 @@ class IdeaTool:
                 )
         return IdeaSpaceToolWorkingContextModel(idea_space_tool_meta=tool_meta)
 
+    @tool_discovery_boundary
     def get_all_sub_idea_spaces_supported_by_convention(
         self,
         idea_namespace: Namespace | None = None,
@@ -398,14 +451,10 @@ class IdeaTool:
         idea_space = self._get_idea_space(idea_namespace)
         if isinstance(idea_space, ToolError):
             return idea_space
-        try:
-            spaces = [idea_space, *idea_space.get_subspaces(depth=None)]
-            return sorted(space.idea_path for space in spaces if space.convention is not None)
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
+        spaces = [idea_space, *idea_space.get_subspaces(depth=None)]
+        return sorted(space.idea_path for space in spaces if space.convention is not None)
 
+    @tool_inspection_boundary
     def get_idea_space_convention(
         self,
         idea_space_path: IdeaSpacePath = ".",
@@ -459,6 +508,7 @@ class IdeaTool:
         except OSError as exc:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
 
+    @tool_discovery_boundary
     def get_sub_idea_spaces(
         self,
         idea_space_pivot: IdeaSpacePivot = ".",
@@ -482,16 +532,9 @@ class IdeaTool:
         idea_space = self._get_idea_space(idea_namespace)
         if isinstance(idea_space, ToolError):
             return idea_space
-
-        try:
-            path = idea_space.resolve(idea_space_pivot)
-            sub_space = IdeaSpace.from_path(path, root=idea_space.root_directory_path)
-            result_spaces = sub_space.get_subspaces(depth=depth)
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
-
+        path = idea_space.resolve(idea_space_pivot)
+        sub_space = IdeaSpace.from_path(path, root=idea_space.root_directory_path)
+        result_spaces = sub_space.get_subspaces(depth=depth)
         return [space.idea_path for space in result_spaces]
 
     def create_sub_idea_space(
@@ -587,6 +630,7 @@ class IdeaTool:
             )
         return idea_space_path
 
+    @tool_discovery_boundary
     def get_idea_note_paths(
         self,
         idea_space_pivot: IdeaSpacePivot = ".",
@@ -671,6 +715,7 @@ class IdeaTool:
         except OSError as exc:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
 
+    @tool_discovery_boundary
     def get_metadata_of_idea_notes(
         self,
         idea_note_paths: Sequence[IdeaNotePath],
@@ -698,17 +743,9 @@ class IdeaTool:
                 if file_path.is_dir():
                     metadata_by_path[path] = None
                     continue
-
                 idea_note = IdeaNote.from_path(path=file_path, root=idea_space.root_directory_path)
-            except (FileNotFoundError, OutsidePathError, MetadataDeserializationError):
+            except (FileNotFoundError, MetadataDeserializationError):
                 metadata_by_path[path] = None
-            except OSError as exc:
-                return ToolError(
-                    kind=ToolErrorKind.IO_ERROR,
-                    msg=str(exc),
-                    retry=False,
-                    suggestion=f"Exclude `{path=}` from paths.",
-                )
             else:
                 metadata_by_path[path] = idea_note.metadata.as_dict()
 
@@ -761,6 +798,7 @@ class IdeaTool:
 
         return idea_note_path
 
+    @tool_inspection_boundary
     def get_idea_note(
         self,
         idea_note_path: IdeaNotePath,
@@ -784,40 +822,15 @@ class IdeaTool:
         if isinstance(resolved_namespace, ToolError):
             return resolved_namespace
 
-        try:
-            file_path = idea_space.resolve(idea_note_path)
-            if file_path.is_dir():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"Given `{idea_note_path=}` corresponds to `IdeaSpacePath`, not a path to `IdeaNote` ",
-                    suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`. ",
-                )
+        file_path = idea_space.resolve(idea_note_path)
+        if file_path.is_dir():
+            return ToolError(
+                kind=ToolErrorKind.INVALID_ARGUMENT,
+                msg=f"Given `{idea_note_path=}` corresponds to `IdeaSpacePath`, not a path to `IdeaNote` ",
+                suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`. ",
+            )
 
-            idea_note = IdeaNote.from_path(path=file_path, root=idea_space.root_directory_path)
-        except FileNotFoundError as exc:
-            return ToolError(
-                kind=ToolErrorKind.NOT_FOUND,
-                msg=str(exc),
-                retry=False,
-            )
-        except OutsidePathError as exc:
-            return ToolError(
-                kind=ToolErrorKind.PERMISSION_DENIED,
-                msg=str(exc),
-                retry=False,
-            )
-        except OSError as exc:
-            return ToolError(
-                kind=ToolErrorKind.IO_ERROR,
-                msg=str(exc),
-                retry=False,
-            )
-        except MetadataDeserializationError:
-            return ToolError(
-                kind=ToolErrorKind.PARSE_ERROR,
-                msg="The specified IdeaNote is broken.",
-                retry=False,
-            )
+        idea_note = IdeaNote.from_path(path=file_path, root=idea_space.root_directory_path)
 
         return build_idea_note_model(
             idea_note,
