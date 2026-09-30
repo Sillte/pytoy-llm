@@ -85,6 +85,43 @@ def test_authority_selects_scheme_directory(tmp_path: Path) -> None:
     assert resolver.resolve(second_uri) == second_root / "notes" / "a.md"
 
 
+def test_to_uri_round_trips_local_path_semantically(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    resolver = UriLocalPathResolver([SchemeDirectory(root, "repo", "local")])
+    original_uri = Uri.from_any("repo://local/notes/a%20b.md")
+
+    local_path = resolver.resolve(original_uri)
+    round_trip_uri = resolver.to_uri(local_path, "REPO", "local")
+
+    assert round_trip_uri.scheme == "repo"
+    assert round_trip_uri.authority == "local"
+    assert resolver.resolve(round_trip_uri) == local_path
+
+
+def test_to_uri_encodes_reserved_path_characters_and_round_trips(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    local_path = root / "notes" / "literal%20 space#tag.md"
+    local_path.parent.mkdir(parents=True)
+    local_path.touch()
+    resolver = UriLocalPathResolver([SchemeDirectory(root, "repo", "local")])
+
+    uri = resolver.to_uri(local_path, "repo", "local")
+    parsed_uri = Uri.from_any(str(uri))
+
+    assert uri.path == "notes/literal%2520%20space%23tag.md"
+    assert resolver.resolve(parsed_uri) == local_path.resolve()
+
+
+def test_to_uri_rejects_local_path_outside_registered_root(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    resolver = UriLocalPathResolver([SchemeDirectory(root, "repo")])
+
+    with pytest.raises(ValueError):
+        resolver.to_uri(root / ".." / "outside.md", "repo", "")
+
+
 def test_http_success_is_true(monkeypatch) -> None:
     monkeypatch.setattr(
         "pytoy_llm.idea.link_checker.urlopen",

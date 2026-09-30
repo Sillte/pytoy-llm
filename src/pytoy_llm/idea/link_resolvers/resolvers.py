@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from pytoy_llm.idea.domain.exceptions import OutsidePathError
 from pytoy_llm.idea.domain.links import (
@@ -50,33 +50,53 @@ def location_from_fragment(
 
 
 class MarkdownLinkResolver:
-    def __init__(self, local_path_resolver: UriLocalPathResolver):
+    def __init__(
+        self,
+        local_path_resolver: UriLocalPathResolver,
+        *,
+        default_boundary_directory: Path | None = None,
+    ):
         self.local_path_resolver = local_path_resolver
+        self.boundary_root_directory = (
+            Path(default_boundary_directory).resolve() if default_boundary_directory else None
+        )
 
     def resolve(
         self, file_path: Path, link_source: MarkdownLinkSource
     ) -> ResolvedLink | UnresolvedLink:
         target = link_source.target
 
-        if target.scheme in {"http", "https"}:
-            return ResolvedRemoteLink.from_any(
-                url=str(target), link_source=link_source, source_path=file_path
-            )
-        elif not target.scheme:
+        if self.local_path_resolver.is_registered(
+            link_source.target.scheme, link_source.target.authority
+        ):
             return ResolvedLocalLink.from_any(
-                target_path=self.local_path_resolver.resolve(
-                    target, source_base_directory=file_path.parent
-                ),
+                target_path=self.local_path_resolver.resolve(target),
                 target_location=location_from_fragment(link_source.fragment),
                 link_source=link_source,
                 source_path=file_path,
             )
 
-        return UnresolvedLink(
-            link_source=link_source,
-            source_path=file_path,
-            reason=f"Unknown `scheme={target.scheme=}`. {target=}",
-        )
+        elif target.scheme != "":
+            return ResolvedRemoteLink.from_any(
+                uri=target, link_source=link_source, source_path=file_path
+            )
+        else:
+            target_path = self.local_path_resolver.resolve(
+                target, source_base_directory=file_path.parent
+            )
+            if self.boundary_root_directory is not None:
+                if not target_path.is_relative_to(self.boundary_root_directory):
+                    return UnresolvedLink(
+                        link_source=link_source,
+                        source_path=file_path,
+                        reason=f"Out of boundary: {self.boundary_root_directory=}, {target=}",
+                    )
+            return ResolvedLocalLink.from_any(
+                target_path=target_path,
+                target_location=location_from_fragment(link_source.fragment),
+                link_source=link_source,
+                source_path=file_path,
+            )
 
 
 @dataclass(frozen=True)
@@ -99,21 +119,38 @@ class SchemeDirectory:
 
 
 class UriLocalPathResolver:
+    """
+
+    Note: SchemeDirectory.root_folder has been `resolved`.
+    """
+
     def __init__(
         self,
         scheme_directories: Iterable[SchemeDirectory],
-        default_root_directory: Path | None = None,
     ):
         directories: dict[tuple[str, str], SchemeDirectory] = {}
         for directory in scheme_directories:
-            key = (directory.scheme, directory.authority)
+            if directory.scheme == "":
+                raise ValueError(f"Empty scheme is not accepted. `{directory=}`.")
+            key = (directory.scheme.lower(), directory.authority)
             if key in directories:
                 raise ValueError(f"Duplicate URI route: {key}")
+
             directories[key] = directory
         self._directories = directories
-        self._default_root_directory = (
-            Path(default_root_directory).resolve() if default_root_directory else None
-        )
+
+    @classmethod
+    def from_any(
+        cls,
+        scheme_directories: Iterable[SchemeDirectory],
+    ) -> Self:
+        return cls(scheme_directories=scheme_directories)
+
+    def get_root_directory(self, scheme: str, authority: str = "") -> Path | None:
+        result = self._directories.get((scheme.lower(), authority))
+        if result is not None:
+            return result.root_directory
+        return None
 
     def is_registered(self, scheme: str, authority: str = "") -> bool:
         return (scheme.lower(), authority) in self._directories
@@ -131,7 +168,7 @@ class UriLocalPathResolver:
         scheme = uri.scheme.lower()
 
         if scheme:
-            route = self._directories.get((scheme, uri.authority))
+            route = self._directories.get((scheme.lower(), uri.authority))
             if route is None:
                 raise ValueError(f"URI route is not registered: {scheme=}, {uri.authority=}.")
 
@@ -153,7 +190,25 @@ class UriLocalPathResolver:
         if relative_path.is_absolute():
             raise ValueError(f"uri.path must be relative when the URI has no scheme: {uri}")
         target = (base_directory / relative_path).resolve()
-        if self._default_root_directory:
-            if not target.is_relative_to(self._default_root_directory):
-                raise OutsidePathError(f"The given relative `{path=}` is outside its given root.")
+
         return target
+
+    def to_uri(self, local_path: Path | str, scheme: str, authority: str) -> Uri:
+        scheme = scheme.lower()
+        route = self._directories.get((scheme, authority))
+        local_path = Path(local_path)
+
+        if route is None:
+            raise ValueError(f"URI route is not registered: {scheme=}, {authority=}.")
+        if not local_path.is_absolute():
+            raise ValueError(f"Local path must be absolute: {local_path=}.")
+
+        local_path = local_path.resolve()
+        posix = local_path.relative_to(route.root_directory).as_posix()
+        path = "" if posix == "." else quote(posix, safe="/")
+
+        return Uri(
+            scheme=scheme,
+            authority=authority,
+            path=path,
+        )

@@ -62,12 +62,25 @@ class WorkspaceExplorer:
     def from_any(
         cls,
         workspace: Path | str,
-        excludes: set[str] | frozenset[str] | Sequence[str] | None = None,
+        *,
+        excludes: Sequence[str] | None = None,
+        ignored_roots: Sequence[Path | str] = (),
     ) -> Self:
-        excludes = frozenset(cls.DEFAULT_EXCLUDE_PATTERNS if excludes is None else excludes)
         workspace = Path(workspace).resolve()
-        access = WorkspaceAccess.from_any(workspace=workspace, excludes=excludes)
-        return cls(access=access)
+
+        exclude_patterns = {
+            *cls.DEFAULT_EXCLUDE_PATTERNS,
+            *(excludes or ()),
+            *cls._patterns_for_ignored_roots(
+                workspace,
+                ignored_roots,
+            ),
+        }
+        access = WorkspaceAccess.from_any(
+            workspace=workspace,
+            excludes=frozenset(exclude_patterns),
+        )
+        return cls(access)
 
     @property
     def tools(self) -> Sequence[Callable]:
@@ -76,3 +89,17 @@ class WorkspaceExplorer:
             *self.inspection.tools,
             *self.search.tools,
         ]
+
+    @staticmethod
+    def _patterns_for_ignored_roots(
+        workspace: Path,
+        roots: Sequence[Path | str],
+    ) -> set[str]:
+        workspace = Path(workspace).resolve()
+        exclude_patterns = set()
+        for root in roots:
+            root = Path(root).resolve()
+            if root.is_relative_to(workspace) and root != workspace:
+                relative_path = root.relative_to(workspace)
+                exclude_patterns.add(relative_path.as_posix())
+        return exclude_patterns

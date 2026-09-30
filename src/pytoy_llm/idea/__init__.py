@@ -18,6 +18,7 @@ from .domain.links import (
 from .domain.writers import DiskFileWriter, FileWriterProtocol
 from .graph import IdeaGraph
 from .link_checker import LinkReachabilityChecker
+from .link_resolvers import SchemeDirectory, UriLocalPathResolver
 from .note import IdeaNote
 from .space import IdeaSpace
 
@@ -38,7 +39,9 @@ __all__ = [
     "LineLocation",
     "LinkReachabilityChecker",
     "Location",
+    "SchemeDirectory",
     "TextPosition",
     "TextRange",
     "UnresolvedIdeaLink",
+    "UriLocalPathResolver",
 ]

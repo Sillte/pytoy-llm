@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from posixpath import normpath
 from typing import Callable, Mapping, Self, Sequence
 from urllib.parse import unquote
 
@@ -14,9 +13,10 @@ from pytoy_llm.idea import (
     MetadataDeserializationError,
     MetadataValueError,
     OutsidePathError,
+    SchemeDirectory,
+    UriLocalPathResolver,
 )
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
-from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
 
 from .boundaries import tool_discovery_boundary, tool_inspection_boundary
 from .discovery import IdeaDiscovery
@@ -26,9 +26,9 @@ from .models import (
     IdeaSpaceConventionModel,
     IdeaSpaceToolMetaModel,
     IdeaSpaceToolWorkingContextModel,
+    LocalLinkModel,
     RemoteLinkModel,
     UnresolvedLinkModel,
-    WorkspaceLinkModel,
 )
 from .semantic_types import (
     IdeaNoteBody,
@@ -43,48 +43,47 @@ from .semantic_types import (
 
 
 def build_idea_note_model(
-    idea_note: IdeaNote,
+    source_idea_note: IdeaNote,
     idea_graph: IdeaGraph,
-    workspace_root: Path | None,
+    local_path_resolver: UriLocalPathResolver,
     namespace: Namespace,
 ) -> IdeaNoteModel | ToolError:
-    idea_links = idea_graph.resolve_links(idea_note)
+    idea_links = idea_graph.resolve_links(source_idea_note)
 
     idea_note_links = []
-    workspace_links = []
+    local_links = []
     remote_links = []
     unresolved_links = []
 
     source_idea_note_reference = IdeaNoteReference(
-        idea_note_path=idea_note.idea_path, namespace=namespace
+        idea_note_path=source_idea_note.idea_path, namespace=namespace
     )
 
     for idea_link in idea_links:
         try:
-            if idea_link.uri.scheme == "idea":
-                target_namespace = idea_link.uri.authority or namespace
-                idea_note_links.append(
-                    IdeaNoteLinkModel(
-                        source_idea_note_reference=source_idea_note_reference,
-                        target_idea_note_reference=IdeaNoteReference(
-                            idea_note_path=idea_link.uri.path,
-                            namespace=target_namespace,
-                        ),
-                    )
-                )
-            elif idea_link.uri.scheme == "workspace":
-                if workspace_root is not None:
-                    workspace_path = _relative_path_from_uri(
-                        idea_link.uri.path, idea_link.uri.authority
-                    )
-                    workspace_links.append(
-                        WorkspaceLinkModel(
+            scheme, authority = idea_link.uri.scheme, idea_link.uri.authority
+            if local_path_resolver.is_registered(scheme, authority):
+                _ = local_path_resolver.resolve(idea_link.uri, source_idea_note.file_path.parent)
+                if scheme == "idea":
+                    authority = authority or namespace
+                    idea_note_links.append(
+                        IdeaNoteLinkModel(
                             source_idea_note_reference=source_idea_note_reference,
-                            workspace_file_path=workspace_path,
-                        ),
+                            target_idea_note_reference=IdeaNoteReference(
+                                idea_note_path=idea_link.uri.path.strip("/"),
+                                namespace=authority,
+                            ),
+                        )
                     )
                 else:
-                    raise ValueError("Workspace is not given here.")
+                    local_links.append(
+                        LocalLinkModel(
+                            source_idea_note_reference=source_idea_note_reference,
+                            scheme=idea_link.uri.scheme,
+                            namespace=idea_link.uri.authority,
+                            path=unquote(idea_link.uri.path).strip("/"),
+                        ),
+                    )
             else:
                 remote_links.append(
                     RemoteLinkModel(
@@ -102,29 +101,19 @@ def build_idea_note_model(
             )
 
     modified_at = datetime.fromtimestamp(
-        idea_note.file_path.stat().st_mtime,
+        source_idea_note.file_path.stat().st_mtime,
         timezone.utc,
     )
     return IdeaNoteModel(
-        idea_note_path=idea_note.idea_path,
+        idea_note_path=source_idea_note.idea_path,
         modified_at=modified_at,
-        body=idea_note.body,
-        metadata=idea_note.metadata.as_dict(),
+        body=source_idea_note.body,
+        metadata=source_idea_note.metadata.as_dict(),
         idea_note_links=idea_note_links,
         remote_links=remote_links,
-        workspace_local_links=workspace_links,
+        local_links=local_links,
         unresolved_links=unresolved_links,
     )
-
-
-def _relative_path_from_uri(path: str, authority: str) -> str:
-    if authority:
-        raise ValueError(f"URI authority is not supported: {authority}")
-
-    normalized_path = normpath(unquote(path).lstrip("/"))
-    if normalized_path == ".." or normalized_path.startswith("../"):
-        raise ValueError("URI path must stay relative to its registered root.")
-    return normalized_path
 
 
 class IdeaTool:
@@ -134,14 +123,14 @@ class IdeaTool:
     ``mark_llm_start`` and ``mark_llm_finished`` are intended to be registered
     as lifecycle event handlers for this purpose.
 
-    Note that this class may also provide the tools of WorkspaceExplorer.
-
     """
+
+    SCHEME = "idea"
 
     def __init__(
         self,
         idea_spaces: Mapping[Namespace, IdeaSpace] | IdeaSpace,
-        workspace_explorer: WorkspaceExplorer | None = None,
+        local_path_resolver: UriLocalPathResolver,
         *,
         default_namespace: Namespace | None = None,
     ) -> None:
@@ -172,6 +161,10 @@ class IdeaTool:
 
         if default_namespace not in self._idea_spaces:
             raise ValueError(f"`{default_namespace=}` does not exist in `{idea_spaces}`")
+
+        if not local_path_resolver.is_registered(self.SCHEME, default_namespace):
+            raise ValueError(f"`{default_namespace=}` is not registered.")
+
         if any(
             space.directory_path != space.root_directory_path
             for space in self._idea_spaces.values()
@@ -181,7 +174,7 @@ class IdeaTool:
             )
 
         self._file_writer = DiskFileWriter()
-        self._workspace_explorer = workspace_explorer
+        self._local_path_resolver = local_path_resolver
         self._discovery = IdeaDiscovery(self._get_idea_space)
 
         self._started_at: datetime = datetime.now(tz=timezone.utc)
@@ -191,16 +184,35 @@ class IdeaTool:
         return self._default_namespace
 
     @classmethod
+    def make_exclude_patterns(
+        cls, ancestor_root: Path, idea_space_roots: Sequence[Path]
+    ) -> Sequence[str]:
+        """Return the list of `execlude` patterns which
+        notifies the `ancestor` does not regard the `idea_space_roots` as the members.
+        """
+        ancestor_root = Path(ancestor_root).resolve()
+        exclude_patterns = []
+        for root in idea_space_roots:
+            root = root.resolve()
+            if root.is_relative_to(ancestor_root) and root != ancestor_root:
+                relative_path = root.relative_to(ancestor_root)
+                exclude_patterns.append(relative_path.as_posix())
+        return exclude_patterns
+
+    @classmethod
     def from_any(
         cls,
-        idea_space_roots: Sequence[Path | str] | Path | str,
-        workspace_root: Path | str | None = None,
+        idea_space_roots: Sequence[Path | str] | Path | str | IdeaSpace,
+        *,
+        scheme_directories: Sequence[SchemeDirectory] = tuple(),
+        workspace_root: str | Path | None = None,
         default_namespace: Namespace | None = None,
     ) -> Self:
-        if isinstance(workspace_root, str):
-            workspace_root = Path(workspace_root)
+        scheme_directories = list(scheme_directories)
         if isinstance(idea_space_roots, (Path, str)):
             idea_space_roots = [idea_space_roots]
+        elif isinstance(idea_space_roots, IdeaSpace):
+            idea_space_roots = [idea_space_roots.root_directory_path]
         roots = [Path(root).resolve() for root in idea_space_roots]
         idea_spaces = {
             root.name: IdeaSpace.from_path(path=root, root=root, with_creation=True)
@@ -208,31 +220,34 @@ class IdeaTool:
         }
         if len(idea_spaces) != len(roots):
             raise ValueError("IdeaSpace roots must have unique directory names.")
-
         if workspace_root is not None:
             workspace_root = Path(workspace_root).resolve()
-            exclude_patterns = set(WorkspaceExplorer.DEFAULT_EXCLUDE_PATTERNS)
-            for root in roots:
-                if root.is_relative_to(workspace_root) and root != workspace_root:
-                    relative_path = root.relative_to(workspace_root)
-                    exclude_patterns.add(relative_path.as_posix())
-            workspace_explorer = WorkspaceExplorer.from_any(
-                workspace=workspace_root,
-                excludes=exclude_patterns,
+
+            if any(elem.scheme == "workspace" for elem in scheme_directories):
+                raise ValueError(
+                    f"Dumplication of `workspace` scheme, {scheme_directories=}, {workspace_root=} "
+                )
+            workspace_scheme_directory = SchemeDirectory(
+                root_directory=workspace_root, scheme="workspace"
             )
-        else:
-            workspace_explorer = None
-        return cls(
-            idea_spaces=idea_spaces,
-            workspace_explorer=workspace_explorer,
-            default_namespace=default_namespace,
+            scheme_directories.append(workspace_scheme_directory)
+
+        for name, space in idea_spaces.items():
+            scheme_directories.append(
+                SchemeDirectory(
+                    root_directory=space.root_directory_path, scheme=cls.SCHEME, authority=name
+                )
+            )
+
+        local_path_resolver = UriLocalPathResolver.from_any(
+            scheme_directories=scheme_directories,
         )
 
-    @property
-    def workspace_root(self) -> Path | None:
-        if self._workspace_explorer is not None:
-            return self._workspace_explorer.workspace
-        return None
+        return cls(
+            idea_spaces=idea_spaces,
+            local_path_resolver=local_path_resolver,
+            default_namespace=default_namespace,
+        )
 
     def _resolve_idea_namespace(
         self, idea_namespace: Namespace | None = None
@@ -284,8 +299,6 @@ class IdeaTool:
             self.write_idea_note,
             self.delete_idea_note,
         ]
-        if self._workspace_explorer is not None:
-            tools = [*tools, *self._workspace_explorer.tools]
         return tools
 
     def mark_llm_start(self) -> None:
@@ -401,7 +414,7 @@ class IdeaTool:
                 idea_note_model = build_idea_note_model(
                     convention,
                     self._idea_graphs[resolved_namespace],
-                    workspace_root=self.workspace_root,
+                    local_path_resolver=self._local_path_resolver,
                     namespace=resolved_namespace,
                 )
                 if isinstance(idea_note_model, IdeaNoteModel):
@@ -705,7 +718,7 @@ class IdeaTool:
         return build_idea_note_model(
             idea_note,
             self._idea_graphs[resolved_namespace],
-            workspace_root=self.workspace_root,
+            local_path_resolver=self._local_path_resolver,
             namespace=resolved_namespace,
         )
 

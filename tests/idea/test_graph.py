@@ -45,7 +45,10 @@ def test_graph_returns_unresolved_link_for_retired_repo_scheme(tmp_path: Path) -
     links = IdeaGraph(IdeaSpace(tmp_path)).resolve_links(source, only_valid=False)
 
     assert len(links) == 1
-    assert isinstance(links[0], UnresolvedIdeaLink)
+    assert len(links) == 1
+    assert isinstance(links[0], IdeaLink)
+    assert links[0].uri.scheme == "unknown"
+    assert links[0].uri.authority == "project"
 
 
 def test_graph_finds_backlinks(tmp_path: Path) -> None:

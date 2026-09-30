@@ -34,7 +34,7 @@ class IdeaLinkConverter:
                 link = IdeaLink(
                     source_path=inner_link.source_path,
                     source_text_range=inner_link.link_source.text_range,
-                    uri=Uri.from_any(inner_link.url),
+                    uri=Uri.from_any(inner_link.uri),
                     target_path=None,
                 )
             case UnresolvedLink():

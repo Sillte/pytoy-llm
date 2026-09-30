@@ -3,29 +3,50 @@ from typing import Sequence
 from pydantic import AwareDatetime, BaseModel, Field
 
 from pytoy_llm.idea.domain.uri import Uri
-from pytoy_llm.tools.workspace_explorer.semantic_types import WorkspaceFilePath
 
 from .semantic_types import (
     IdeaNoteMetadata,
     IdeaNotePath,
     IdeaNoteReference,
     IdeaSpacePath,
+    LocalFilePath,
+    Namespace,
 )
 
 
-class WorkspaceLinkModel(BaseModel, frozen=True):
-    """A link from an IdeaNote to a local workspace file."""
+class LocalLinkModel(BaseModel, frozen=True):
+    """A link from an IdeaNote to a file in a configured local root.
+
+    `scheme` identifies the kind of local link, and `namespace` identifies
+    the configured root to which `path` is relative.
+
+    `path` is a decoded filesystem path, not a percent-encoded URI path.
+    `uri_string` percent-encodes it when constructing a URI.
+    """
+
+    scheme: str = Field(
+        description="The scheme identifying the kind of local link.",
+        examples=["workspace"],
+    )
+    namespace: Namespace = Field(
+        description="The configured namespace containing the target file. When `namespace` is represented in the form of URI, it corresponds to Authority.",
+        examples=["example.com", "authority"],
+    )
+    path: LocalFilePath = Field(
+        description="A path relative to the root configured for the namespace.",
+        examples=["src/llm/idea.note.py", "pyproject.toml"],
+    )
 
     source_idea_note_reference: IdeaNoteReference
 
-    workspace_file_path: WorkspaceFilePath = Field(
-        description="Path of the referenced file, relative to the workspace root.",
-        examples=["src/pytoy_llm/idea/note.py"],
-    )
-
     @property
     def uri_string(self) -> str:
-        return f"workspace:///{self.workspace_file_path.strip('/')}"
+        from urllib.parse import quote
+
+        path = quote(self.path.strip("/"), safe="/")
+        if self.namespace:
+            return f"{self.scheme}://{self.namespace}/{path}"
+        return f"{self.scheme}:{path}"
 
 
 class RemoteLinkModel(BaseModel, frozen=True):
@@ -94,9 +115,9 @@ class IdeaNoteModel(BaseModel, frozen=True):
         description="Links from this note to other IdeaNotes.",
     )
 
-    workspace_local_links: Sequence[WorkspaceLinkModel] = Field(
+    local_links: Sequence[LocalLinkModel] = Field(
         default=(),
-        description="Links from this note to local workspace files.",
+        description="Links from this note to local files.",
     )
 
     remote_links: Sequence[RemoteLinkModel] = Field(

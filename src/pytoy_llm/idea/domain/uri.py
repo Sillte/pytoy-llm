@@ -12,7 +12,10 @@ class Uri:
     fragment: str | None = None
 
     @classmethod
-    def from_any(cls, arg: str) -> Self:
+    def from_any(cls, arg: str | Self) -> Self:
+        if not isinstance(arg, str):
+            return arg
+
         result = urlsplit(arg)
 
         return cls(

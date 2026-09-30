@@ -21,9 +21,11 @@ class IdeaGraph:
             SchemeDirectory.from_any(root_directory=self._space.root_directory_path, scheme="idea")
         ]
         self._path_resolver = UriLocalPathResolver(
-            scheme_directories, default_root_directory=self._space.root_directory_path
+            scheme_directories,
         )
-        self._link_resolver = MarkdownLinkResolver(self._path_resolver)
+        self._link_resolver = MarkdownLinkResolver(
+            self._path_resolver, default_boundary_directory=self._space.root_directory_path
+        )
         self._converter = IdeaLinkConverter()
 
     @classmethod

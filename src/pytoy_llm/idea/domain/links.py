@@ -87,22 +87,22 @@ class ResolvedLocalLink:
 
 @dataclass(frozen=True)
 class ResolvedRemoteLink:
-    url: str
+    uri: Uri
     link_source: LinkSource
     source_path: Path
 
     @classmethod
     def from_any(
         cls,
-        url: str,
+        uri: Uri,
         link_source: LinkSource,
         source_path: Path,
     ) -> Self:
-        return cls(url=url, link_source=link_source, source_path=source_path)
+        return cls(uri=uri, link_source=link_source, source_path=source_path)
 
     @property
-    def target_uri(self) -> str:
-        return self.url
+    def target_uri(self) -> Uri:
+        return self.uri
 
 
 type ResolvedLink = ResolvedLocalLink | ResolvedRemoteLink

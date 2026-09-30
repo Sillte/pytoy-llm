@@ -53,6 +53,21 @@ IdeaNotePath = Annotated[
     ),
 ]
 
+LocalFilePath = Annotated[
+    str,
+    Field(
+        description=(
+            "Relative path to a file inside the root which is defined by scheme and namespace."
+            "The path must not escape the root."
+        ),
+        examples=[
+            "README.md",
+            "src/pytoy_llm/api.py",
+            "tests/test_api.py",
+        ],
+    ),
+]
+
 
 IdeaSpacePivot = Annotated[
     IdeaSpacePath,

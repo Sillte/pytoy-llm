@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from pytoy_llm.idea import IdeaSpace
+from pytoy_llm.idea import IdeaSpace, SchemeDirectory, UriLocalPathResolver
 from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.idea_tool import IdeaTool
-from pytoy_llm.tools.idea_tool.models import RemoteLinkModel
+from pytoy_llm.tools.idea_tool.models import IdeaNoteModel, RemoteLinkModel
 from pytoy_llm.tools.idea_tool.semantic_types import IdeaNoteReference
 
 
@@ -38,11 +38,11 @@ def test_idea_note_operations_use_selected_namespace(tmp_path: Path) -> None:
     archive_root.mkdir()
     (drafts_root / "shared.md").write_text("draft note\n", encoding="utf-8")
     (archive_root / "shared.md").write_text("archived note\n", encoding="utf-8")
-    tool = IdeaTool(
-        {
-            "drafts": IdeaSpace(drafts_root),
-            "archive": IdeaSpace(archive_root),
-        },
+    tool = IdeaTool.from_any(
+        [
+            drafts_root,
+            archive_root,
+        ],
         default_namespace="drafts",
     )
 
@@ -50,15 +50,39 @@ def test_idea_note_operations_use_selected_namespace(tmp_path: Path) -> None:
     archive_note = tool.get_idea_note("shared.md", idea_namespace="archive")
     written_path = tool.write_idea_note("new.md", "new archived note", {}, idea_namespace="archive")
 
+    assert isinstance(default_note, IdeaNoteModel)
     assert default_note.body == "draft note\n"
+    assert isinstance(archive_note, IdeaNoteModel)
     assert archive_note.body == "archived note\n"
     assert written_path == "new.md"
     assert (archive_root / "new.md").read_text(encoding="utf-8") == "new archived note"
     assert not (drafts_root / "new.md").exists()
 
 
+def test_local_link_path_is_decoded_and_uri_string_round_trips(tmp_path: Path) -> None:
+    idea_root = tmp_path / "ideas"
+    workspace_root = tmp_path / "workspace"
+    idea_root.mkdir()
+    workspace_root.mkdir()
+    (idea_root / "source.md").write_text(
+        "[target](workspace:///src/a%20b%23c.md)", encoding="utf-8"
+    )
+    tool = IdeaTool.from_any(idea_root, workspace_root=workspace_root)
+
+    note = tool.get_idea_note("source.md")
+
+    assert isinstance(note, IdeaNoteModel)
+    assert len(note.local_links) == 1
+    local_link = note.local_links[0]
+    assert local_link.path == "src/a b#c.md"
+
+    resolver = UriLocalPathResolver([SchemeDirectory(workspace_root, "workspace")])
+    round_trip_uri = Uri.from_any(local_link.uri_string)
+    assert resolver.resolve(round_trip_uri) == workspace_root / "src" / "a b#c.md"
+
+
 def test_discovery_tools_are_registered_with_documentation(tmp_path: Path) -> None:
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(IdeaSpace(tmp_path))
     registered_tools = {
         getattr(registered_tool, "__name__", ""): registered_tool for registered_tool in tool.tools
     }
@@ -80,7 +104,7 @@ def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(
     note_path.write_text("---\nstatus: active\ntags: [one, two]\n---\nBody\n")
     (tmp_path / "folder").mkdir()
 
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.get_metadata_of_idea_notes(["note.md", "missing.md", "folder"])
 
@@ -92,8 +116,7 @@ def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(
 
 
 def test_create_sub_idea_space_creates_a_new_directory(tmp_path: Path) -> None:
-    tool = IdeaTool(IdeaSpace(tmp_path))
-
+    tool = IdeaTool.from_any(tmp_path)
     result = tool.create_sub_idea_space("knowledge")
 
     assert result == "knowledge"
@@ -102,7 +125,7 @@ def test_create_sub_idea_space_creates_a_new_directory(tmp_path: Path) -> None:
 
 def test_create_sub_idea_space_rejects_existing_directory(tmp_path: Path) -> None:
     (tmp_path / "knowledge").mkdir()
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.create_sub_idea_space("knowledge")
 
@@ -112,7 +135,7 @@ def test_create_sub_idea_space_rejects_existing_directory(tmp_path: Path) -> Non
 
 def test_delete_subspace_deletes_only_empty_directories(tmp_path: Path) -> None:
     (tmp_path / "knowledge").mkdir()
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.delete_sub_idea_space("knowledge")
 
@@ -124,7 +147,7 @@ def test_delete_subspace_rejects_non_empty_directories(tmp_path: Path) -> None:
     knowledge = tmp_path / "knowledge"
     knowledge.mkdir()
     (knowledge / "note.md").write_text("note", encoding="utf-8")
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.delete_sub_idea_space("knowledge")
 
@@ -142,7 +165,7 @@ def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
     (tmp_path / "knowledge" / "python").mkdir()
     (tmp_path / "knowledge" / "python" / ".convention.md").write_text("python convention\n")
 
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.get_all_sub_idea_spaces_supported_by_convention()
 
@@ -151,7 +174,7 @@ def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
 
 def test_get_convention_pivot_paths_represents_root_as_dot(tmp_path: Path) -> None:
     (tmp_path / ".convention.md").write_text("root convention\n")
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.get_all_sub_idea_spaces_supported_by_convention()
 
@@ -163,7 +186,7 @@ def test_get_convention_pivot_paths_returns_empty_sequence_without_conventions(
 ) -> None:
     (tmp_path / "knowledge").mkdir()
     (tmp_path / "knowledge" / "note.md").write_text("note\n")
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.get_all_sub_idea_spaces_supported_by_convention()
 
@@ -176,7 +199,7 @@ def test_update_metadata_of_idea_note_preserves_body_and_merges_metadata(
     note_path = tmp_path / "note.md"
     note_path.write_text("---\nstatus: draft\nowner: alice\n---\n# Body\n")
 
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.update_metadata_of_idea_note("note.md", {"status": "published", "tags": ["one"]})
 
@@ -187,7 +210,7 @@ def test_update_metadata_of_idea_note_preserves_body_and_merges_metadata(
 
 
 def test_update_metadata_of_idea_note_returns_error_for_missing_note(tmp_path: Path) -> None:
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.update_metadata_of_idea_note("missing.md", {"status": "published"})
 
@@ -198,7 +221,7 @@ def test_update_metadata_of_idea_note_clear_replaces_existing_metadata(tmp_path:
     note_path = tmp_path / "note.md"
     note_path.write_text("---\nstatus: draft\nowner: alice\n---\n# Body\n")
 
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.update_metadata_of_idea_note("note.md", {"status": "published"}, clear=True)
 
@@ -212,7 +235,7 @@ def test_update_metadata_of_idea_note_clear_with_empty_metadata_removes_frontmat
     note_path = tmp_path / "note.md"
     note_path.write_text("---\nstatus: draft\n---\n# Body\n")
 
-    tool = IdeaTool(IdeaSpace(tmp_path))
+    tool = IdeaTool.from_any(tmp_path)
 
     result = tool.update_metadata_of_idea_note("note.md", {}, clear=True)
 
