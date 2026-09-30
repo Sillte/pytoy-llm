@@ -1,119 +1,23 @@
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Mapping, Self, Sequence
-from urllib.parse import unquote
-
-from pydantic import AwareDatetime
 
 from pytoy_llm.idea import (
-    DiskFileWriter,
     IdeaGraph,
-    IdeaNote,
     IdeaSpace,
-    MetadataDeserializationError,
-    MetadataValueError,
-    OutsidePathError,
     SchemeDirectory,
     UriLocalPathResolver,
 )
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 
-from .boundaries import tool_discovery_boundary, tool_inspection_boundary
 from .discovery import IdeaDiscovery
+from .inspection import IdeaInspection
 from .models import (
-    IdeaNoteLinkModel,
-    IdeaNoteModel,
-    IdeaSpaceConventionModel,
     IdeaSpaceToolMetaModel,
     IdeaSpaceToolWorkingContextModel,
-    LocalLinkModel,
-    RemoteLinkModel,
-    UnresolvedLinkModel,
 )
-from .semantic_types import (
-    IdeaNoteBody,
-    IdeaNoteMetadata,
-    IdeaNotePath,
-    IdeaNoteReference,
-    IdeaSpaceDepth,
-    IdeaSpacePath,
-    IdeaSpacePivot,
-    Namespace,
-)
-
-
-def build_idea_note_model(
-    source_idea_note: IdeaNote,
-    idea_graph: IdeaGraph,
-    local_path_resolver: UriLocalPathResolver,
-    namespace: Namespace,
-) -> IdeaNoteModel | ToolError:
-    idea_links = idea_graph.resolve_links(source_idea_note)
-
-    idea_note_links = []
-    local_links = []
-    remote_links = []
-    unresolved_links = []
-
-    source_idea_note_reference = IdeaNoteReference(
-        idea_note_path=source_idea_note.idea_path, namespace=namespace
-    )
-
-    for idea_link in idea_links:
-        try:
-            scheme, authority = idea_link.uri.scheme, idea_link.uri.authority
-            if local_path_resolver.is_registered(scheme, authority):
-                _ = local_path_resolver.resolve(idea_link.uri, source_idea_note.file_path.parent)
-                if scheme == "idea":
-                    authority = authority or namespace
-                    idea_note_links.append(
-                        IdeaNoteLinkModel(
-                            source_idea_note_reference=source_idea_note_reference,
-                            target_idea_note_reference=IdeaNoteReference(
-                                idea_note_path=idea_link.uri.path.strip("/"),
-                                namespace=authority,
-                            ),
-                        )
-                    )
-                else:
-                    local_links.append(
-                        LocalLinkModel(
-                            source_idea_note_reference=source_idea_note_reference,
-                            scheme=idea_link.uri.scheme,
-                            namespace=idea_link.uri.authority,
-                            path=unquote(idea_link.uri.path).strip("/"),
-                        ),
-                    )
-            else:
-                remote_links.append(
-                    RemoteLinkModel(
-                        source_idea_note_reference=source_idea_note_reference,
-                        uri=idea_link.uri,
-                    )
-                )
-        except (ValueError, TypeError) as exc:
-            unresolved_links.append(
-                UnresolvedLinkModel(
-                    source_idea_note_reference=source_idea_note_reference,
-                    uri=idea_link.uri,
-                    reason=str(exc),
-                )
-            )
-
-    modified_at = datetime.fromtimestamp(
-        source_idea_note.file_path.stat().st_mtime,
-        timezone.utc,
-    )
-    return IdeaNoteModel(
-        idea_note_path=source_idea_note.idea_path,
-        modified_at=modified_at,
-        body=source_idea_note.body,
-        metadata=source_idea_note.metadata.as_dict(),
-        idea_note_links=idea_note_links,
-        remote_links=remote_links,
-        local_links=local_links,
-        unresolved_links=unresolved_links,
-    )
+from .mutation import IdeaMutation
+from .semantic_types import Namespace
 
 
 class IdeaTool:
@@ -173,36 +77,22 @@ class IdeaTool:
                 f"Ideaspace for this tool must be the root; However, `{idea_spaces=}`."
             )
 
-        self._file_writer = DiskFileWriter()
         self._local_path_resolver = local_path_resolver
         self._discovery = IdeaDiscovery(self._get_idea_space)
+        self._inspection = IdeaInspection(
+            get_idea_space=self._get_idea_space,
+            resolve_idea_namespace=self._resolve_idea_namespace,
+            idea_graphs=self._idea_graphs,
+            local_path_resolver=self._local_path_resolver,
+        )
+        self._mutation = IdeaMutation(self._get_idea_space)
 
         self._started_at: datetime = datetime.now(tz=timezone.utc)
-
-    @property
-    def default_namespace(self) -> Namespace:
-        return self._default_namespace
-
-    @classmethod
-    def make_exclude_patterns(
-        cls, ancestor_root: Path, idea_space_roots: Sequence[Path]
-    ) -> Sequence[str]:
-        """Return the list of `execlude` patterns which
-        notifies the `ancestor` does not regard the `idea_space_roots` as the members.
-        """
-        ancestor_root = Path(ancestor_root).resolve()
-        exclude_patterns = []
-        for root in idea_space_roots:
-            root = root.resolve()
-            if root.is_relative_to(ancestor_root) and root != ancestor_root:
-                relative_path = root.relative_to(ancestor_root)
-                exclude_patterns.append(relative_path.as_posix())
-        return exclude_patterns
 
     @classmethod
     def from_any(
         cls,
-        idea_space_roots: Sequence[Path | str] | Path | str | IdeaSpace,
+        idea_space_roots: Sequence[Path | str] | Path | str | IdeaSpace | Mapping[str, IdeaSpace],
         *,
         scheme_directories: Sequence[SchemeDirectory] = tuple(),
         workspace_root: str | Path | None = None,
@@ -213,16 +103,20 @@ class IdeaTool:
             idea_space_roots = [idea_space_roots]
         elif isinstance(idea_space_roots, IdeaSpace):
             idea_space_roots = [idea_space_roots.root_directory_path]
-        roots = [Path(root).resolve() for root in idea_space_roots]
-        idea_spaces = {
-            root.name: IdeaSpace.from_path(path=root, root=root, with_creation=True)
-            for root in roots
-        }
-        if len(idea_spaces) != len(roots):
-            raise ValueError("IdeaSpace roots must have unique directory names.")
+
+        if not isinstance(idea_space_roots, Mapping):
+            roots = [Path(root).resolve() for root in idea_space_roots]
+            idea_spaces = {
+                root.name: IdeaSpace.from_path(path=root, root=root, with_creation=True)
+                for root in roots
+            }
+            if len(idea_spaces) != len(roots):
+                raise ValueError("IdeaSpace roots must have unique directory names.")
+        else:
+            idea_spaces = idea_space_roots
+
         if workspace_root is not None:
             workspace_root = Path(workspace_root).resolve()
-
             if any(elem.scheme == "workspace" for elem in scheme_directories):
                 raise ValueError(
                     f"Dumplication of `workspace` scheme, {scheme_directories=}, {workspace_root=} "
@@ -248,6 +142,22 @@ class IdeaTool:
             local_path_resolver=local_path_resolver,
             default_namespace=default_namespace,
         )
+
+    @property
+    def default_namespace(self) -> Namespace:
+        return self._default_namespace
+
+    @property
+    def inspection(self) -> IdeaInspection:
+        return self._inspection
+
+    @property
+    def discovery(self) -> IdeaDiscovery:
+        return self._discovery
+
+    @property
+    def mutation(self) -> IdeaMutation:
+        return self._mutation
 
     def _resolve_idea_namespace(
         self, idea_namespace: Namespace | None = None
@@ -289,15 +199,8 @@ class IdeaTool:
             self.get_default_idea_namespace,
             self.get_idea_space_working_context,
             *self._discovery.tools,
-            self.get_idea_space_convention,
-            self.get_updated_time_of_idea_notes,
-            self.create_sub_idea_space,
-            self.delete_sub_idea_space,
-            self.get_metadata_of_idea_notes,
-            self.update_metadata_of_idea_note,
-            self.get_idea_note,
-            self.write_idea_note,
-            self.delete_idea_note,
+            *self._inspection.tools,
+            *self._mutation.tools,
         ]
         return tools
 
@@ -354,11 +257,12 @@ class IdeaTool:
 
             ``ToolError`` if the saved context exists but cannot be parsed.
         """
-        if isinstance(tool_context_path := self.get_tool_context_path(idea_namespace), ToolError):
-            return tool_context_path
+        context_path = self.get_tool_context_path(idea_namespace)
+        if isinstance(context_path, ToolError):
+            return context_path
 
         try:
-            text = tool_context_path.read_text()
+            text = context_path.read_text()
         except FileNotFoundError:
             tool_meta = IdeaSpaceToolMetaModel()
         else:
@@ -370,457 +274,3 @@ class IdeaTool:
                     msg=f"`IdeaSpaceToolMetaModel` cannot be made: {exc}",
                 )
         return IdeaSpaceToolWorkingContextModel(idea_space_tool_meta=tool_meta)
-
-    def get_all_sub_idea_spaces_supported_by_convention(
-        self,
-        idea_namespace: Namespace | None = None,
-    ) -> Sequence[IdeaSpacePath] | ToolError:
-        """Direct-call compatibility alias for the discovery tool."""
-        return self._discovery.get_all_sub_idea_spaces_supported_by_convention(idea_namespace)
-
-    @tool_inspection_boundary
-    def get_idea_space_convention(
-        self,
-        idea_space_path: IdeaSpacePath = ".",
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaSpaceConventionModel | None | ToolError:
-        """Get the convention defined directly at an IdeaSpace path.
-
-        Parent IdeaSpaces are not searched for inherited conventions.
-
-        Args:
-            idea_space_path:
-                IdeaSpace-root-relative path. ``.`` refers to the root.
-            idea_namespace:
-                Namespace of the IdeaSpace. ``null`` uses the default namespace.
-
-        Returns:
-            The convention defined at ``idea_space_path``, or ``null`` when none is
-            defined. Returns ``ToolError`` when the path cannot be inspected.
-        """
-
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        resolved_namespace = self._resolve_idea_namespace(idea_namespace)
-        if isinstance(resolved_namespace, ToolError):
-            return resolved_namespace
-
-        try:
-            file_path = idea_space.resolve(idea_space_path)
-            sub_idea_space = IdeaSpace.from_path(file_path, root=idea_space.root_directory_path)
-            convention = sub_idea_space.convention
-            if convention is not None:
-                idea_note_model = build_idea_note_model(
-                    convention,
-                    self._idea_graphs[resolved_namespace],
-                    local_path_resolver=self._local_path_resolver,
-                    namespace=resolved_namespace,
-                )
-                if isinstance(idea_note_model, IdeaNoteModel):
-                    return IdeaSpaceConventionModel(
-                        idea_note=idea_note_model,
-                        applied_to=sub_idea_space.idea_path,
-                    )
-                else:
-                    return idea_note_model
-            return None
-        except ValueError as exc:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=str(exc))
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
-
-    def get_sub_idea_spaces(
-        self,
-        idea_space_pivot: IdeaSpacePivot = ".",
-        depth: IdeaSpaceDepth = 0,
-        idea_namespace: Namespace | None = None,
-    ) -> Sequence[IdeaSpacePath] | ToolError:
-        """Direct-call compatibility alias for the discovery tool."""
-        return self._discovery.get_sub_idea_spaces(
-            idea_space_pivot=idea_space_pivot,
-            depth=depth,
-            idea_namespace=idea_namespace,
-        )
-
-    def create_sub_idea_space(
-        self,
-        idea_space_path: IdeaSpacePath,
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaSpacePath | ToolError:
-        """Create a new empty IdeaSpace directory.
-
-        ``idea_space_path`` must identify a new directory below the IdeaSpace root. Its
-        parent directory must already exist. Existing directories and reserved
-        metadata directories are not treated as successful creation.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            directory_path = idea_space.resolve(idea_space_path)
-            if directory_path == idea_space.root_directory_path:
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg="The IdeaSpace root already exists and cannot be created as a subspace.",
-                )
-            if directory_path.name == IdeaSpace.SPACE_META_NAME:
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"`{idea_space_path}` is reserved for IdeaSpace tool metadata.",
-                )
-            if directory_path.exists():
-                if directory_path.is_dir():
-                    msg = f"IdeaSpace already exists at `{idea_space_path}`."
-                else:
-                    msg = f"`{idea_space_path}` already exists and is not a directory."
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=msg,
-                )
-            if not directory_path.parent.is_dir():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"Parent of `{idea_space_path}` does not exist.",
-                    suggestion=f"How about creating a subspace at `{Path(idea_space_path).parent.as_posix()}`",
-                )
-            directory_path.mkdir()
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except FileNotFoundError as exc:
-            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
-        return idea_space_path
-
-    def delete_sub_idea_space(
-        self,
-        idea_space_path: IdeaSpacePath,
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaSpacePath | ToolError:
-        """Delete an existing empty IdeaSpace subdirectory.
-
-        The IdeaSpace root, reserved metadata directories, and non-empty
-        directories cannot be deleted by this operation.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            directory_path = idea_space.resolve(idea_space_path)
-            if directory_path == idea_space.root_directory_path:
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg="The IdeaSpace root cannot be deleted.",
-                )
-            if directory_path.name == IdeaSpace.SPACE_META_NAME:
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"`{idea_space_path}` is reserved for IdeaSpace tool metadata.",
-                )
-            if not directory_path.is_dir():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"`{idea_space_path}` does not identify an IdeaSpace directory.",
-                )
-            directory_path.rmdir()
-        except FileNotFoundError as exc:
-            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=False)
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg=f"IdeaSpace `{idea_space_path}` must be empty before it can be deleted: {exc}",
-                retry=False,
-            )
-        return idea_space_path
-
-    def get_idea_note_paths(
-        self,
-        idea_space_pivot: IdeaSpacePivot = ".",
-        depth: IdeaSpaceDepth = 0,
-        idea_namespace: Namespace | None = None,
-    ) -> Sequence[IdeaNotePath] | ToolError:
-        """Direct-call compatibility alias for the discovery tool."""
-        return self._discovery.get_idea_note_paths(
-            idea_space_pivot=idea_space_pivot,
-            depth=depth,
-            idea_namespace=idea_namespace,
-        )
-
-    def get_updated_time_of_idea_notes(
-        self,
-        idea_space_pivot: IdeaSpacePivot = ".",
-        depth: IdeaSpaceDepth = 0,
-        idea_namespace: Namespace | None = None,
-    ) -> dict[IdeaNotePath, AwareDatetime] | ToolError:
-        """Get the file modification time of each IdeaNote under the specified IdeaSpace pivot.
-
-        This is the filesystem modification time, not an LLM edit timestamp.
-        A timestamp later than a previously recorded time indicates that the file
-        was modified after that time, but this tool does not identify who made the
-        change.
-
-        Args:
-            depth:
-                Number of descendant levels to inspect. ``0`` inspects notes
-                directly under ``pivot``. ``null`` inspects all descendants.
-
-        Returns:
-            A mapping from each IdeaSpace-relative note path to its last file
-            modification time. Timestamps are timezone-aware UTC datetimes.
-
-            ``ToolError`` if ``pivot`` is outside the IdeaSpace or the notes
-            cannot be inspected.
-        """
-
-        def _get_file_modified_time(file_path: Path) -> AwareDatetime:
-            return datetime.fromtimestamp(
-                file_path.stat().st_mtime,
-                tz=timezone.utc,
-            )
-
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            pivot_path = idea_space.resolve(idea_space_pivot)
-            notes = IdeaSpace.from_path(pivot_path, root=idea_space.root_directory_path).get_notes(
-                depth=depth
-            )
-            return {note.idea_path: _get_file_modified_time(note.file_path) for note in notes}
-
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
-
-    @tool_discovery_boundary
-    def get_metadata_of_idea_notes(
-        self,
-        idea_note_paths: Sequence[IdeaNotePath],
-        idea_namespace: Namespace | None = None,
-    ) -> dict[IdeaNotePath, IdeaNoteMetadata | None] | ToolError:
-        """Get metadata for multiple IdeaNotes.
-
-        For each input path, return a metadata object when the path identifies
-        an IdeaNote. Return an empty object ``{}`` when the note has no
-        metadata. Return `null` when the path is invalid, does not exist, identifies a directory,
-        or the note's metadata cannot be deserialized.
-
-        Return ``ToolError`` only when the metadata operation cannot be
-        completed because of an I/O error. The returned mapping uses the
-        requested paths as keys.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        metadata_by_path: dict[IdeaNotePath, IdeaNoteMetadata | None] = {}
-
-        for path in idea_note_paths:
-            try:
-                file_path = idea_space.resolve(path)
-                if file_path.is_dir():
-                    metadata_by_path[path] = None
-                    continue
-                idea_note = IdeaNote.from_path(path=file_path, root=idea_space.root_directory_path)
-            except (FileNotFoundError, MetadataDeserializationError):
-                metadata_by_path[path] = None
-            else:
-                metadata_by_path[path] = idea_note.metadata.as_dict()
-
-        return metadata_by_path
-
-    def update_metadata_of_idea_note(
-        self,
-        idea_note_path: IdeaNotePath,
-        idea_note_metadata: IdeaNoteMetadata,
-        clear: bool = False,
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaNotePath | ToolError:
-        """Add or replace metadata fields of an existing IdeaNote.
-
-        When ``clear`` is true, remove all existing metadata before applying
-        ``metadata``. The Markdown body is always preserved.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            file_path = idea_space.resolve(idea_note_path)
-            if file_path.is_dir():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"Given `{idea_note_path=}` corresponds to `IdeaSpace`, not a path to `IdeaNote`.",
-                    suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`.",
-                )
-
-            idea_note = IdeaNote.from_path(path=file_path, root=idea_space.root_directory_path)
-            if clear:
-                idea_note.metadata.clear()
-            for key, value in idea_note_metadata.items():
-                idea_note.metadata[key] = value
-            idea_note.write(self._file_writer)
-
-        except MetadataValueError:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg="Given metadata is invalid.",
-                retry=False,
-            )
-
-        except FileNotFoundError as exc:
-            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=False)
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
-
-        return idea_note_path
-
-    @tool_inspection_boundary
-    def get_idea_note(
-        self,
-        idea_note_path: IdeaNotePath,
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaNoteModel | ToolError:
-        """Read an IdeaNote and resolve its outgoing links.
-
-        Args:
-            idea_note_path:
-                IdeaSpace-root-relative path of the note.
-            idea_namespace:
-                Namespace of the IdeaSpace. ``null`` uses the default namespace.
-
-        Returns:
-            The note model, or ``ToolError`` if the note cannot be read or parsed.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        resolved_namespace = self._resolve_idea_namespace(idea_namespace)
-        if isinstance(resolved_namespace, ToolError):
-            return resolved_namespace
-
-        file_path = idea_space.resolve(idea_note_path)
-        if file_path.is_dir():
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg=f"Given `{idea_note_path=}` corresponds to `IdeaSpacePath`, not a path to `IdeaNote` ",
-                suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`. ",
-            )
-
-        idea_note = IdeaNote.from_path(path=file_path, root=idea_space.root_directory_path)
-
-        return build_idea_note_model(
-            idea_note,
-            self._idea_graphs[resolved_namespace],
-            local_path_resolver=self._local_path_resolver,
-            namespace=resolved_namespace,
-        )
-
-    def write_idea_note(
-        self,
-        idea_note_path: IdeaNotePath,
-        idea_note_body: IdeaNoteBody,
-        idea_note_metadata: IdeaNoteMetadata,
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaNotePath | ToolError:
-        """Create or replace an IdeaNote.
-
-        Existing body and metadata are replaced rather than merged. ``idea_note_body``
-        must not contain YAML frontmatter; metadata is supplied separately.
-
-        Args:
-            idea_note_path:
-                IdeaSpace-root-relative path. ``.`` refers to the root.
-
-            idea_namespace:
-                Namespace of the IdeaSpace. ``null`` uses the default namespace.
-        Returns:
-            The written IdeaSpace-root-relative path, or ``ToolError`` on failure.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            file_path = idea_space.resolve(idea_note_path)
-            if not file_path.parent.is_dir():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg="Parent IdeaSpace does not exist.",
-                    suggestion=f"Create the parent IdeaSpace first: `{Path(idea_note_path).parent.as_posix()}`.",
-                    retry=False,
-                )
-
-            idea_note = IdeaNote.create(
-                file_path=file_path, body=idea_note_body, root=idea_space.root_directory_path
-            )
-            for key, value in idea_note_metadata.items():
-                idea_note.metadata[key] = value
-            idea_note.write(self._file_writer)
-        except OutsidePathError:
-            return ToolError(
-                kind=ToolErrorKind.PERMISSION_DENIED,
-                msg=(f"`{idea_note_path}` is outside of `IdeaSpace`."),
-                retry=False,
-            )
-        except MetadataValueError:
-            return ToolError(
-                kind=ToolErrorKind.INVALID_ARGUMENT,
-                msg="Given metadata is invalid as the key and value.",
-                retry=False,
-            )
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc))
-        return idea_note_path
-
-    def delete_idea_note(
-        self,
-        idea_note_path: IdeaNotePath,
-        idea_namespace: Namespace | None = None,
-    ) -> IdeaNotePath | ToolError:
-        """Permanently delete an existing IdeaNote.
-
-        This operation cannot be undone. ``idea_note_path`` must identify a note, not a
-        directory.
-
-        Returns the IdeaSpace-root-relative path after a successful deletion,
-        or ``ToolError`` if the note cannot be deleted.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            file_path = idea_space.resolve(idea_note_path)
-
-            if file_path.is_dir():
-                return ToolError(
-                    kind=ToolErrorKind.INVALID_ARGUMENT,
-                    msg=f"Given `{idea_note_path=}` corresponds to `IdeaSpace`, not a path to `IdeaNote`.",
-                    suggestion="Use `get_idea_note_paths` to get the paths of `IdeaNote`.",
-                )
-            file_path.unlink()
-        except FileNotFoundError as exc:
-            return ToolError(
-                kind=ToolErrorKind.NOT_FOUND,
-                msg=str(exc),
-                retry=False,
-            )
-        except OutsidePathError as exc:
-            return ToolError(
-                kind=ToolErrorKind.PERMISSION_DENIED,
-                msg=str(exc),
-                retry=False,
-            )
-        except OSError as exc:
-            return ToolError(
-                kind=ToolErrorKind.IO_ERROR,
-                msg=str(exc),
-                retry=False,
-            )
-
-        return idea_note_path

@@ -46,9 +46,11 @@ def test_idea_note_operations_use_selected_namespace(tmp_path: Path) -> None:
         default_namespace="drafts",
     )
 
-    default_note = tool.get_idea_note("shared.md")
-    archive_note = tool.get_idea_note("shared.md", idea_namespace="archive")
-    written_path = tool.write_idea_note("new.md", "new archived note", {}, idea_namespace="archive")
+    default_note = tool.inspection.get_idea_note("shared.md")
+    archive_note = tool.inspection.get_idea_note("shared.md", idea_namespace="archive")
+    written_path = tool.mutation.write_idea_note(
+        "new.md", "new archived note", {}, idea_namespace="archive"
+    )
 
     assert isinstance(default_note, IdeaNoteModel)
     assert default_note.body == "draft note\n"
@@ -69,7 +71,7 @@ def test_local_link_path_is_decoded_and_uri_string_round_trips(tmp_path: Path) -
     )
     tool = IdeaTool.from_any(idea_root, workspace_root=workspace_root)
 
-    note = tool.get_idea_note("source.md")
+    note = tool.inspection.get_idea_note("source.md")
 
     assert isinstance(note, IdeaNoteModel)
     assert len(note.local_links) == 1
@@ -94,7 +96,40 @@ def test_discovery_tools_are_registered_with_documentation(tmp_path: Path) -> No
     ):
         assert name in registered_tools
         assert registered_tools[name].__doc__
-        assert callable(getattr(tool, name))
+
+
+def test_inspection_tools_are_registered_with_documentation(tmp_path: Path) -> None:
+    tool = IdeaTool.from_any(IdeaSpace(tmp_path))
+    registered_tools = {
+        getattr(registered_tool, "__name__", ""): registered_tool for registered_tool in tool.tools
+    }
+
+    for name in (
+        "get_idea_space_working_context",
+        "get_idea_space_convention",
+        "get_updated_time_of_idea_notes",
+        "get_metadata_of_idea_notes",
+        "get_idea_note",
+    ):
+        assert name in registered_tools
+        assert registered_tools[name].__doc__
+
+
+def test_mutation_tools_are_registered_with_documentation(tmp_path: Path) -> None:
+    tool = IdeaTool.from_any(IdeaSpace(tmp_path))
+    registered_tools = {
+        getattr(registered_tool, "__name__", ""): registered_tool for registered_tool in tool.tools
+    }
+
+    for name in (
+        "create_sub_idea_space",
+        "delete_sub_idea_space",
+        "update_metadata_of_idea_note",
+        "write_idea_note",
+        "delete_idea_note",
+    ):
+        assert name in registered_tools
+        assert registered_tools[name].__doc__
 
 
 def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(
@@ -106,7 +141,7 @@ def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(
 
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.get_metadata_of_idea_notes(["note.md", "missing.md", "folder"])
+    result = tool.inspection.get_metadata_of_idea_notes(["note.md", "missing.md", "folder"])
 
     assert result == {
         "note.md": {"status": "active", "tags": ["one", "two"]},
@@ -117,7 +152,7 @@ def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(
 
 def test_create_sub_idea_space_creates_a_new_directory(tmp_path: Path) -> None:
     tool = IdeaTool.from_any(tmp_path)
-    result = tool.create_sub_idea_space("knowledge")
+    result = tool.mutation.create_sub_idea_space("knowledge")
 
     assert result == "knowledge"
     assert (tmp_path / "knowledge").is_dir()
@@ -127,7 +162,7 @@ def test_create_sub_idea_space_rejects_existing_directory(tmp_path: Path) -> Non
     (tmp_path / "knowledge").mkdir()
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.create_sub_idea_space("knowledge")
+    result = tool.mutation.create_sub_idea_space("knowledge")
 
     assert isinstance(result, ToolError)
     assert result.kind == ToolErrorKind.INVALID_ARGUMENT
@@ -137,7 +172,7 @@ def test_delete_subspace_deletes_only_empty_directories(tmp_path: Path) -> None:
     (tmp_path / "knowledge").mkdir()
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.delete_sub_idea_space("knowledge")
+    result = tool.mutation.delete_sub_idea_space("knowledge")
 
     assert result == "knowledge"
     assert not (tmp_path / "knowledge").exists()
@@ -149,7 +184,7 @@ def test_delete_subspace_rejects_non_empty_directories(tmp_path: Path) -> None:
     (knowledge / "note.md").write_text("note", encoding="utf-8")
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.delete_sub_idea_space("knowledge")
+    result = tool.mutation.delete_sub_idea_space("knowledge")
 
     assert isinstance(result, ToolError)
     assert result.kind == ToolErrorKind.INVALID_ARGUMENT
@@ -167,7 +202,7 @@ def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
 
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.get_all_sub_idea_spaces_supported_by_convention()
+    result = tool.discovery.get_all_sub_idea_spaces_supported_by_convention()
 
     assert result == [".", "knowledge", "knowledge/python"]
 
@@ -176,7 +211,7 @@ def test_get_convention_pivot_paths_represents_root_as_dot(tmp_path: Path) -> No
     (tmp_path / ".convention.md").write_text("root convention\n")
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.get_all_sub_idea_spaces_supported_by_convention()
+    result = tool.discovery.get_all_sub_idea_spaces_supported_by_convention()
 
     assert result == ["."]
 
@@ -188,7 +223,7 @@ def test_get_convention_pivot_paths_returns_empty_sequence_without_conventions(
     (tmp_path / "knowledge" / "note.md").write_text("note\n")
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.get_all_sub_idea_spaces_supported_by_convention()
+    result = tool.discovery.get_all_sub_idea_spaces_supported_by_convention()
 
     assert result == []
 
@@ -201,7 +236,9 @@ def test_update_metadata_of_idea_note_preserves_body_and_merges_metadata(
 
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.update_metadata_of_idea_note("note.md", {"status": "published", "tags": ["one"]})
+    result = tool.mutation.update_metadata_of_idea_note(
+        "note.md", {"status": "published", "tags": ["one"]}
+    )
 
     assert result == "note.md"
     assert (
@@ -212,7 +249,7 @@ def test_update_metadata_of_idea_note_preserves_body_and_merges_metadata(
 def test_update_metadata_of_idea_note_returns_error_for_missing_note(tmp_path: Path) -> None:
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.update_metadata_of_idea_note("missing.md", {"status": "published"})
+    result = tool.mutation.update_metadata_of_idea_note("missing.md", {"status": "published"})
 
     assert isinstance(result, ToolError)
 
@@ -223,7 +260,9 @@ def test_update_metadata_of_idea_note_clear_replaces_existing_metadata(tmp_path:
 
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.update_metadata_of_idea_note("note.md", {"status": "published"}, clear=True)
+    result = tool.mutation.update_metadata_of_idea_note(
+        "note.md", {"status": "published"}, clear=True
+    )
 
     assert result == "note.md"
     assert note_path.read_text() == "---\nstatus: published\n---\n# Body\n"
@@ -237,7 +276,7 @@ def test_update_metadata_of_idea_note_clear_with_empty_metadata_removes_frontmat
 
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.update_metadata_of_idea_note("note.md", {}, clear=True)
+    result = tool.mutation.update_metadata_of_idea_note("note.md", {}, clear=True)
 
     assert result == "note.md"
     assert note_path.read_text() == "# Body\n"
