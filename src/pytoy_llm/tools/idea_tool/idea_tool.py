@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from functools import wraps
 from pathlib import Path
 from posixpath import normpath
 from typing import Callable, Mapping, Self, Sequence
@@ -19,6 +18,8 @@ from pytoy_llm.idea import (
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer import WorkspaceExplorer
 
+from .boundaries import tool_discovery_boundary, tool_inspection_boundary
+from .discovery import IdeaDiscovery
 from .models import (
     IdeaNoteLinkModel,
     IdeaNoteModel,
@@ -39,71 +40,6 @@ from .semantic_types import (
     IdeaSpacePivot,
     Namespace,
 )
-
-# TODO:
-# We have to consider the contract of tools.
-# We preapre the contract in minimum way, i.e,
-# WET - style is acccepted to represent the contract of `ToolError`.
-
-
-def tool_discovery_boundary[R](
-    func: Callable[..., R],
-) -> Callable[..., R | ToolError]:
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> R | ToolError:
-        try:
-            return func(*args, **kwargs)
-        except OutsidePathError as exc:
-            return ToolError(
-                kind=ToolErrorKind.PERMISSION_DENIED,
-                msg=str(exc),
-                retry=False,
-            )
-        except OSError as exc:
-            return ToolError(
-                kind=ToolErrorKind.IO_ERROR,
-                msg=str(exc),
-                retry=False,
-            )
-
-    return wrapper
-
-
-def tool_inspection_boundary[R](
-    func: Callable[..., R],
-) -> Callable[..., R | ToolError]:
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> R | ToolError:
-        try:
-            return func(*args, **kwargs)
-        except MetadataDeserializationError:
-            return ToolError(
-                kind=ToolErrorKind.PARSE_ERROR,
-                msg="The specified IdeaNote is broken.",
-                retry=False,
-            )
-        except ValueError as exc:
-            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=str(exc))
-        except FileNotFoundError as exc:
-            return ToolError(
-                kind=ToolErrorKind.NOT_FOUND,
-                msg=str(exc),
-                retry=False,
-            )
-        except OutsidePathError as exc:
-            return ToolError(
-                kind=ToolErrorKind.PERMISSION_DENIED,
-                msg=str(exc),
-                retry=False,
-            )
-        except OSError as exc:
-            return ToolError(
-                kind=ToolErrorKind.IO_ERROR,
-                msg=str(exc),
-                retry=False,
-            )
-
-    return wrapper
 
 
 def build_idea_note_model(
@@ -246,6 +182,7 @@ class IdeaTool:
 
         self._file_writer = DiskFileWriter()
         self._workspace_explorer = workspace_explorer
+        self._discovery = IdeaDiscovery(self._get_idea_space)
 
         self._started_at: datetime = datetime.now(tz=timezone.utc)
 
@@ -336,13 +273,11 @@ class IdeaTool:
             self.get_idea_namespaces,
             self.get_default_idea_namespace,
             self.get_idea_space_working_context,
-            self.get_all_sub_idea_spaces_supported_by_convention,
+            *self._discovery.tools,
             self.get_idea_space_convention,
             self.get_updated_time_of_idea_notes,
-            self.get_sub_idea_spaces,
             self.create_sub_idea_space,
             self.delete_sub_idea_space,
-            self.get_idea_note_paths,
             self.get_metadata_of_idea_notes,
             self.update_metadata_of_idea_note,
             self.get_idea_note,
@@ -423,36 +358,12 @@ class IdeaTool:
                 )
         return IdeaSpaceToolWorkingContextModel(idea_space_tool_meta=tool_meta)
 
-    @tool_discovery_boundary
     def get_all_sub_idea_spaces_supported_by_convention(
         self,
         idea_namespace: Namespace | None = None,
     ) -> Sequence[IdeaSpacePath] | ToolError:
-        """List all IdeaSpace paths where a convention is defined.
-
-        The returned paths are relative to the selected IdeaSpace root.
-        The root is represented by ``.``.
-
-        Use each returned path as the ``idea_space_path`` argument of ``get_idea_space_convention``
-        to read the convention that applies to that path.
-        This tool returns IdeaSpace paths only; it does not return convention contents.
-
-        Args:
-            idea_namespace:
-                Namespace of the IdeaSpace. ``null`` uses the default namespace.
-
-        Returns:
-            A sequence of IdeaSpace-relative pivots sorted by path. An empty sequence
-            means that no convention is defined in the IdeaSpace.
-
-            ``ToolError`` if the IdeaSpace cannot be inspected.
-        """
-
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        spaces = [idea_space, *idea_space.get_subspaces(depth=None)]
-        return sorted(space.idea_path for space in spaces if space.convention is not None)
+        """Direct-call compatibility alias for the discovery tool."""
+        return self._discovery.get_all_sub_idea_spaces_supported_by_convention(idea_namespace)
 
     @tool_inspection_boundary
     def get_idea_space_convention(
@@ -508,34 +419,18 @@ class IdeaTool:
         except OSError as exc:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
 
-    @tool_discovery_boundary
     def get_sub_idea_spaces(
         self,
         idea_space_pivot: IdeaSpacePivot = ".",
         depth: IdeaSpaceDepth = 0,
         idea_namespace: Namespace | None = None,
     ) -> Sequence[IdeaSpacePath] | ToolError:
-        """List IdeaSpace subdirectories below ``idea_space_pivot``.
-
-        Args:
-            depth:
-                ``0`` returns only immediate child subspaces. ``null``
-                returns subspaces at all descendant levels.
-
-        Returns:
-            IdeaSpace-root-relative paths of matching subspaces. This tool
-            returns paths only.
-
-            ``ToolError`` if ``idea_space_pivot`` is outside the IdeaSpace or cannot be
-            inspected.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        path = idea_space.resolve(idea_space_pivot)
-        sub_space = IdeaSpace.from_path(path, root=idea_space.root_directory_path)
-        result_spaces = sub_space.get_subspaces(depth=depth)
-        return [space.idea_path for space in result_spaces]
+        """Direct-call compatibility alias for the discovery tool."""
+        return self._discovery.get_sub_idea_spaces(
+            idea_space_pivot=idea_space_pivot,
+            depth=depth,
+            idea_namespace=idea_namespace,
+        )
 
     def create_sub_idea_space(
         self,
@@ -630,43 +525,18 @@ class IdeaTool:
             )
         return idea_space_path
 
-    @tool_discovery_boundary
     def get_idea_note_paths(
         self,
         idea_space_pivot: IdeaSpacePivot = ".",
         depth: IdeaSpaceDepth = 0,
         idea_namespace: Namespace | None = None,
     ) -> Sequence[IdeaNotePath] | ToolError:
-        """List IdeaNote paths under the specified IdeaSpace pivot.
-
-        Args:
-            idea_space_pivot:
-                Starting IdeaSpace path. ``.`` represents the IdeaSpace root.
-            depth:
-                ``0`` returns notes directly under the pivot.
-                ``null`` returns notes at all descendant levels.
-            idea_namespace:
-                Namespace of the IdeaSpace. ``null`` uses the default namespace.
-
-        Returns:
-            IdeaSpace-root-relative paths of matching IdeaNotes.
-            The result is empty when no matching IdeaNotes exist.
-
-            ``ToolError`` if the IdeaSpace cannot be inspected.
-        """
-        idea_space = self._get_idea_space(idea_namespace)
-        if isinstance(idea_space, ToolError):
-            return idea_space
-        try:
-            pivot_path = idea_space.resolve(idea_space_pivot)
-            result_notes = IdeaSpace.from_path(
-                pivot_path, root=idea_space.root_directory_path
-            ).get_notes(depth=depth)
-        except OutsidePathError as exc:
-            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
-        except OSError as exc:
-            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
-        return [note.idea_path for note in result_notes]
+        """Direct-call compatibility alias for the discovery tool."""
+        return self._discovery.get_idea_note_paths(
+            idea_space_pivot=idea_space_pivot,
+            depth=depth,
+            idea_namespace=idea_namespace,
+        )
 
     def get_updated_time_of_idea_notes(
         self,

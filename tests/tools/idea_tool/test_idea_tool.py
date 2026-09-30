@@ -57,6 +57,22 @@ def test_idea_note_operations_use_selected_namespace(tmp_path: Path) -> None:
     assert not (drafts_root / "new.md").exists()
 
 
+def test_discovery_tools_are_registered_with_documentation(tmp_path: Path) -> None:
+    tool = IdeaTool(IdeaSpace(tmp_path))
+    registered_tools = {
+        getattr(registered_tool, "__name__", ""): registered_tool for registered_tool in tool.tools
+    }
+
+    for name in (
+        "get_all_sub_idea_spaces_supported_by_convention",
+        "get_sub_idea_spaces",
+        "get_idea_note_paths",
+    ):
+        assert name in registered_tools
+        assert registered_tools[name].__doc__
+        assert callable(getattr(tool, name))
+
+
 def test_get_metadata_of_idea_notes_returns_metadata_and_none_for_invalid_paths(
     tmp_path: Path,
 ) -> None:
