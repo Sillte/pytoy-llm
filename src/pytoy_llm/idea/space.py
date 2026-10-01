@@ -10,7 +10,7 @@ from pytoy_llm.idea.domain.path import (
     resolve_root_directory_path,
 )
 
-from .domain.exceptions import OutsidePathError
+from .domain.exceptions import OutsidePathError, ShouldBeSpacePathError
 from .domain.readers import DiskFileReader, FileReaderProtocol
 from .note import IdeaNote
 
@@ -40,7 +40,7 @@ class IdeaSpace:
         if not absolute_path.is_relative_to(root_directory_path):
             raise OutsidePathError(f"Space must be inside root: path={path}, root={root}")
         if absolute_path.exists() and not absolute_path.is_dir():
-            raise ValueError(
+            raise ShouldBeSpacePathError(
                 f"Space path must be a directory, not a: `{path=}`, `{absolute_path=}`"
             )
 
@@ -99,6 +99,12 @@ class IdeaSpace:
 
         if not absolute_path.is_relative_to(self._root_directory_path):
             raise OutsidePathError(f"`{absolute_path}` is outside of `IdeaSpace`.")
+
+        if absolute_path.is_relative_to(self.space_meta_directory):
+            raise OutsidePathError(
+                f"Access with {self.space_meta_directory} is not allowed with `resolve`. Use `self.space_meta_directory`, directoly."
+            )
+
         return absolute_path
 
     @property

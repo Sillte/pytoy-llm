@@ -5,6 +5,8 @@ from .domain.exceptions import (
     MetadataSerializationError,
     MetadataValueError,
     OutsidePathError,
+    ShouldBeNotePathError,
+    ShouldBeSpacePathError,
 )
 from .domain.links import (
     AnchorLocation,
@@ -40,6 +42,8 @@ __all__ = [
     "LinkReachabilityChecker",
     "Location",
     "SchemeDirectory",
+    "ShouldBeNotePathError",
+    "ShouldBeSpacePathError",
     "TextPosition",
     "TextRange",
     "UnresolvedIdeaLink",

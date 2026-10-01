@@ -18,6 +18,12 @@ def tool_discovery_boundary[R](
                 msg=str(exc),
                 retry=False,
             )
+        except FileNotFoundError as exc:
+            return ToolError(
+                kind=ToolErrorKind.NOT_FOUND,
+                msg=str(exc),
+                retry=False,
+            )
         except OSError as exc:
             return ToolError(
                 kind=ToolErrorKind.IO_ERROR,

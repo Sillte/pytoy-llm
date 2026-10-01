@@ -1,11 +1,13 @@
 from pathlib import Path
 
+from pydantic import TypeAdapter
+
 from pytoy_llm.idea import IdeaSpace, SchemeDirectory, UriLocalPathResolver
 from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.idea_tool import IdeaTool
 from pytoy_llm.tools.idea_tool.models import IdeaNoteModel, RemoteLinkModel
-from pytoy_llm.tools.idea_tool.semantic_types import IdeaNoteReference
+from pytoy_llm.tools.idea_tool.semantic_types import IdeaNoteReference, Namespace
 
 
 def test_remote_link_model_serializes_uri_dataclass() -> None:
@@ -29,6 +31,14 @@ def test_remote_link_model_serializes_uri_dataclass() -> None:
         "idea_note_path": "knowledge/python.md",
     }
     assert RemoteLinkModel.model_validate(model.model_dump()).uri == uri
+
+
+def test_optional_namespace_schema_uses_null_for_default() -> None:
+    schema = TypeAdapter(Namespace | None).json_schema()
+    namespace_schema = next(item for item in schema["anyOf"] if item.get("type") == "string")
+
+    assert "null" in namespace_schema["description"]
+    assert "" not in namespace_schema["examples"]
 
 
 def test_idea_note_operations_use_selected_namespace(tmp_path: Path) -> None:
@@ -189,6 +199,31 @@ def test_delete_subspace_rejects_non_empty_directories(tmp_path: Path) -> None:
     assert isinstance(result, ToolError)
     assert result.kind == ToolErrorKind.INVALID_ARGUMENT
     assert knowledge.exists()
+
+
+def test_mutation_tools_cannot_access_reserved_space_metadata(tmp_path: Path) -> None:
+    tool = IdeaTool.from_any(tmp_path)
+    tool.mark_llm_finished()
+    meta_name = IdeaSpace.SPACE_META_NAME
+    context_path = tmp_path / meta_name / "tool_context.json"
+    original_context = context_path.read_text(encoding="utf-8")
+
+    results = [
+        tool.mutation.create_sub_idea_space(f"{meta_name}/new-space"),
+        tool.mutation.delete_sub_idea_space(meta_name),
+        tool.mutation.write_idea_note(f"{meta_name}/tool_context.json", "overwritten", {}),
+        tool.mutation.update_metadata_of_idea_note(
+            f"{meta_name}/tool_context.json", {"status": "overwritten"}
+        ),
+        tool.mutation.delete_idea_note(f"{meta_name}/tool_context.json"),
+    ]
+
+    assert all(
+        isinstance(result, ToolError) and result.kind == ToolErrorKind.PERMISSION_DENIED
+        for result in results
+    )
+    assert context_path.read_text(encoding="utf-8") == original_context
+    assert not (context_path.parent / "new-space").exists()
 
 
 def test_get_convention_pivot_paths_returns_root_and_nested_conventions(

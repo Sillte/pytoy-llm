@@ -1,7 +1,7 @@
 from typing import Callable, Sequence
 
-from pytoy_llm.idea import IdeaSpace
-from pytoy_llm.tools.errors import ToolError
+from pytoy_llm.idea import IdeaSpace, ShouldBeSpacePathError
+from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 
 from .boundaries import tool_discovery_boundary
 from .semantic_types import (
@@ -85,7 +85,10 @@ class IdeaDiscovery:
         if isinstance(idea_space, ToolError):
             return idea_space
         path = idea_space.resolve(idea_space_pivot)
-        sub_space = IdeaSpace.from_path(path, root=idea_space.root_directory_path)
+        try:
+            sub_space = IdeaSpace.from_path(path, root=idea_space.root_directory_path)
+        except ShouldBeSpacePathError as exc:
+            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=str(exc))
         result_spaces = sub_space.get_subspaces(depth=depth)
         return [space.idea_path for space in result_spaces]
 
@@ -117,7 +120,10 @@ class IdeaDiscovery:
         if isinstance(idea_space, ToolError):
             return idea_space
         pivot_path = idea_space.resolve(idea_space_pivot)
-        result_notes = IdeaSpace.from_path(
-            pivot_path, root=idea_space.root_directory_path
-        ).get_notes(depth=depth)
+        try:
+            result_notes = IdeaSpace.from_path(
+                pivot_path, root=idea_space.root_directory_path
+            ).get_notes(depth=depth)
+        except ShouldBeSpacePathError as exc:
+            return ToolError(kind=ToolErrorKind.INVALID_ARGUMENT, msg=str(exc))
         return [note.idea_path for note in result_notes]

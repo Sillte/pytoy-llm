@@ -1,7 +1,13 @@
 class OutsidePathError(PermissionError):
     """Path is outside of `IdeaSpace`."""
 
-    ...
+
+class ShouldBeNotePathError(ValueError):
+    """Path should be an `IdeaNote` path."""
+
+
+class ShouldBeSpacePathError(ValueError):
+    """Path should be an `IdeaSpace` path."""
 
 
 class MetadataError(Exception):

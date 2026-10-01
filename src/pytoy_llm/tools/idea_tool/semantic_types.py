@@ -7,12 +7,11 @@ Namespace = Annotated[
     Field(
         description=(
             "Name of the Namespace containing the target IdeaSpace. "
-            "Use an empty string to refer to the default Namespace."
+            "As an argument of the function,`null` is used to refer to the default Namespace."
         ),
         examples=[
-            "",
-            "research",
-            "archive",
+            "NameA",
+            "default",
         ],
     ),
 ]

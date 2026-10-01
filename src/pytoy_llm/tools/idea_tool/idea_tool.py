@@ -265,6 +265,11 @@ class IdeaTool:
             text = context_path.read_text()
         except FileNotFoundError:
             tool_meta = IdeaSpaceToolMetaModel()
+        except (OSError, UnicodeDecodeError) as exc:
+            return ToolError(
+                kind=ToolErrorKind.IO_ERROR,
+                msg=f"`IdeaSpaceToolMetaModel` cannot be made: {exc}",
+            )
         else:
             try:
                 tool_meta = IdeaSpaceToolMetaModel.model_validate_json(text)
