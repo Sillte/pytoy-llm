@@ -100,7 +100,7 @@ def test_discovery_tools_are_registered_with_documentation(tmp_path: Path) -> No
     }
 
     for name in (
-        "get_all_sub_idea_spaces_supported_by_convention",
+        "get_idea_space_paths_with_conventions",
         "get_sub_idea_spaces",
         "get_idea_note_paths",
     ):
@@ -117,6 +117,7 @@ def test_inspection_tools_are_registered_with_documentation(tmp_path: Path) -> N
     for name in (
         "get_idea_space_working_context",
         "get_idea_space_convention",
+        "get_effective_conventions",
         "get_updated_time_of_idea_notes",
         "get_metadata_of_idea_notes",
         "get_idea_note",
@@ -226,7 +227,7 @@ def test_mutation_tools_cannot_access_reserved_space_metadata(tmp_path: Path) ->
     assert not (context_path.parent / "new-space").exists()
 
 
-def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
+def test_idea_space_paths_with_conventions_returns_root_and_nested_spaces(
     tmp_path: Path,
 ) -> None:
     (tmp_path / ".convention.md").write_text("root convention\n")
@@ -237,30 +238,104 @@ def test_get_convention_pivot_paths_returns_root_and_nested_conventions(
 
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.discovery.get_all_sub_idea_spaces_supported_by_convention()
+    result = tool.discovery.get_idea_space_paths_with_conventions()
 
     assert result == [".", "knowledge", "knowledge/python"]
 
 
-def test_get_convention_pivot_paths_represents_root_as_dot(tmp_path: Path) -> None:
+def test_idea_space_paths_with_conventions_represents_root_as_dot(tmp_path: Path) -> None:
     (tmp_path / ".convention.md").write_text("root convention\n")
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.discovery.get_all_sub_idea_spaces_supported_by_convention()
+    result = tool.discovery.get_idea_space_paths_with_conventions()
 
     assert result == ["."]
 
 
-def test_get_convention_pivot_paths_returns_empty_sequence_without_conventions(
+def test_idea_space_paths_with_conventions_returns_empty_without_conventions(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "knowledge").mkdir()
     (tmp_path / "knowledge" / "note.md").write_text("note\n")
     tool = IdeaTool.from_any(tmp_path)
 
-    result = tool.discovery.get_all_sub_idea_spaces_supported_by_convention()
+    result = tool.discovery.get_idea_space_paths_with_conventions()
 
     assert result == []
+
+
+def test_get_effective_conventions_returns_ancestor_conventions_root_first(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".convention.md").write_text("root convention\n", encoding="utf-8")
+    knowledge_path = tmp_path / "knowledge"
+    knowledge_path.mkdir()
+    (knowledge_path / ".idea_space_convention.md").write_text(
+        "knowledge convention\n", encoding="utf-8"
+    )
+    python_path = knowledge_path / "python"
+    python_path.mkdir()
+    (python_path / ".convention.md").write_text("python convention\n", encoding="utf-8")
+    note_path = python_path / "note.md"
+    note_path.write_text("note\n", encoding="utf-8")
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.inspection.get_effective_conventions("knowledge/python/note.md")
+
+    assert not isinstance(result, ToolError)
+    assert list(result) == [".", "knowledge", "knowledge/python"]
+    assert [model.idea_note.body for model in result.values()] == [
+        "root convention\n",
+        "knowledge convention\n",
+        "python convention\n",
+    ]
+
+
+def test_get_effective_conventions_for_space_excludes_descendant_conventions(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".convention.md").write_text("root convention\n", encoding="utf-8")
+    knowledge_path = tmp_path / "knowledge"
+    knowledge_path.mkdir()
+    (knowledge_path / ".convention.md").write_text("knowledge convention\n", encoding="utf-8")
+    (knowledge_path / "python").mkdir()
+    (knowledge_path / "python" / ".convention.md").write_text(
+        "python convention\n", encoding="utf-8"
+    )
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.inspection.get_effective_conventions("knowledge")
+
+    assert list(result) == [".", "knowledge"]
+
+
+def test_get_effective_conventions_returns_empty_mapping_without_conventions(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "knowledge").mkdir()
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.inspection.get_effective_conventions("knowledge")
+
+    assert result == {}
+
+
+def test_get_effective_conventions_rejects_missing_paths_and_md_directories(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "folder.md").mkdir()
+    tool = IdeaTool.from_any(tmp_path)
+
+    missing_note = tool.inspection.get_effective_conventions("missing.md")
+    missing_space = tool.inspection.get_effective_conventions("missing-space")
+    md_directory = tool.inspection.get_effective_conventions("folder.md")
+
+    assert isinstance(missing_note, ToolError)
+    assert missing_note.kind == ToolErrorKind.NOT_FOUND
+    assert isinstance(missing_space, ToolError)
+    assert missing_space.kind == ToolErrorKind.NOT_FOUND
+    assert isinstance(md_directory, ToolError)
+    assert md_directory.kind == ToolErrorKind.INVALID_ARGUMENT
 
 
 def test_update_metadata_of_idea_note_preserves_body_and_merges_metadata(

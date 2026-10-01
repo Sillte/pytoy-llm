@@ -8,7 +8,6 @@ from .semantic_types import (
     IdeaNoteMetadata,
     IdeaNotePath,
     IdeaNoteReference,
-    IdeaSpacePath,
     LocalFilePath,
     Namespace,
 )
@@ -91,7 +90,7 @@ class UnresolvedLinkModel(BaseModel, frozen=True):
 
 
 class IdeaNoteModel(BaseModel, frozen=True):
-    """A knowledge note exposed to an LLM."""
+    """A IdeaNote exposed to an LLM."""
 
     idea_note_path: IdeaNotePath = Field(
         description="Path of the IdeaNote, relative to the IdeaSpace root.",
@@ -132,17 +131,22 @@ class IdeaNoteModel(BaseModel, frozen=True):
 
 
 class IdeaSpaceConventionModel(BaseModel, frozen=True):
-    """A convention that defines how IdeaNotes within an IdeaSpace are organized."""
+    """An IdeaNote that serves as the convention for an IdeaSpace.
 
-    applied_to: IdeaSpacePath = Field(
-        description=(
-            "Path within the IdeaSpace, relative to the IdeaSpace root. "
-            "The convention applies to all files under this path."
-        ),
-        examples=[".", "knowledge"],
+    Convention is an IdeaNote that defines local conventions
+    for organizing, interpreting, creating, or maintaining IdeaNotes within an IdeaSpace.
+
+    The convention is defined by a `.convention.md` note located directly
+    in an IdeaSpace. Its scope and inheritance are determined by the
+    IdeaSpace hierarchy, rather than by fields in this model.
+
+    The contained IdeaNoteModel exposes the convention's path, body,
+    metadata, and links using the same representation as other IdeaNotes.
+    """
+
+    idea_note: IdeaNoteModel = Field(
+        description="The IdeaNote that serves as the IdeaSpace's convention."
     )
-
-    idea_note: IdeaNoteModel = Field(description="IdeaNote that represents the convention.")
 
 
 class IdeaSpaceToolMetaModel(BaseModel, frozen=True):

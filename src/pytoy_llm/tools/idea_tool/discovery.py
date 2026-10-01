@@ -25,13 +25,13 @@ class IdeaDiscovery:
     @property
     def tools(self) -> Sequence[Callable]:
         return [
-            self.get_all_sub_idea_spaces_supported_by_convention,
+            self.get_idea_space_paths_with_conventions,
             self.get_sub_idea_spaces,
             self.get_idea_note_paths,
         ]
 
     @tool_discovery_boundary
-    def get_all_sub_idea_spaces_supported_by_convention(
+    def get_idea_space_paths_with_conventions(
         self,
         idea_namespace: Namespace | None = None,
     ) -> Sequence[IdeaSpacePath] | ToolError:

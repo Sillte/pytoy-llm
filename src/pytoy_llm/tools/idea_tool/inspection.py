@@ -15,7 +15,7 @@ from pytoy_llm.idea import (
 )
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 
-from .boundaries import tool_discovery_boundary, tool_inspection_boundary
+from .boundaries import tool_inspection_boundary
 from .models import (
     IdeaNoteLinkModel,
     IdeaNoteModel,
@@ -128,6 +128,7 @@ class IdeaInspection:
     def tools(self) -> Sequence[Callable]:
         return [
             self.get_idea_space_convention,
+            self.get_effective_conventions,
             self.get_updated_time_of_idea_notes,
             self.get_metadata_of_idea_notes,
             self.get_idea_note,
@@ -174,7 +175,6 @@ class IdeaInspection:
                 if isinstance(idea_note_model, IdeaNoteModel):
                     return IdeaSpaceConventionModel(
                         idea_note=idea_note_model,
-                        applied_to=sub_idea_space.idea_path,
                     )
                 return idea_note_model
             return None
@@ -184,6 +184,81 @@ class IdeaInspection:
             return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
         except OSError as exc:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
+
+    @tool_inspection_boundary
+    def get_effective_conventions(
+        self,
+        idea_space_or_note_path: IdeaSpacePath | IdeaNotePath,
+        idea_namespace: Namespace | None = None,
+    ) -> Mapping[IdeaSpacePath, IdeaSpaceConventionModel] | ToolError:
+        """Get conventions effective for an IdeaNote or direct notes in an IdeaSpace.
+
+        Paths ending in `.md` are interpreted as IdeaNote paths; other paths are
+        interpreted as IdeaSpace paths. The returned mapping is ordered from the
+        root IdeaSpace toward the target's containing or identified IdeaSpace.
+        Each key is the IdeaSpace path where that convention is defined. Deeper
+        conventions take precedence over shallower ones.
+
+        Returns an empty mapping when no applicable convention is defined.
+        Returns ``ToolError`` when the input path does not exist or is invalid.
+        """
+        idea_space = self._get_idea_space(idea_namespace)
+        if isinstance(idea_space, ToolError):
+            return idea_space
+        resolved_namespace = self._resolve_idea_namespace(idea_namespace)
+        if isinstance(resolved_namespace, ToolError):
+            return resolved_namespace
+
+        input_path = Path(idea_space_or_note_path)
+        target_path = idea_space.resolve(input_path)
+
+        if input_path.name.endswith(".md"):
+            if target_path.is_dir():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Expected an IdeaNote path, but found a directory: {input_path}",
+                )
+            if not target_path.is_file():
+                return ToolError(
+                    kind=ToolErrorKind.NOT_FOUND,
+                    msg=f"{input_path=} is not found.",
+                )
+            target_space_path = target_path.parent
+        else:
+            if not target_path.exists():
+                return ToolError(
+                    kind=ToolErrorKind.NOT_FOUND,
+                    msg=f"{input_path=} is not found.",
+                )
+            target_space_path = target_path
+
+        target_space = IdeaSpace.from_path(
+            target_space_path,
+            root=idea_space.root_directory_path,
+        )
+        ancestor_spaces = [target_space]
+        while ancestor_spaces[-1].idea_path != ".":
+            ancestor_spaces.append(ancestor_spaces[-1].parent)
+
+        conventions: dict[IdeaSpacePath, IdeaSpaceConventionModel] = {}
+        for ancestor_space in reversed(ancestor_spaces):
+            convention = ancestor_space.convention
+            if convention is None:
+                continue
+
+            idea_note_model = build_idea_note_model(
+                convention,
+                self._idea_graphs[resolved_namespace],
+                local_path_resolver=self._local_path_resolver,
+                namespace=resolved_namespace,
+            )
+            if isinstance(idea_note_model, ToolError):
+                return idea_note_model
+            conventions[ancestor_space.idea_path] = IdeaSpaceConventionModel(
+                idea_note=idea_note_model,
+            )
+
+        return conventions
 
     def get_updated_time_of_idea_notes(
         self,
@@ -228,7 +303,7 @@ class IdeaInspection:
         except OSError as exc:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
 
-    @tool_discovery_boundary
+    @tool_inspection_boundary
     def get_metadata_of_idea_notes(
         self,
         idea_note_paths: Sequence[IdeaNotePath],
