@@ -30,8 +30,10 @@ class IdeaMutation:
         return [
             self.create_sub_idea_space,
             self.delete_sub_idea_space,
+            self.move_idea_space,
             self.update_metadata_of_idea_note,
             self.write_idea_note,
+            self.move_idea_note,
             self.delete_idea_note,
         ]
 
@@ -127,6 +129,94 @@ class IdeaMutation:
                 retry=False,
             )
         return idea_space_path
+
+    def move_idea_space(
+        self,
+        source_idea_space_path: IdeaSpacePath,
+        destination_idea_space_path: IdeaSpacePath,
+        idea_namespace: Namespace | None = None,
+    ) -> IdeaSpacePath | ToolError:
+        """Move an IdeaSpace directory and all its contents within one namespace.
+
+        The IdeaSpace root and reserved metadata directories cannot be moved.
+        The destination parent must already exist, and an existing destination
+        is never overwritten. Moving a space does not rewrite links, and its
+        effective conventions may change under the new hierarchy.
+
+        Returns the destination IdeaSpace-root-relative path, or ``ToolError``
+        if the move cannot be completed. Moving a space to its current path is
+        a successful no-op.
+        """
+        idea_space = self._get_idea_space(idea_namespace)
+        if isinstance(idea_space, ToolError):
+            return idea_space
+        try:
+            source_path = idea_space.resolve(source_idea_space_path)
+            destination_path = idea_space.resolve(destination_idea_space_path)
+            root_path = idea_space.root_directory_path
+
+            if Path(source_idea_space_path).suffix == ".md":
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"`{source_idea_space_path}` identifies an IdeaNote path, not an IdeaSpace.",
+                )
+            if Path(destination_idea_space_path).suffix == ".md":
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"`{destination_idea_space_path}` identifies an IdeaNote path, not an IdeaSpace.",
+                )
+            if source_path == root_path:
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg="The IdeaSpace root cannot be moved.",
+                )
+            if (
+                IdeaSpace.SPACE_META_NAME in source_path.relative_to(root_path).parts
+                or IdeaSpace.SPACE_META_NAME in destination_path.relative_to(root_path).parts
+            ):
+                return ToolError(
+                    kind=ToolErrorKind.PERMISSION_DENIED,
+                    msg="IdeaSpace tool metadata directories cannot be moved.",
+                    retry=False,
+                )
+            if not source_path.exists():
+                return ToolError(
+                    kind=ToolErrorKind.NOT_FOUND,
+                    msg=f"IdeaSpace `{source_idea_space_path}` does not exist.",
+                    retry=False,
+                )
+            if not source_path.is_dir():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"`{source_idea_space_path}` does not identify an IdeaSpace directory.",
+                )
+            if source_path == destination_path:
+                return destination_idea_space_path
+            if destination_path.is_relative_to(source_path):
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg="An IdeaSpace cannot be moved into itself or one of its descendants.",
+                )
+            if destination_path.exists():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Destination `{destination_idea_space_path}` already exists.",
+                )
+            if not destination_path.parent.is_dir():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Parent IdeaSpace of `{destination_idea_space_path}` does not exist.",
+                )
+
+            source_path.rename(destination_path)
+        except FileNotFoundError as exc:
+            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=False)
+        except OutsidePathError as exc:
+            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
+        except OSError as exc:
+            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
+
+        return destination_idea_space_path
 
     def update_metadata_of_idea_note(
         self,
@@ -265,3 +355,72 @@ class IdeaMutation:
             return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
 
         return idea_note_path
+
+    def move_idea_note(
+        self,
+        source_idea_note_path: IdeaNotePath,
+        destination_idea_note_path: IdeaNotePath,
+        idea_namespace: Namespace | None = None,
+    ) -> IdeaNotePath | ToolError:
+        """Move an IdeaNote to another path in the same IdeaSpace.
+
+        Both paths must identify Markdown notes. The destination parent must
+        already exist, and an existing destination is never overwritten.
+        Moving a note does not rewrite links to or from it. Moving a
+        ``.convention.md`` note changes the IdeaSpace where its convention
+        applies.
+
+        Returns the destination IdeaSpace-root-relative path, or ``ToolError``
+        if the move cannot be completed. Moving a note to its current path is
+        a successful no-op.
+        """
+        idea_space = self._get_idea_space(idea_namespace)
+        if isinstance(idea_space, ToolError):
+            return idea_space
+        try:
+            source_path = idea_space.resolve(source_idea_note_path)
+            destination_path = idea_space.resolve(destination_idea_note_path)
+
+            if source_path.suffix != ".md":
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"`{source_idea_note_path}` does not identify an IdeaNote path.",
+                )
+            if destination_path.suffix != ".md":
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"`{destination_idea_note_path}` does not identify an IdeaNote path.",
+                )
+            if not source_path.exists():
+                return ToolError(
+                    kind=ToolErrorKind.NOT_FOUND,
+                    msg=f"IdeaNote `{source_idea_note_path}` does not exist.",
+                    retry=False,
+                )
+            if not source_path.is_file():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"`{source_idea_note_path}` does not identify an IdeaNote file.",
+                )
+            if source_path == destination_path:
+                return destination_idea_note_path
+            if destination_path.exists():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Destination `{destination_idea_note_path}` already exists.",
+                )
+            if not destination_path.parent.is_dir():
+                return ToolError(
+                    kind=ToolErrorKind.INVALID_ARGUMENT,
+                    msg=f"Parent IdeaSpace of `{destination_idea_note_path}` does not exist.",
+                )
+
+            source_path.rename(destination_path)
+        except FileNotFoundError as exc:
+            return ToolError(kind=ToolErrorKind.NOT_FOUND, msg=str(exc), retry=False)
+        except OutsidePathError as exc:
+            return ToolError(kind=ToolErrorKind.PERMISSION_DENIED, msg=str(exc), retry=False)
+        except OSError as exc:
+            return ToolError(kind=ToolErrorKind.IO_ERROR, msg=str(exc), retry=False)
+
+        return destination_idea_note_path

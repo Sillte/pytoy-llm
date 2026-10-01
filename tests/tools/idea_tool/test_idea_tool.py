@@ -135,8 +135,10 @@ def test_mutation_tools_are_registered_with_documentation(tmp_path: Path) -> Non
     for name in (
         "create_sub_idea_space",
         "delete_sub_idea_space",
+        "move_idea_space",
         "update_metadata_of_idea_note",
         "write_idea_note",
+        "move_idea_note",
         "delete_idea_note",
     ):
         assert name in registered_tools
@@ -202,6 +204,144 @@ def test_delete_subspace_rejects_non_empty_directories(tmp_path: Path) -> None:
     assert knowledge.exists()
 
 
+def test_move_idea_space_moves_subtree(tmp_path: Path) -> None:
+    source = tmp_path / "drafts"
+    nested_note = source / "nested" / "note.md"
+    destination = tmp_path / "archive" / "drafts"
+    source.mkdir()
+    nested_note.parent.mkdir()
+    (tmp_path / "archive").mkdir()
+    original = b"# Note\r\n"
+    nested_note.write_bytes(original)
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.mutation.move_idea_space("drafts", "archive/drafts")
+
+    assert result == "archive/drafts"
+    assert not source.exists()
+    assert (destination / "nested" / "note.md").read_bytes() == original
+
+
+def test_move_idea_space_to_same_path_is_a_no_op(tmp_path: Path) -> None:
+    source = tmp_path / "drafts"
+    source.mkdir()
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.mutation.move_idea_space("drafts", "./drafts")
+
+    assert result == "./drafts"
+    assert source.is_dir()
+
+
+def test_move_idea_space_rejects_root_and_missing_source(tmp_path: Path) -> None:
+    (tmp_path / "drafts").mkdir()
+    tool = IdeaTool.from_any(tmp_path)
+
+    root_result = tool.mutation.move_idea_space(".", "moved-root")
+    missing_result = tool.mutation.move_idea_space("missing", "moved")
+
+    assert isinstance(root_result, ToolError)
+    assert root_result.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert isinstance(missing_result, ToolError)
+    assert missing_result.kind == ToolErrorKind.NOT_FOUND
+    assert (tmp_path / "drafts").is_dir()
+
+
+def test_move_idea_space_rejects_invalid_destinations_without_moving_source(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "drafts"
+    source.mkdir()
+    (source / "note.md").write_bytes(b"note\r\n")
+    (tmp_path / "archive").mkdir()
+    tool = IdeaTool.from_any(tmp_path)
+
+    existing_destination = tool.mutation.move_idea_space("drafts", "archive")
+    descendant_destination = tool.mutation.move_idea_space("drafts", "drafts/child")
+    missing_parent = tool.mutation.move_idea_space("drafts", "missing/archive")
+    note_destination = tool.mutation.move_idea_space("drafts", "archive.md")
+
+    assert isinstance(existing_destination, ToolError)
+    assert existing_destination.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert isinstance(descendant_destination, ToolError)
+    assert descendant_destination.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert isinstance(missing_parent, ToolError)
+    assert missing_parent.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert isinstance(note_destination, ToolError)
+    assert note_destination.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert (source / "note.md").read_bytes() == b"note\r\n"
+
+
+def test_move_idea_note_preserves_bytes_and_moves_file(tmp_path: Path) -> None:
+    source = tmp_path / "drafts" / "note.md"
+    destination = tmp_path / "published" / "note.md"
+    source.parent.mkdir()
+    destination.parent.mkdir()
+    original = b"---\r\ntitle: draft\r\n---\r\n# Note\r\n"
+    source.write_bytes(original)
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.mutation.move_idea_note("drafts/note.md", "published/note.md")
+
+    assert result == "published/note.md"
+    assert not source.exists()
+    assert destination.read_bytes() == original
+
+
+def test_move_idea_note_to_same_path_is_a_no_op(tmp_path: Path) -> None:
+    note = tmp_path / "note.md"
+    note.write_bytes(b"# unchanged\r\n")
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.mutation.move_idea_note("note.md", "./note.md")
+
+    assert result == "./note.md"
+    assert note.read_bytes() == b"# unchanged\r\n"
+
+
+def test_move_idea_note_rejects_existing_destination_without_overwriting(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.md"
+    destination = tmp_path / "destination.md"
+    source.write_bytes(b"source\r\n")
+    destination.write_bytes(b"destination\r\n")
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.mutation.move_idea_note("source.md", "destination.md")
+
+    assert isinstance(result, ToolError)
+    assert result.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert source.read_bytes() == b"source\r\n"
+    assert destination.read_bytes() == b"destination\r\n"
+
+
+def test_move_idea_note_rejects_invalid_destination_without_moving_source(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.md"
+    source.write_bytes(b"source\r\n")
+    tool = IdeaTool.from_any(tmp_path)
+
+    non_note_path = tool.mutation.move_idea_note("source.md", "destination.txt")
+    missing_parent = tool.mutation.move_idea_note("source.md", "missing/destination.md")
+
+    assert isinstance(non_note_path, ToolError)
+    assert non_note_path.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert isinstance(missing_parent, ToolError)
+    assert missing_parent.kind == ToolErrorKind.INVALID_ARGUMENT
+    assert source.read_bytes() == b"source\r\n"
+
+
+def test_move_idea_note_returns_not_found_for_missing_source(tmp_path: Path) -> None:
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.mutation.move_idea_note("missing.md", "destination.md")
+
+    assert isinstance(result, ToolError)
+    assert result.kind == ToolErrorKind.NOT_FOUND
+
+
 def test_mutation_tools_cannot_access_reserved_space_metadata(tmp_path: Path) -> None:
     tool = IdeaTool.from_any(tmp_path)
     tool.mark_llm_finished()
@@ -217,6 +357,8 @@ def test_mutation_tools_cannot_access_reserved_space_metadata(tmp_path: Path) ->
             f"{meta_name}/tool_context.json", {"status": "overwritten"}
         ),
         tool.mutation.delete_idea_note(f"{meta_name}/tool_context.json"),
+        tool.mutation.move_idea_note("note.md", f"{meta_name}/note.md"),
+        tool.mutation.move_idea_space(".", f"{meta_name}/moved"),
     ]
 
     assert all(
