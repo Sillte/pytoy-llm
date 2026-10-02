@@ -2,29 +2,19 @@
 
 ## Purpose
 
-The `tools` package provides tools for LLM agents to inspect and
-search workspace contents.
+The `tools` package provides LLM-facing tools for workspace exploration and
+IdeaSpace operations. These are separate capabilities with different access
+and mutation policies.
 
 ## Responsibility Boundaries
 
-- `WorkspaceExplorer` is the public facade for workspace exploration.
-- Discovery, inspection, and search responsibilities remain separate.
-- `WorkspaceAccess` owns workspace path validation and access policy.
+- `WorkspaceExplorer` is the public facade for read-only workspace exploration;
+  its specific policy is in `workspace_explorer/DESIGN_POLICY.md`.
+- `IdeaTool` is the public facade for discovery, inspection, and mutation of
+  configured IdeaSpaces; its specific policy is in `idea_tool/DESIGN_POLICY.md`.
+- Discovery, inspection, and search responsibilities remain separate within
+  each tool.
 - Internal implementation modules should not be required by package users.
-
-## Safety
-
-- All paths are interpreted relative to the workspace root.
-- Absolute paths, parent traversal, and symlink or junction paths resolving
-  outside the workspace must be rejected.
-- Workspace tools must not create, modify, or delete files.
-- Path validation must remain centralized in `WorkspaceAccess`.
-
-## Resource Limits
-
-File reads and searches must remain bounded by explicit resource limits, such
-as file size and result count. Exceeding a limit returns
-`ToolErrorKind.RESOURCE_LIMIT` rather than loading unbounded content.
 
 ## Errors
 
@@ -32,10 +22,3 @@ Expected tool failures are returned as `ToolError` values. Implementations
 should distinguish invalid arguments, missing paths, permission failures, and
 resource limits where the cause is known. Unexpected exceptions should not be
 used as the normal tool contract.
-
-## Exclusions
-
-Default exclusions exist to avoid generated files and dependency trees during
-workspace exploration. An explicitly supplied empty exclusion collection means
-that no configurable exclusions were requested. Any unconditional exclusions
-must be enforced and documented by the path-gathering policy.

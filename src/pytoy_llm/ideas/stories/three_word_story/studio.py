@@ -6,7 +6,7 @@ from pytoy_llm.idea import IdeaSpace
 from pytoy_llm.models import LLMRequest, UsageLimit
 from pytoy_llm.task.models import AgentInvocationSpec, InvocationHooks
 from pytoy_llm.task.models.task_specs import TaskSpec
-from pytoy_llm.tools.idea_tool.idea_tool import IdeaTool
+from pytoy_llm.tools.idea_tool import IdeaTool
 
 from .prompts import CONVENTION, SYSTEM_PROMPT
 
