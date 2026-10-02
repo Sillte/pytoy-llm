@@ -66,8 +66,14 @@ class IdeaTool:
         if default_namespace not in self._idea_spaces:
             raise ValueError(f"`{default_namespace=}` does not exist in `{idea_spaces}`")
 
-        if not local_path_resolver.is_registered(self.SCHEME, default_namespace):
-            raise ValueError(f"`{default_namespace=}` is not registered.")
+        for namespace, idea_space in self._idea_spaces.items():
+            if not local_path_resolver.is_registered(self.SCHEME, namespace):
+                raise ValueError(f"`{namespace=}` is not registered.")
+            if (
+                local_path_resolver.get_root_directory(self.SCHEME, namespace)
+                != idea_space.root_directory_path
+            ):
+                raise ValueError(f"`{namespace=}` is registered to a different root.")
 
         if any(
             space.directory_path != space.root_directory_path

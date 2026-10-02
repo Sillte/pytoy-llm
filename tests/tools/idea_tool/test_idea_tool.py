@@ -1,18 +1,19 @@
 from pathlib import Path
 
+import pytest
 from pydantic import TypeAdapter
 
 from pytoy_llm.idea import IdeaSpace, SchemeDirectory, UriLocalPathResolver
 from pytoy_llm.idea.domain.uri import Uri
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.idea_tool import IdeaTool
-from pytoy_llm.tools.idea_tool.models import IdeaNoteModel, RemoteLinkModel
+from pytoy_llm.tools.idea_tool.models import ExternalLinkModel, IdeaNoteModel
 from pytoy_llm.tools.idea_tool.semantic_types import IdeaNoteReference, Namespace
 
 
 def test_remote_link_model_serializes_uri_dataclass() -> None:
     uri = Uri.from_any("https://example.com/reference?q=python#install")
-    model = RemoteLinkModel(
+    model = ExternalLinkModel(
         source_idea_note_reference=IdeaNoteReference(
             idea_note_path="knowledge/python.md", namespace="research"
         ),
@@ -30,7 +31,59 @@ def test_remote_link_model_serializes_uri_dataclass() -> None:
         "namespace": "research",
         "idea_note_path": "knowledge/python.md",
     }
-    assert RemoteLinkModel.model_validate(model.model_dump()).uri == uri
+    assert ExternalLinkModel.model_validate(model.model_dump()).uri == uri
+
+
+def test_unknown_idea_namespace_is_an_unresolved_link(tmp_path: Path) -> None:
+    (tmp_path / "source.md").write_text(
+        "[missing](idea://unknown/target.md) [website](https://example.com)", encoding="utf-8"
+    )
+    tool = IdeaTool.from_any(tmp_path)
+
+    result = tool.inspection.get_idea_note("source.md")
+
+    assert isinstance(result, IdeaNoteModel)
+    assert len(result.external_links) == 1
+    assert str(result.external_links[0].uri) == "https://example.com"
+    assert len(result.unresolved_links) == 1
+    assert result.unresolved_links[0].reason == "IdeaSpace namespace `unknown` is not configured."
+
+
+def test_constructor_requires_resolver_route_for_each_namespace(tmp_path: Path) -> None:
+    default_root = tmp_path / "default"
+    archive_root = tmp_path / "archive"
+    default_root.mkdir()
+    archive_root.mkdir()
+    idea_spaces = {
+        "default": IdeaSpace(default_root),
+        "archive": IdeaSpace(archive_root),
+    }
+    resolver = UriLocalPathResolver([SchemeDirectory(default_root, IdeaTool.SCHEME, "default")])
+
+    with pytest.raises(ValueError, match="archive.*not registered"):
+        IdeaTool(idea_spaces, resolver, default_namespace="default")
+
+
+def test_constructor_rejects_resolver_route_with_mismatched_root(tmp_path: Path) -> None:
+    default_root = tmp_path / "default"
+    archive_root = tmp_path / "archive"
+    wrong_archive_root = tmp_path / "wrong-archive"
+    default_root.mkdir()
+    archive_root.mkdir()
+    wrong_archive_root.mkdir()
+    idea_spaces = {
+        "default": IdeaSpace(default_root),
+        "archive": IdeaSpace(archive_root),
+    }
+    resolver = UriLocalPathResolver(
+        [
+            SchemeDirectory(default_root, IdeaTool.SCHEME, "default"),
+            SchemeDirectory(wrong_archive_root, IdeaTool.SCHEME, "archive"),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="archive.*different root"):
+        IdeaTool(idea_spaces, resolver, default_namespace="default")
 
 
 def test_optional_namespace_schema_uses_null_for_default() -> None:

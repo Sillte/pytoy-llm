@@ -48,13 +48,13 @@ class LocalLinkModel(BaseModel, frozen=True):
         return f"{self.scheme}:{path}"
 
 
-class RemoteLinkModel(BaseModel, frozen=True):
-    """A link from an IdeaNote to a remote resource."""
+class ExternalLinkModel(BaseModel, frozen=True):
+    """A link from an IdeaNote to an external URI."""
 
     source_idea_note_reference: IdeaNoteReference
 
     uri: Uri = Field(
-        description="URI of the referenced remote resource.",
+        description="External URI referenced by the IdeaNote.",
         examples=["https://example.com/reference"],
     )
 
@@ -119,9 +119,9 @@ class IdeaNoteModel(BaseModel, frozen=True):
         description="Links from this note to local files.",
     )
 
-    remote_links: Sequence[RemoteLinkModel] = Field(
+    external_links: Sequence[ExternalLinkModel] = Field(
         default=(),
-        description="Links from this note to remote resources.",
+        description="Links from this note to external URIs.",
     )
 
     unresolved_links: Sequence[UnresolvedLinkModel] = Field(

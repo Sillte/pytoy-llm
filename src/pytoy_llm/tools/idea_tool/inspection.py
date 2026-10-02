@@ -17,11 +17,11 @@ from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 
 from .boundaries import tool_inspection_boundary
 from .models import (
+    ExternalLinkModel,
     IdeaNoteLinkModel,
     IdeaNoteModel,
     IdeaSpaceConventionModel,
     LocalLinkModel,
-    RemoteLinkModel,
     UnresolvedLinkModel,
 )
 from .semantic_types import (
@@ -45,7 +45,7 @@ def build_idea_note_model(
 
     idea_note_links = []
     local_links = []
-    remote_links = []
+    external_links = []
     unresolved_links = []
 
     source_idea_note_reference = IdeaNoteReference(
@@ -77,9 +77,17 @@ def build_idea_note_model(
                             path=unquote(idea_link.uri.path).strip("/"),
                         ),
                     )
+            elif scheme == "idea":
+                unresolved_links.append(
+                    UnresolvedLinkModel(
+                        source_idea_note_reference=source_idea_note_reference,
+                        uri=idea_link.uri,
+                        reason=f"IdeaSpace namespace `{authority}` is not configured.",
+                    )
+                )
             else:
-                remote_links.append(
-                    RemoteLinkModel(
+                external_links.append(
+                    ExternalLinkModel(
                         source_idea_note_reference=source_idea_note_reference,
                         uri=idea_link.uri,
                     )
@@ -103,7 +111,7 @@ def build_idea_note_model(
         body=source_idea_note.body,
         metadata=source_idea_note.metadata.as_dict(),
         idea_note_links=idea_note_links,
-        remote_links=remote_links,
+        external_links=external_links,
         local_links=local_links,
         unresolved_links=unresolved_links,
     )
