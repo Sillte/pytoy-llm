@@ -2,14 +2,14 @@ import pytest
 from pydantic_ai import ModelRequest, ToolReturnPart
 
 from pytoy_llm.models import LLMMessage
-from pytoy_llm.models.parts import AnyContentPart, ToolResultPart
+from pytoy_llm.models.parts import ContentPart, ToolResultPart
 from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
 
 
-def test_request_any_content_part_is_not_converted() -> None:
+def test_request_content_part_is_not_converted() -> None:
     message = LLMMessage.from_parts(
         [
-            AnyContentPart(
+            ContentPart(
                 role="user",
                 content=[{"type": "text", "text": "Describe this image."}],
             )
@@ -23,7 +23,7 @@ def test_request_any_content_part_is_not_converted() -> None:
 
 def test_request_tool_result_part_converts_to_tool_return() -> None:
     message = LLMMessage.from_parts(
-        [ToolResultPart(call_id="call-1", tool_name="weather", content='{"temperature": 20}')],
+        [ToolResultPart(call_id="call-1", tool_name="weather", result='{"temperature": 20}')],
         kind="request",
     )
 
@@ -56,4 +56,4 @@ def test_tool_return_converts_to_tool_result_part() -> None:
     assert isinstance(part, ToolResultPart)
     assert part.call_id == "call-1"
     assert part.tool_name == "weather"
-    assert part.content == '{"temperature": 20}'
+    assert part.result == '{"temperature": 20}'

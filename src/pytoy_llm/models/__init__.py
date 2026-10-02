@@ -10,7 +10,7 @@ from pytoy_llm.models.llm_messages import (
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens  # noqa
 from pytoy_llm.models.llm_tools import LLMToolsLike  # noqa
 from pytoy_llm.models.parts import (  # noqa
-    AnyContentPart,
+    ContentPart,
     OpaquePart,
     Part,
     PartAdapter,

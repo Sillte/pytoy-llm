@@ -25,7 +25,7 @@ from pytoy_llm.models.agent_metas import UsageLimit as PytoyUsageLimit
 from pytoy_llm.models.llm_messages import LLMMessage, LLMResult
 from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens, ReasoningEffort
 from pytoy_llm.models.parts import (
-    AnyContentPart,
+    ContentPart,
     OpaquePart,
     SystemPromptHistoryPart,
     ToolResultPart,
@@ -42,7 +42,7 @@ class RequestPartConverter:
             case LLMTextPart():
                 if part.role == "user":
                     return UserPromptPart(content=part.content)
-            case AnyContentPart():
+            case ContentPart():
                 raise ValueError(f"`{part}` cannot be converted to a ModelRequestPart")
             case SystemPromptHistoryPart():
                 return SystemPromptPart(content=part.content)
@@ -56,7 +56,7 @@ class RequestPartConverter:
                 return ToolReturnPart(
                     tool_name=part.tool_name,
                     tool_call_id=part.call_id,
-                    content=part.content,
+                    content=part.result,
                 )
             case _:
                 assert_never(part)
@@ -71,7 +71,7 @@ class RequestPartConverter:
             case ToolReturnPart():
                 return ToolResultPart(
                     call_id=part.tool_call_id,
-                    content=part.content,
+                    result=part.content,
                     tool_name=part.tool_name,
                 )
             case _:
@@ -92,7 +92,7 @@ class ResponsePartConverter:
             case ToolResultPart():
                 raise TypeError(f"{part=}")
 
-            case AnyContentPart():
+            case ContentPart():
                 raise ValueError(f"`{part}` cannot be converted to a ModelResponsePart")
             case SystemPromptHistoryPart():
                 raise ValueError(f"`{part}` cannot be converted to a ModelResponsePart")

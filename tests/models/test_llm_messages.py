@@ -3,7 +3,7 @@ from litellm import ModelResponse
 from pydantic import BaseModel
 
 from pytoy_llm.models.llm_messages import LLMMessage, LLMRequest
-from pytoy_llm.models.parts import TextPart
+from pytoy_llm.models.parts import ContentPart, TextPart
 
 
 # --- Mock Data ---
@@ -78,6 +78,19 @@ def test_request_from_mapping_wraps_single_message() -> None:
     part = request.messages[0].parts[0]
     assert isinstance(part, TextPart)
     assert part.content == "Hello"
+
+
+def test_from_records_preserves_content_part_types_and_infers_request() -> None:
+    message = LLMMessage.from_records(
+        [
+            {"role": "user", "content": "Hello"},
+            {"role": "user", "content": [{"type": "text", "text": "Describe this image."}]},
+        ]
+    )
+
+    assert message.kind == "request"
+    assert isinstance(message.parts[0], TextPart)
+    assert isinstance(message.parts[1], ContentPart)
 
 
 def test_request_rejects_any_system_prompt_override() -> None:

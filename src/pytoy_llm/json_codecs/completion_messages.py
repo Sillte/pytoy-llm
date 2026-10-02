@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from pytoy_llm.models import LLMMessage
 from pytoy_llm.models.parts import (
-    AnyContentPart,
+    ContentPart,
     OpaquePart,
     Part,
     TextPart,
@@ -96,7 +96,7 @@ class CompletionMessagesCodec:
             if isinstance(content, str):
                 parts.append(TextPart(role=role, content=content))
             elif isinstance(content, Sequence) and not isinstance(content, str | bytes):
-                parts.append(AnyContentPart(role=role, content=list(content)))
+                parts.append(ContentPart(role=role, content=list(content)))
             elif content is not None:
                 return LLMMessage(kind=kind, parts=[OpaquePart(value=dict(message))])
 
@@ -115,7 +115,7 @@ class CompletionMessagesCodec:
             if isinstance(call_id, str) and "content" in message:
                 return LLMMessage(
                     kind=kind,
-                    parts=[ToolResultPart(call_id=call_id, content=message["content"])],
+                    parts=[ToolResultPart(call_id=call_id, result=message["content"])],
                 )
             return LLMMessage(kind=kind, parts=[OpaquePart(value=dict(message))])
 
@@ -142,7 +142,7 @@ class CompletionMessagesCodec:
         match part:
             case TextPart():
                 return {"role": part.role, "content": part.content}
-            case AnyContentPart():
+            case ContentPart():
                 return {"role": part.role, "content": part.content}
             case ToolCallPart():
                 return {
@@ -162,7 +162,7 @@ class CompletionMessagesCodec:
                 return {
                     "role": "tool",
                     "tool_call_id": part.call_id,
-                    "content": part.content,
+                    "content": part.result,
                 }
             case OpaquePart():
                 if isinstance(part.value, Mapping):

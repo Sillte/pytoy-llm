@@ -3,7 +3,7 @@ import pytest
 from pytoy_llm.json_codecs import CompletionMessagesCodec
 from pytoy_llm.models import LLMMessage
 from pytoy_llm.models.parts import (
-    AnyContentPart,
+    ContentPart,
     OpaquePart,
     TextPart,
     ToolCallPart,
@@ -106,7 +106,7 @@ def test_invalid_tool_calls_are_rejected(codec):
 def test_content_part_array_round_trip(codec):
     message = LLMMessage.from_parts(
         [
-            AnyContentPart(
+            ContentPart(
                 role="user",
                 content=[{"type": "text", "text": "Describe this image."}],
             )
@@ -127,7 +127,7 @@ def test_content_part_array_round_trip(codec):
 
 def test_tool_result_round_trip(codec):
     message = LLMMessage.from_parts(
-        [ToolResultPart(call_id="call-1", content='{"temperature": 20}')],
+        [ToolResultPart(call_id="call-1", result='{"temperature": 20}')],
         kind="response",
     )
 

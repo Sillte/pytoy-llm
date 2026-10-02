@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import BaseModel, Field
 
 from pytoy_llm.models.llm_metas import LLMOutputMeta
-from pytoy_llm.models.parts import Part, PartAdapter, TextPart
+from pytoy_llm.models.parts import ContentPart, Part, PartAdapter, TextPart
 from pytoy_llm.models.system_prompt import SystemPrompt
 
 
@@ -47,7 +47,7 @@ class LLMMessage(BaseModel, frozen=True):
     ) -> Self:
         def _infer_kind(parts: Sequence[Part]) -> Literal["request", "response"]:
             for part in parts:
-                if isinstance(part, TextPart) and part.role in {"user", "system"}:
+                if isinstance(part, ContentPart) and part.role in {"user", "system"}:
                     return "request"
             return "response"
 
