@@ -7,6 +7,7 @@ from pytoy_llm.task.models import (
     AgentInvocationSpec,
     FunctionInvocationSpec,
     InvocationHooks,
+    InvocationResult,
     LLMInvocationSpec,
 )
 from pytoy_llm.task.models.context import ExecutionContext
@@ -62,11 +63,20 @@ def test_hook_exceptions_do_not_change_successful_invocation() -> None:
         ),
     )
 
-    result = spec.invoke(
-        "input", ExecutionContext(llm_param=None, connection=None, llm_messages=())
+    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+
+    assert trace.result.output == "input"
+
+
+def test_invocation_trace_owns_invocation_result() -> None:
+    invocation_result = InvocationResult[str](output="output")
+    spec = FunctionInvocationSpec(
+        invocator=lambda _value, _context: invocation_result,
     )
 
-    assert result.output == "input"
+    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+
+    assert trace.result == invocation_result
 
 
 def test_hook_exception_does_not_replace_invocation_exception() -> None:

@@ -49,7 +49,7 @@ class TaskSpec[T]:
         invocation_input = task_input
         for invocation_spec in self.invocation_specs:
             try:
-                invocation_result = invocation_spec.invoke(invocation_input, execution_context)
+                invocation_trace = invocation_spec.invoke(invocation_input, execution_context)
             except Exception as exc:
                 return Error(
                     exception=InvocationException(
@@ -57,12 +57,12 @@ class TaskSpec[T]:
                     )
                 )
 
+            invocation_result = invocation_trace.result
             if invocation_result.runtime_patch:
                 execution_context = invocation_result.runtime_patch.apply(execution_context)
             if invocation_result.context_patch:
                 execution_context = invocation_result.context_patch.apply(execution_context)
-            if invocation_result.trace:
-                traces.append(invocation_result.trace)
+            traces.append(invocation_trace)
             invocation_input = invocation_result.output
 
         result = TaskResult(

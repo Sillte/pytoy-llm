@@ -64,19 +64,20 @@ def _normalize_request_creator(
 
 def to_invocation_result[T](
     output: T | InvocationResult[T],
-    trace: InvocationTrace,
     runtime_patch: RuntimeContextPatch | None = None,
 ) -> InvocationResult[T]:
     if isinstance(output, InvocationResult):
-        return replace(output, trace=trace, runtime_patch=runtime_patch)
-    return InvocationResult(output=output, trace=trace, runtime_patch=runtime_patch)
+        if runtime_patch is None:
+            return output
+        return replace(output, runtime_patch=runtime_patch)
+    return InvocationResult(output=output, runtime_patch=runtime_patch)
 
 
 def invoke_with_hooks[T](
     hooks: InvocationHooks[T],
     context: ExecutionContext,
-    operation: Callable[[], InvocationResult[T]],
-) -> InvocationResult[T]:
+    operation: Callable[[], InvocationTrace[T]],
+) -> InvocationTrace[T]:
     if hooks.on_start:
         try:
             hooks.on_start(context)
@@ -84,7 +85,7 @@ def invoke_with_hooks[T](
             pass
 
     try:
-        result = operation()
+        trace = operation()
     except Exception as exc:
         if hooks.on_exception:
             try:
@@ -95,10 +96,10 @@ def invoke_with_hooks[T](
     else:
         if hooks.on_result:
             try:
-                hooks.on_result(result)
+                hooks.on_result(trace.result)
             except Exception:
                 pass
-        return result
+        return trace
 
 
 @dataclass(frozen=True)
@@ -110,31 +111,24 @@ class FunctionInvocationSpec[T]:
     hooks: InvocationHooks[T] = field(default_factory=InvocationHooks)
     kind: Literal["function"] = "function"
 
-    def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult:
+    def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationTrace[T]:
         def operation():
             starttime = time.time()
             execution_context.emitters.activity_emitter.fire(
                 ToolCallActivity(tool_name="FunctionInvocationSpec", args=input)
             )
             output = self.invocator(input, execution_context)
+            result = to_invocation_result(output)
             execution_context.emitters.activity_emitter.fire(
-                ToolResultActivity(tool_name="FunctionInvocationSpec", result=output)
+                ToolResultActivity(tool_name="FunctionInvocationSpec", result=result.output)
             )
 
             info = InvocationInfo(
                 started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta
             )
-            trace = InvocationTrace(input=input, output=output, info=info)
-            return self.to_invocation_result(output, trace)
+            return InvocationTrace(input=input, result=result, info=info)
 
         return invoke_with_hooks(self.hooks, execution_context, operation)
-
-    def to_invocation_result(
-        self, output: T | InvocationResult[T], trace: InvocationTrace
-    ) -> InvocationResult[T]:
-        if isinstance(output, InvocationResult):
-            return replace(output, trace=trace)
-        return InvocationResult(output=output, trace=trace)
 
     @classmethod
     def from_any(
@@ -176,23 +170,25 @@ class SelectedInvocationSpec[T]:
     hooks: InvocationHooks[T] = field(default_factory=InvocationHooks)
     kind: Literal["selector"] = "selector"
 
-    def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationResult[T]:
-        def operation() -> InvocationResult[T]:
+    def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationTrace[T]:
+        def operation() -> InvocationTrace[T]:
             starttime = time.time()
-            first_result = self.spec_selector.invoke(input, execution_context)
+            selector_trace = self.spec_selector.invoke(input, execution_context)
             execution_context.emitters.activity_emitter.fire(
-                ToolCallActivity(tool_name="SelectedInvocationSpec", args=first_result)
+                ToolCallActivity(tool_name="SelectedInvocationSpec", args=selector_trace.result)
             )
-            spec_output = first_result.output
-            second_result = spec_output.invoke(input, execution_context)
+            spec_output = selector_trace.result.output
+            selected_trace = spec_output.invoke(input, execution_context)
             info = InvocationInfo(
                 started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta
             )
-            children_traces = [first_result.trace] if first_result.trace else []
             trace = InvocationTrace(
-                input=input, output=second_result.output, info=info, children=children_traces
+                input=input,
+                result=selected_trace.result,
+                info=info,
+                children=[selector_trace, selected_trace],
             )
-            return to_invocation_result(second_result, trace)
+            return trace
 
         return invoke_with_hooks(self.hooks, execution_context, operation)
 
@@ -232,8 +228,8 @@ class LLMInvocationSpec[T: BaseModel | str]:
             hooks=hooks or InvocationHooks(),
         )
 
-    def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
-        def operation() -> InvocationResult[T]:
+    def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationTrace[T]:
+        def operation() -> InvocationTrace[T]:
             starttime = time.time()
             input_messages = self.create_request(input, execution_context)
             connection = self.connection or execution_context.connection
@@ -243,20 +239,24 @@ class LLMInvocationSpec[T: BaseModel | str]:
                 llm_param=llm_param,
                 event_emitters=execution_context.emitters,
             )
-            result = llm_facade.completion_with_result(input_messages, output_type=self.output_type)
-            output = result.output
-            runtime_patch = RuntimeContextPatch(llm_messages=result.messages)
+            completion_result = llm_facade.completion_with_result(
+                input_messages, output_type=self.output_type
+            )
+            output = completion_result.output
+            invocation_result = to_invocation_result(
+                output, runtime_patch=RuntimeContextPatch(llm_messages=completion_result.messages)
+            )
             info = InvocationInfo(
                 started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta
             )
             trace = InvocationTrace(
                 input=input,
-                output=output,
+                result=invocation_result,
                 info=info,
-                expenditure=LLMExpenditure(tokens=result.meta.tokens),
-                details={"llm_result": result.model_dump(mode="json")},
+                expenditure=LLMExpenditure(tokens=completion_result.meta.tokens),
+                details={"llm_result": completion_result.model_dump(mode="json")},
             )
-            return to_invocation_result(output, trace, runtime_patch=runtime_patch)
+            return trace
 
         return invoke_with_hooks(self.hooks, execution_context, operation)
 
@@ -303,8 +303,8 @@ class AgentInvocationSpec[T: BaseModel | str]:
             hooks=hooks or InvocationHooks(),
         )
 
-    def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationResult[T]:
-        def operation() -> InvocationResult[T]:
+    def invoke(self, input: Any, execution_context: ExecutionContext) -> InvocationTrace[T]:
+        def operation() -> InvocationTrace[T]:
             starttime = time.time()
             input_messages = self.create_request(input, execution_context)
             connection = self.connection or execution_context.connection
@@ -314,25 +314,27 @@ class AgentInvocationSpec[T: BaseModel | str]:
                 llm_param=llm_param,
                 event_emitters=execution_context.emitters,
             )
-            result = llm_facade.run_with_result(
+            agent_result = llm_facade.run_with_result(
                 input_messages,
                 output_type=self.output_type,
                 tools=self.tools,
                 usage_limit=self.usage_limit,
             )
-            output = result.output
-            runtime_patch = RuntimeContextPatch(llm_messages=result.messages)
+            output = agent_result.output
+            invocation_result = to_invocation_result(
+                output, runtime_patch=RuntimeContextPatch(llm_messages=agent_result.messages)
+            )
             info = InvocationInfo(
                 started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta
             )
             trace = InvocationTrace(
                 input=input,
-                output=output,
+                result=invocation_result,
                 info=info,
-                expenditure=LLMExpenditure(tokens=result.meta.tokens),
-                details={"llm_result": result.model_dump(mode="json")},
+                expenditure=LLMExpenditure(tokens=agent_result.meta.tokens),
+                details={"llm_result": agent_result.model_dump(mode="json")},
             )
-            return to_invocation_result(output, trace, runtime_patch=runtime_patch)
+            return trace
 
         return invoke_with_hooks(self.hooks, execution_context, operation)
 

@@ -29,10 +29,17 @@ class InvocationInfo(BaseModel, frozen=True):
         return self.meta.intent
 
 
-class InvocationTrace(BaseModel, frozen=True):
+@dataclass(frozen=True)
+class InvocationResult[T]:
+    output: T
+    runtime_patch: RuntimeContextPatch | None = None
+    context_patch: ContextPatch | None = None
+
+
+class InvocationTrace[T](BaseModel, frozen=True):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     input: Annotated[Any, Field(description="Input")]
-    output: Annotated[Any, Field(description="Output")]
+    result: Annotated[InvocationResult[T], Field(description="Result of the invocation")]
     info: Annotated[InvocationInfo, Field(description="Metatada Information about the invocation.")]
     expenditure: Annotated[Expenditure, Field(description="Expenditure of the invocation")] = (
         NoExpenditure()
@@ -41,11 +48,3 @@ class InvocationTrace(BaseModel, frozen=True):
         Mapping[str, JsonValue], Field(description="detailed information for debugging")
     ] = {}
     children: Annotated[Sequence[InvocationTrace], Field(description="Children of execution")] = ()
-
-
-@dataclass(frozen=True)
-class InvocationResult[T]:
-    output: T
-    runtime_patch: RuntimeContextPatch | None = None
-    context_patch: ContextPatch | None = None
-    trace: InvocationTrace | None = None
