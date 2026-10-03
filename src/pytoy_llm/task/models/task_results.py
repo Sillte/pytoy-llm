@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from pytoy_llm.models import LLMTokens
 from pytoy_llm.task.models.context import TaskContextState
@@ -10,6 +11,7 @@ from pytoy_llm.task.models.invocation_results import InvocationTrace
 
 @dataclass(frozen=True)
 class TaskResult[T]:
+    input: Any
     output: T
     context_state: TaskContextState
     traces: Sequence[InvocationTrace] = field(default_factory=lambda: tuple())

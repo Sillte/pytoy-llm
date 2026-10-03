@@ -45,8 +45,8 @@ class ToolCallPart(BasePart, frozen=True):
 class ToolResultPart(BasePart, frozen=True):
     """The result returned from a tool invocation."""
 
-    tool_name: str = Field(
-        description="The name of the tool that produced the result, when available."
+    tool_name: str | None = Field(
+        default=None, description="The name of the tool that produced the result, when available."
     )
     call_id: str = Field(description="The identifier of the tool call that produced this result.")
     result: Any = Field(description="The result content returned by the tool.")

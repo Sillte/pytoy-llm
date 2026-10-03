@@ -8,6 +8,8 @@ type Verbosity = Literal["low", "medium", "high"]
 
 
 class LLMTokens(BaseModel, frozen=True):
+    """Token information regarding the LLM"""
+
     prompt: int
     completion: int
     total: int

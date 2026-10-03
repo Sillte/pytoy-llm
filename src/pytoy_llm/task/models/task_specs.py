@@ -66,6 +66,7 @@ class TaskSpec[T]:
             invocation_input = invocation_result.output
 
         result = TaskResult(
+            input=task_input,
             task_name=self.meta.name,
             output=invocation_result.output,
             traces=traces,
