@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Self
 
-from pytoy_llm.models import LLMEventEmitters
+from pytoy_llm.models import LLMEventEmitters, LLMParam, UsageLimit
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
 from pytoy_llm.task.models.exceptions import InvocationException
@@ -33,13 +33,18 @@ class TaskSpec[T]:
         task_input: Any,
         context_state: TaskContextState,
         emitters: LLMEventEmitters | None = None,
+        llm_param: LLMParam | None = None,
+        usage_limit: UsageLimit | None = None,
     ) -> Outcome[TaskResult[T], InvocationException]:
-        llm_param = None
+        """Run with base configuration; invocation parameters override matching LLM fields,
+        while usage limits combine by selecting the stricter cap.
+        """
         connection = None
         execution_context = ExecutionContext(
             llm_param=llm_param,
             connection=connection,
             llm_messages=context_state.llm_messages,
+            usage_limit=usage_limit,
             state=context_state.state,
             emitters=emitters or LLMEventEmitters(),
         )

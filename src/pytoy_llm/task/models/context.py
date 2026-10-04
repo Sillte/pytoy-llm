@@ -6,6 +6,7 @@ from typing import Annotated, Any, MutableMapping, Self
 
 from pydantic import BaseModel, Field
 
+from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage
@@ -24,6 +25,7 @@ class ExecutionContext:
     llm_messages: Sequence[LLMMessage]
     state: TaskRunState = field(default_factory=dict)
     emitters: LLMEventEmitters = field(default_factory=LLMEventEmitters)
+    usage_limit: UsageLimit | None = None
 
 
 @dataclass(frozen=True)

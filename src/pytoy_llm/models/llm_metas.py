@@ -51,3 +51,7 @@ class LLMParam(BaseModel, frozen=True):
     presence_penalty: float | None = None
     reasoning_effort: ReasoningEffort | None = None
     verbosity: Verbosity | None = None
+
+    def merge(self, override: Self) -> Self:
+        """Return parameters with non-None values from ``override`` taking precedence."""
+        return self.model_copy(update=override.model_dump(exclude_none=True))

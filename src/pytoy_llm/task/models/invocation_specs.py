@@ -73,6 +73,22 @@ def to_invocation_result[T](
     return InvocationResult(output=output, runtime_patch=runtime_patch)
 
 
+def _merge_llm_param(base: LLMParam | None, override: LLMParam | None) -> LLMParam | None:
+    if base is None:
+        return override
+    if override is None:
+        return base
+    return base.merge(override)
+
+
+def _merge_usage_limit(base: UsageLimit | None, override: UsageLimit | None) -> UsageLimit | None:
+    if base is None:
+        return override
+    if override is None:
+        return base
+    return base.merge(override)
+
+
 def invoke_with_hooks[T](
     hooks: InvocationHooks[T],
     context: ExecutionContext,
@@ -233,7 +249,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
             starttime = time.time()
             input_messages = self.create_request(input, execution_context)
             connection = self.connection or execution_context.connection
-            llm_param = self.llm_param or execution_context.llm_param
+            llm_param = _merge_llm_param(execution_context.llm_param, self.llm_param)
             llm_facade = LLMFacade(
                 connection=connection,
                 llm_param=llm_param,
@@ -308,17 +324,18 @@ class AgentInvocationSpec[T: BaseModel | str]:
             starttime = time.time()
             input_messages = self.create_request(input, execution_context)
             connection = self.connection or execution_context.connection
-            llm_param = self.llm_param or execution_context.llm_param
+            llm_param = _merge_llm_param(execution_context.llm_param, self.llm_param)
             llm_facade = LLMFacade(
                 connection=connection,
                 llm_param=llm_param,
                 event_emitters=execution_context.emitters,
             )
+            usage_limit = _merge_usage_limit(execution_context.usage_limit, self.usage_limit)
             agent_result = llm_facade.run_with_result(
                 input_messages,
                 output_type=self.output_type,
                 tools=self.tools,
-                usage_limit=self.usage_limit,
+                usage_limit=usage_limit,
             )
             output = agent_result.output
             invocation_result = to_invocation_result(
