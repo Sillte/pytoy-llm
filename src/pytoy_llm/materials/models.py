@@ -3,7 +3,7 @@ import warnings
 from collections.abc import Sequence
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 type StructuredText = Annotated[
     str,
@@ -106,7 +106,66 @@ class ModelMaterialData[T: BaseModel](BaseModel, frozen=True):
         return _join_blocks(blocks)
 
 
-type MaterialData = TextMaterialData | ModelMaterialData
+class JsonMaterialData(BaseModel, frozen=True):
+    """
+    Material data represented by a JSON instance accompanied by its JSON Schema.
+
+    The JSON Schema describes the structure of the data, while the JSON
+    instance provides the concrete data to be presented to the LLM.
+    """
+
+    description: Annotated[
+        str,
+        Field(
+            description=(
+                "Human-readable description of what this material contains and what it represents."
+            ),
+        ),
+    ]
+
+    json_schema: Annotated[
+        JsonValue,
+        Field(description="JSON Schema describing the structure of the data."),
+    ]
+
+    data: Annotated[
+        JsonValue,
+        Field(description="Concrete JSON instance corresponding to the JSON Schema."),
+    ]
+
+    type: Literal["json"] = "json"
+
+    def compose_explanation(self, parent_header_depth: int) -> str:
+        """Compose the material body under a parent Markdown section."""
+        sub_header_depth = parent_header_depth + 1
+        sub_header_prefix = "#" * sub_header_depth
+
+        warn_forbidden_headers(self.description, sub_header_depth)
+
+        header_description = f"{sub_header_prefix} Description"
+        header_schema = f"{sub_header_prefix} JSON Schema"
+        header_data = f"{sub_header_prefix} JSON Instance"
+
+        schema_text = _compose_json_block(self.json_schema)
+        data_text = _compose_json_block(self.data)
+
+        return _join_blocks(
+            [
+                header_description,
+                self.description,
+                header_schema,
+                schema_text,
+                header_data,
+                data_text,
+            ]
+        )
+
+
+type MaterialData = TextMaterialData | ModelMaterialData | JsonMaterialData
+
+
+def _compose_json_block(value: JsonValue) -> str:
+    return "```json\n" + json.dumps(value, indent=2, ensure_ascii=False) + "\n```"
 
 
 def _join_blocks(blocks: Sequence[str]) -> str:

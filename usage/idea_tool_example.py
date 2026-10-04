@@ -5,6 +5,7 @@ from pytoy_llm.activity_sinks import PrintActivitySink
 from pytoy_llm.models import UsageLimit
 from pytoy_llm.models.llm_messages import LLMRequest
 from pytoy_llm.task import TaskRequest, TaskSyncExecutor
+from pytoy_llm.task.audit import TaskAuditor
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
 )
@@ -13,6 +14,7 @@ from pytoy_llm.task.models.metas import (
     TaskSpecMeta,
 )
 from pytoy_llm.task.models.task_specs import TaskSpec
+from pytoy_llm.task.shared.outcome import is_error
 from pytoy_llm.tools.idea_tool.idea_tool import IdeaTool
 
 logging.basicConfig(level=logging.DEBUG)
@@ -63,7 +65,7 @@ root_folder = Path("../").resolve()
 print("root_folder", root_folder)
 idea_space_root = Path("./IDEAS")
 create_test_idea_space(idea_space_root)
-idea_tool = IdeaTool.from_any(idea_space_root=idea_space_root, workspace_root=root_folder)
+idea_tool = IdeaTool.from_any(idea_space_roots=idea_space_root, workspace_root=root_folder)
 
 analysis_agent = AgentInvocationSpec.from_any(
     meta=InvocationSpecMeta(
@@ -82,7 +84,7 @@ Do not add unnecessary context, recommendations, or background.
 Do not expand a question into a proposal or analysis unless requested.
 """,
         user="""
-現状、不具合の候補をいくつかあげてくれるかな？
+どんなフォルダやファイルがあるかの例を教えて
 """,
     ),
     tools=[idea_tool.tools],
@@ -108,3 +110,9 @@ request = TaskRequest(
 
 exit = TaskSyncExecutor().execute(request)
 print(exit.output)
+if is_error(exit.outcome):
+    print(exit.outcome.exception)
+else:
+    auditor = TaskAuditor.from_task_result(exit.outcome.value)
+    auditor.dump("./auditor.json")
+    print(auditor.make_llm_messages_audit_section().compose(header_depth=3))
