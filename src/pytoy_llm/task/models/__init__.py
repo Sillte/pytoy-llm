@@ -1,11 +1,12 @@
 from pytoy_llm.task.models.context import (
+    CancelToken,
     ContextPatch,
     ExecutionContext,
     ExecutionEvents,
     TaskContextState,
     TaskRunState,
 )
-from pytoy_llm.task.models.exceptions import TaskExecutionException
+from pytoy_llm.task.models.exceptions import TaskCanceledException, TaskExecutionException
 from pytoy_llm.task.models.expenditures import Expenditure, LLMExpenditure, NoExpenditure
 from pytoy_llm.task.models.invocation_hooks import InvocationHooks
 from pytoy_llm.task.models.invocation_results import (
@@ -26,6 +27,7 @@ from pytoy_llm.task.models.task_results import TaskResult
 from pytoy_llm.task.models.task_specs import TaskSpec
 
 __all__ = [
+    "CancelToken",
     "ContextPatch",
     "ExecutionContext",
     "ExecutionEvents",
@@ -45,6 +47,7 @@ __all__ = [
     "TaskResult",
     "TaskSpec",
     "TaskRunState",
+    "TaskCanceledException",
     "TaskExecutionException",
     "Expenditure",
     "LLMExpenditure",

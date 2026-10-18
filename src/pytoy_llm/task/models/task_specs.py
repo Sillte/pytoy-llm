@@ -4,11 +4,10 @@ from typing import Any, Self
 
 from pytoy_llm.models import LLMEventEmitters, LLMParam, UsageLimit
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
-from pytoy_llm.task.models.context import ExecutionContext, TaskContextState
-from pytoy_llm.task.models.exceptions import InvocationException
-from pytoy_llm.task.models.invocation_specs import (
-    InvocationSpec,
-)
+from pytoy_llm.task.models.context import CancelToken, ExecutionContext, TaskContextState
+from pytoy_llm.task.models.exceptions import InvocationException, TaskCanceledException
+from pytoy_llm.task.models.invocation_results import InvocationTrace
+from pytoy_llm.task.models.invocation_specs import InvocationSpec
 from pytoy_llm.task.models.metas import TaskSpecMeta
 from pytoy_llm.task.models.task_results import TaskResult
 from pytoy_llm.task.shared.outcome import Error, Outcome, Success
@@ -35,9 +34,16 @@ class TaskSpec[T]:
         emitters: LLMEventEmitters | None = None,
         llm_param: LLMParam | None = None,
         usage_limit: UsageLimit | None = None,
+        cancel_token: CancelToken | None = None,
     ) -> Outcome[TaskResult[T], InvocationException]:
-        """Run with base configuration; invocation parameters override matching LLM fields,
-        while usage limits combine by selecting the stricter cap.
+        """Run with base configuration and observe cancellation between invocations.
+
+        Cancellation does not interrupt an invocation already in progress.
+
+        Raises:
+            TaskCanceledException: If cancellation is observed at an invocation boundary. The
+                exception contains traces completed before that boundary; the invocation that
+                observed cancellation may not be included.
         """
         connection = None
         execution_context = ExecutionContext(
@@ -47,20 +53,36 @@ class TaskSpec[T]:
             usage_limit=usage_limit,
             state=context_state.state,
             emitters=emitters or LLMEventEmitters(),
+            cancel_token=cancel_token if cancel_token is not None else CancelToken(),
         )
 
-        traces = []
+        traces: list[InvocationTrace[Any]] = []
+
+        def raise_if_cancelled() -> None:
+            token = execution_context.cancel_token
+            if token is not None and token.is_set():
+                raise TaskCanceledException(completed_invocation_traces=traces)
 
         invocation_input = task_input
         for invocation_spec in self.invocation_specs:
+            raise_if_cancelled()
             try:
                 invocation_trace = invocation_spec.invoke(invocation_input, execution_context)
+            except TaskCanceledException as exc:
+                raise TaskCanceledException(
+                    completed_invocation_traces=(
+                        *traces,
+                        *exc.completed_invocation_traces,
+                    ),
+                    exception_trace=exc.exception_trace,
+                ) from exc
             except Exception as exc:
                 return Error(
                     exception=InvocationException(
                         context=execution_context, invocation_exception=exc
                     )
                 )
+            raise_if_cancelled()
 
             invocation_result = invocation_trace.result
             if invocation_result.runtime_patch:

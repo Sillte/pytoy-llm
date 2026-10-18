@@ -5,10 +5,14 @@ import pytest
 from pytoy_llm.models import LLMRequest
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
+    CancelToken,
     FunctionInvocationSpec,
     InvocationHooks,
     InvocationResult,
     LLMInvocationSpec,
+    TaskCanceledException,
+    TaskContextState,
+    TaskSpec,
 )
 from pytoy_llm.task.models.context import ExecutionContext
 
@@ -49,6 +53,70 @@ def test_invocation_spec_from_any_rejects_unsupported_creator_arity() -> None:
 
     with pytest.raises(ValueError, match="input and execution context"):
         LLMInvocationSpec.from_any(cast(Any, create_request), output_type=str)
+
+
+def test_task_spec_cancellation_retains_prior_invocation_traces() -> None:
+    token = CancelToken()
+    invoked: list[str] = []
+
+    def completed(value: Any, context: ExecutionContext) -> str:
+        assert value == "input"
+        assert context.cancel_token is token
+        invoked.append("completed")
+        return "completed"
+
+    def cancel(value: Any, context: ExecutionContext) -> str:
+        assert value == "completed"
+        assert context.cancel_token is token
+        invoked.append("cancel")
+        token.set()
+        return "not retained"
+
+    def next_invocation(value: Any, context: ExecutionContext) -> str:
+        assert context.cancel_token is token
+        invoked.append("next")
+        return str(value)
+
+    task = TaskSpec.from_specs(
+        [
+            FunctionInvocationSpec.from_any(completed),
+            FunctionInvocationSpec.from_any(cancel),
+            FunctionInvocationSpec.from_any(next_invocation),
+        ],
+        output_type=str,
+    )
+
+    with pytest.raises(TaskCanceledException) as exc_info:
+        task.run("input", TaskContextState(), cancel_token=token)
+
+    assert invoked == ["completed", "cancel"]
+    assert len(exc_info.value.completed_invocation_traces) == 1
+    assert exc_info.value.completed_invocation_traces[0].result.output == "completed"
+    exception_trace = exc_info.value.exception_trace
+    assert "raise_if_cancelled" in exception_trace
+    with pytest.raises(AttributeError):
+        setattr(exc_info.value, "exception_trace", "changed")
+    assert exc_info.value.exception_trace == exception_trace
+
+
+def test_task_spec_does_not_start_invocations_when_already_canceled() -> None:
+    token = CancelToken()
+    token.set()
+    invoked: list[str] = []
+
+    def invocation(value: Any, context: ExecutionContext) -> str:
+        assert value == "input"
+        assert context.cancel_token is token
+        invoked.append("invocation")
+        return str(value)
+
+    task = TaskSpec.from_single_spec(FunctionInvocationSpec.from_any(invocation), output_type=str)
+
+    with pytest.raises(TaskCanceledException) as exc_info:
+        task.run("input", TaskContextState(), cancel_token=token)
+
+    assert invoked == []
+    assert exc_info.value.completed_invocation_traces == ()
 
 
 def test_hook_exceptions_do_not_change_successful_invocation() -> None:

@@ -1,6 +1,31 @@
 import traceback
+from collections.abc import Sequence
+from typing import Any
 
 from pytoy_llm.task.models.context import ExecutionContext
+from pytoy_llm.task.models.invocation_results import InvocationTrace
+
+
+class TaskCanceledException(Exception):
+    """Raised when a task observes cancellation, with its completed invocation history."""
+
+    def __init__(
+        self,
+        completed_invocation_traces: Sequence[InvocationTrace[Any]] = (),
+        *,
+        exception_trace: str | None = None,
+    ) -> None:
+        self.completed_invocation_traces = tuple(completed_invocation_traces)
+        self._exception_trace = (
+            exception_trace
+            if exception_trace is not None
+            else "".join(traceback.format_stack()[:-1])
+        )
+        super().__init__("Task execution was canceled.")
+
+    @property
+    def exception_trace(self) -> str:
+        return self._exception_trace
 
 
 class InvocationException(Exception):
@@ -22,4 +47,4 @@ class TaskUnknownException(Exception):
         return f"{self.exception=}\n{self.stack_trace}"
 
 
-type TaskExecutionException = InvocationException | TaskUnknownException
+type TaskExecutionException = InvocationException | TaskUnknownException | TaskCanceledException
