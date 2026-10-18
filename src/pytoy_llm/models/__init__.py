@@ -1,4 +1,5 @@
 from pytoy_llm.models.agent_metas import UsageLimit  # noqa
+from pytoy_llm.models.cancel_token import CancelToken
 from pytoy_llm.models.llm_activities import LLMActivity
 from pytoy_llm.models.llm_events import LLMEventEmitters  # noqa
 from pytoy_llm.models.llm_messages import (

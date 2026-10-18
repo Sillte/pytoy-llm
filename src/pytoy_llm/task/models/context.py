@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from threading import Event as ThreadEvent
 from typing import Annotated, Any, MutableMapping, Self
 
 from pydantic import BaseModel, Field
 
-from pytoy_llm.models.agent_metas import UsageLimit
+from pytoy_llm.models import CancelToken, UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMMessage
@@ -17,19 +16,6 @@ type TaskRunState = MutableMapping[str, Any]
 
 
 ExecutionEvents = LLMEventEmitters
-
-
-class CancelToken:
-    """Thread-safe, one-way signal that a task should stop at a checkpoint."""
-
-    def __init__(self) -> None:
-        self._event = ThreadEvent()
-
-    def set(self) -> None:
-        self._event.set()
-
-    def is_set(self) -> bool:
-        return self._event.is_set()
 
 
 @dataclass(frozen=True)

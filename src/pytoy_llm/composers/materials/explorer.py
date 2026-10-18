@@ -45,11 +45,11 @@ class MaterialDataExplorerTaskComposer:
 
     def _get_system_prompt_spec(self) -> SystemPromptSpec:
         return SystemPromptSpec.from_any(
-            name="Explore Materials",
+            name="Materials utilization",
             intent=(
-                "Examine the provided materials and identify findings, "
-                "patterns, relationships, anomalies, and implications supported "
-                "by the materials."
+                "Identify useful information, findings, and relationships "
+                "in the provided materials, guided by the user's input "
+                "and context."
             ),
             rules=[
                 "Base findings on the provided materials.",
