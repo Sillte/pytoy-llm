@@ -3,8 +3,8 @@ from threading import RLock, Thread
 from pytoy_llm.models import LLMEventEmitters
 from pytoy_llm.shared.event import EventEmitter
 from pytoy_llm.task import TaskRequest
-from pytoy_llm.task.models import TaskContextState
-from pytoy_llm.task.models.exceptions import TaskUnknownException
+from pytoy_llm.task.models import CancelToken, TaskContextState
+from pytoy_llm.task.models.exceptions import TaskCanceledException, TaskUnknownException
 from pytoy_llm.task.shared.outcome import Error
 
 from .models import TaskExecutionCancel, TaskExecutionExit, TaskExecutionStart
@@ -21,6 +21,7 @@ class TaskExecutionFactory:
         context_state = request.context_state or TaskContextState()
 
         lock = RLock()
+        cancel_token = CancelToken()
         event_emitters = LLMEventEmitters()
         start_emitter = EventEmitter[TaskExecutionStart]()
         cancel_emitter = EventEmitter[TaskExecutionCancel]()
@@ -29,19 +30,21 @@ class TaskExecutionFactory:
         if request.activity_sink is not None:
             event_emitters.on_activity.subscribe(request.activity_sink.emit)
 
-        def _main() -> TaskExecutionExit[T]:
+        def _main() -> None:
             try:
                 outcome = request.spec.run(
                     task_input=task_input,
                     context_state=context_state,
                     emitters=event_emitters,
+                    cancel_token=cancel_token,
                 )
+            except TaskCanceledException as e:
+                outcome = Error(e)
             except Exception as e:
                 outcome = Error(TaskUnknownException(e))
 
             exit_entity = TaskExecutionExit(id=request.id, outcome=outcome)
             execution.record_exit(exit_entity)
-            return exit_entity
 
         thread = Thread(target=_main)
         execution = TaskExecution(
@@ -49,6 +52,7 @@ class TaskExecutionFactory:
             lock=lock,
             request=request,
             events=event_emitters,
+            cancel_token=cancel_token,
             start_emitter=start_emitter,
             cancel_emitter=cancel_emitter,
             exit_emitter=exit_emitter,

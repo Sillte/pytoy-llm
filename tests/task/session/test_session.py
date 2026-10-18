@@ -224,6 +224,41 @@ def test_canceling_pending_task_returns_session_to_idle() -> None:
     assert session.records[0].status == "canceled"
 
 
+def test_running_task_cancellation_exits_session_and_records_canceled_task() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager)
+    invocation_started = Event()
+    allow_invocation_to_finish = Event()
+
+    def blocking_invocation(value, context):
+        invocation_started.set()
+        allow_invocation_to_finish.wait(timeout=2)
+        assert context.cancel_token.is_set()
+        return value
+
+    task = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(blocking_invocation), "value"
+        )
+    )
+    task.start()
+    assert invocation_started.wait(timeout=1)
+
+    task.cancel()
+
+    assert session.status == "running"
+    assert session.records[0].status == "running"
+    completed = Event()
+    session.on_task_exit.once().subscribe(lambda _: completed.set())
+    allow_invocation_to_finish.set()
+
+    assert completed.wait(timeout=1)
+    assert session.status == "idle"
+    assert session.records[0].status == "canceled"
+    assert execution_manager.get(task.id) is None
+
+
 def test_pending_task_prevents_session_completion() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()

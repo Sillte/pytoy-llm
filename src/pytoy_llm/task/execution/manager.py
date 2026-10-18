@@ -22,8 +22,12 @@ class TaskExecutionManager:
                 self._executions.pop(execution.id, None)
             execution.dispose()
 
+        def _deregister_if_not_started(_):
+            if execution.status == "canceled":
+                _deregister(None)
+
         execution.on_exit.subscribe(_deregister)
-        execution.on_cancel.subscribe(_deregister)
+        execution.on_cancel.subscribe(_deregister_if_not_started)
 
     def select(self, query: TaskExecutionQuery | None = None) -> Sequence[TaskExecution]:
         query = query or TaskExecutionQuery()
@@ -38,6 +42,6 @@ class TaskExecutionManager:
             return self._executions.get(execution_id)
 
     def get_running(self) -> Sequence[TaskExecution]:
-        query = TaskExecutionQuery(status=["running"])
+        query = TaskExecutionQuery(status=["running", "canceling"])
 
         return self.select(query)

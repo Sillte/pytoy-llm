@@ -32,9 +32,11 @@ exposing or reimplementing the internal `TaskExecution` object.
 Creating a task is accepted only while the session is `idle` and registers the
 task in `created` state. The session changes to `pending` until the caller
 starts or cancels the task. A started task changes the session to `running`;
-cancellation returns it to `idle`. Every task exit, including failure, returns
-the session to `idle` and records the task result or exception. A completed
-session is entered explicitly and cannot accept further tasks.
+a cancellation request leaves it running until its exit. Canceling an unstarted
+task returns the session to `idle` immediately. Every started task exit,
+including cancellation and failure, returns the session to `idle`, records the
+result or exception, and emits `on_task_exit`. A completed session is entered
+explicitly and cannot accept further tasks.
 
 A request with an explicit context state keeps that state for the execution.
 Otherwise, the session's current context state is used.

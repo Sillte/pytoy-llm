@@ -13,7 +13,9 @@ from pytoy_llm.task.execution.models import (
     TaskExecutionStart,
 )
 from pytoy_llm.task.models import ExecutionEvents, TaskRequest
-from pytoy_llm.task.shared.outcome import is_error, is_success
+from pytoy_llm.task.models.context import CancelToken
+from pytoy_llm.task.models.exceptions import TaskCanceledException
+from pytoy_llm.task.shared.outcome import Error, is_error, is_success
 
 from .models import TaskExecutionID, TaskExecutionStatus
 
@@ -24,6 +26,7 @@ class TaskExecution[T]:
     lock: RLock
     request: TaskRequest[T]
     events: ExecutionEvents
+    cancel_token: CancelToken
     start_emitter: EventEmitter[TaskExecutionStart]
     cancel_emitter: EventEmitter[TaskExecutionCancel]
     exit_emitter: EventEmitter[TaskExecutionExit[T]]
@@ -39,6 +42,7 @@ class TaskExecution[T]:
         lock: RLock,
         task_request: TaskRequest[T],
         events: ExecutionEvents,
+        cancel_token: CancelToken,
         exit_emitter: EventEmitter[TaskExecutionExit[T]],
         start_emitter: EventEmitter[TaskExecutionStart],
         cancel_emitter: EventEmitter[TaskExecutionCancel],
@@ -49,6 +53,7 @@ class TaskExecution[T]:
             lock=lock,
             request=task_request,
             events=events,
+            cancel_token=cancel_token,
             start_emitter=start_emitter,
             cancel_emitter=cancel_emitter,
             exit_emitter=exit_emitter,
@@ -62,18 +67,12 @@ class TaskExecution[T]:
                     f"Start of `Task` is accepted only when `created`, but {self.status=}"
                 )
 
-            self.on_exit.map(lambda exit_entity: exit_entity.outcome).filter(
-                is_success
-            ).once().subscribe(lambda _: self.to_finish())
-            self.on_exit.map(lambda exit_entity: exit_entity.outcome).filter(
-                is_error
-            ).once().subscribe(lambda _: self.to_error())
             self.on_exit.map(lambda exit_entity: exit_entity.outcome).filter(is_success).map(
                 lambda success: success.value
             ).once().subscribe(hooks.on_result)
-            self.on_exit.map(lambda exit_entity: exit_entity.outcome).filter(is_error).map(
-                lambda error: error.exception
-            ).once().subscribe(hooks.on_exception)
+            self.on_exit.map(lambda exit_entity: exit_entity.outcome).filter(is_error).filter(
+                lambda error: not isinstance(error.exception, TaskCanceledException)
+            ).map(lambda error: error.exception).once().subscribe(hooks.on_exception)
 
             self.status = "running"
             try:
@@ -83,12 +82,20 @@ class TaskExecution[T]:
 
     def cancel(self) -> None:
         with self.lock:
-            if self.status != "created":
+            if self.status == "created":
+                self.cancel_token.set()
+                self.status = "canceled"
+                self.cancel_emitter.fire(TaskExecutionCancel(id=self.id))
+            elif self.status == "running":
+                self.cancel_token.set()
+                self.status = "canceling"
+                self.cancel_emitter.fire(TaskExecutionCancel(id=self.id))
+            elif self.status == "canceling":
+                return
+            else:
                 raise RuntimeError(
-                    f"Cancel of `Task` is accepted only when `created`, but {self.status=}"
+                    f"Cancel of `Task` is accepted only when `created` or `running`, but {self.status=}"
                 )
-            self.status = "canceled"
-            self.cancel_emitter.fire(TaskExecutionCancel(id=self.id))
 
     @cached_property
     def on_exit(self) -> Event[TaskExecutionExit[T]]:
@@ -108,7 +115,27 @@ class TaskExecution[T]:
 
     def record_exit(self, exit_entity: TaskExecutionExit[T]) -> None:
         with self.lock:
+            outcome = exit_entity.outcome
+            is_cancel_outcome = is_error(outcome) and isinstance(
+                outcome.exception, TaskCanceledException
+            )
+            if self.status == "canceling" and not is_cancel_outcome:
+                completed_traces = outcome.value.traces if is_success(outcome) else ()
+                exit_entity = TaskExecutionExit(
+                    id=exit_entity.id,
+                    outcome=Error(
+                        TaskCanceledException(completed_invocation_traces=completed_traces)
+                    ),
+                )
             self.execution_exit = exit_entity
+            if is_success(exit_entity.outcome):
+                self.status = "finished"
+            elif is_error(exit_entity.outcome) and isinstance(
+                exit_entity.outcome.exception, TaskCanceledException
+            ):
+                self.status = "canceled"
+            else:
+                self.status = "error"
             self.exit_emitter.fire(exit_entity)
 
     def dispose(self):
@@ -116,11 +143,3 @@ class TaskExecution[T]:
         self.cancel_emitter.dispose()
         self.exit_emitter.dispose()
         self.events.dispose()
-
-    def to_finish(self) -> None:
-        with self.lock:
-            self.status = "finished"
-
-    def to_error(self) -> None:
-        with self.lock:
-            self.status = "error"

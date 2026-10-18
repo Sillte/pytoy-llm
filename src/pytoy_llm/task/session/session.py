@@ -12,7 +12,8 @@ from pytoy_llm.task.execution import TaskExecutionHandler
 from pytoy_llm.task.execution.manager import TaskExecutionManager
 from pytoy_llm.task.execution.models import TaskExecutionID
 from pytoy_llm.task.models import TaskContextState, TaskRequest
-from pytoy_llm.task.shared.outcome import is_success
+from pytoy_llm.task.models.exceptions import TaskCanceledException
+from pytoy_llm.task.shared.outcome import is_error, is_success
 
 from .models import DEFAULT_KIND, TaskRecord, TaskSessionEvent, TaskSessionID, TaskSessionStatus
 
@@ -118,6 +119,10 @@ class TaskSession:
                     output=exit_entity.outcome.value.output,
                 )
                 self.context_state = exit_entity.outcome.value.context_state
+            elif is_error(exit_entity.outcome) and isinstance(
+                exit_entity.outcome.exception, TaskCanceledException
+            ):
+                record = replace(record, status="canceled", exception=exit_entity.outcome.exception)
             else:
                 record = replace(record, status="error", exception=exit_entity.outcome.exception)
             self.records[exit_entity.id] = record

@@ -8,7 +8,9 @@ from pytoy_llm.task.models.exceptions import TaskExecutionException
 from pytoy_llm.task.shared.outcome import Outcome
 
 type TaskExecutionID = str
-type TaskExecutionStatus = Literal["created", "running", "finished", "error", "canceled"]
+type TaskExecutionStatus = Literal[
+    "created", "running", "canceling", "finished", "error", "canceled"
+]
 
 
 @dataclass(frozen=True)

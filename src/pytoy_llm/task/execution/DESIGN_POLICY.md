@@ -34,10 +34,16 @@ symbols from the package, not from `handler.py`, `models.py`, or `manager.py`.
 `TaskExecutionQuery` uses `TaskExecutionStatus` as its status vocabulary and
 returns handlers rather than internal execution objects.
 
-Cancellation is supported only before an execution starts. It transitions the
-execution from `created` to `canceled` and is separate from execution exit.
-The execution manager deregisters executions after cancellation or exit; a
-handler no longer resolves status or events after deregistration.
+Cancellation can be requested before or during an execution. `on_cancel` reports
+that the request was accepted. Canceling a created execution transitions it
+directly to `canceled`; it has not started, so it does not emit `on_exit`. A
+running execution transitions to `canceling`; its `CancelToken` is shared with
+the task and observed at invocation boundaries, so an invocation already in
+progress is not interrupted. Once a started execution terminates, it emits
+`on_exit` exactly once, including after cancellation; a canceled exit carries a
+`TaskCanceledException` outcome and transitions to `canceled`. The execution
+manager deregisters an unstarted execution on cancellation and a started
+execution on exit.
 
 ## Constraints
 

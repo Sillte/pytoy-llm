@@ -65,6 +65,7 @@ class TaskExecutionHandler[T]:
         self._execution.start(hooks=hooks)
 
     def cancel(self) -> None:
+        """Request cancellation; started executions emit on_exit after observing it."""
         self._execution.cancel()
 
     @property
@@ -73,6 +74,7 @@ class TaskExecutionHandler[T]:
 
     @property
     def on_exit(self) -> Event[TaskExecutionExit[T]]:
+        """Emits once when a started execution terminates, including cancellation."""
         return self._execution.on_exit
 
     @property
@@ -81,6 +83,7 @@ class TaskExecutionHandler[T]:
 
     @property
     def on_cancel(self) -> Event[TaskExecutionCancel]:
+        """Emits when a cancellation request is accepted."""
         return self._execution.on_cancel
 
     @property
