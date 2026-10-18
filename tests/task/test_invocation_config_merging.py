@@ -134,3 +134,17 @@ def test_task_spec_run_places_base_configuration_in_execution_context() -> None:
 
     assert contexts[0].llm_param == llm_param
     assert contexts[0].usage_limit == usage_limit
+
+
+def test_task_spec_run_captures_invocation_stack_trace() -> None:
+    def fail_invocation(_input, _context):
+        raise ValueError("invocation failed")
+
+    task = TaskSpec.from_single_spec(FunctionInvocationSpec(invocator=fail_invocation))
+
+    outcome = task.run("input", TaskContextState())
+
+    assert outcome.kind == "Error"
+    assert "fail_invocation" in outcome.exception.stack_trace
+    assert "ValueError: invocation failed" in outcome.exception.stack_trace
+    assert outcome.exception.stack_trace in str(outcome.exception)
