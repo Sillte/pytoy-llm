@@ -1,6 +1,7 @@
 from unittest.mock import Mock, call
 
 from pytoy_llm import api
+from pytoy_llm.models import CancelToken
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.llm_metas import LLMParam
 
@@ -11,6 +12,7 @@ def test_run_forwards_all_parameters_to_agent(monkeypatch):
     llm_param = LLMParam(temperature=0.2)
     connection = "test-connection"
     usage_limit = UsageLimit(max_total_tokens=100, max_requests=2)
+    cancel_token = CancelToken()
 
     agent = Mock()
     agent.return_value = agent
@@ -24,12 +26,16 @@ def test_run_forwards_all_parameters_to_agent(monkeypatch):
         llm_param=llm_param,
         connection=connection,
         usage_limit=usage_limit,
+        cancel_token=cancel_token,
     )
 
     assert result == "result"
     assert agent.mock_calls == [
         call(
-            connection, llm_param=llm_param, event_emitters=agent.call_args.kwargs["event_emitters"]
+            connection,
+            llm_param=llm_param,
+            event_emitters=agent.call_args.kwargs["event_emitters"],
+            cancel_token=cancel_token,
         ),
         call.run(messages, output_type=str, tools=tools, usage_limit=usage_limit),
     ]

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.litellm_client.adapter import LiteLLMTransactionAdapter, LLMParamConverter
 from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
+from pytoy_llm.models import CancelToken, LLMCancelException
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMRequest, LLMRequestLike, LLMResult
@@ -25,6 +26,7 @@ class PytoyLiteLLMClient:
         connection: str | Connection,
         llm_param: LLMParam | None = None,
         event_emitters: LLMEventEmitters | None = None,
+        cancel_token: CancelToken | None = None,
     ) -> None:
 
         if isinstance(connection, str):
@@ -34,6 +36,7 @@ class PytoyLiteLLMClient:
         self._connection: Connection = connection
         self._llm_param = llm_param
         self._event_emitters = event_emitters or LLMEventEmitters()
+        self._cancel_token = cancel_token
 
     @property
     def connection(self) -> Connection:
@@ -105,4 +108,11 @@ class PytoyLiteLLMClient:
             )
 
         assert isinstance(response, ModelResponse)
+        if self._cancel_token is not None and self._cancel_token.is_set():
+            canceled_result = adapter.to_llm_model(
+                request=request,
+                llm_response=response,
+                output_type=str,
+            )
+            raise LLMCancelException(messages=canceled_result.messages)
         return response

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pytoy_llm.models import (
+    CancelToken,
     LLMEventEmitters,
     LLMParam,
     LLMRequestLike,
@@ -35,11 +36,17 @@ class FakeFacade:
         self.llm_param = llm_param
         self.event_emitters = event_emitters
         self.usage_limit: UsageLimit | None = None
+        self.cancel_token: CancelToken | None = None
         self.instances.append(self)
 
     def completion_with_result(
-        self, request: LLMRequestLike, *, output_type: type[str]
+        self,
+        request: LLMRequestLike,
+        *,
+        output_type: type[str],
+        cancel_token: CancelToken | None = None,
     ) -> LLMResult[str]:
+        self.cancel_token = cancel_token
         return _llm_result()
 
     def run_with_result(
@@ -49,8 +56,10 @@ class FakeFacade:
         output_type: type[str],
         tools: LLMToolsLike,
         usage_limit: UsageLimit | None,
+        cancel_token: CancelToken | None = None,
     ) -> LLMResult[str]:
         self.usage_limit = usage_limit
+        self.cancel_token = cancel_token
         return _llm_result()
 
 
@@ -74,25 +83,35 @@ def test_llm_invocation_merges_context_and_invocation_parameters(monkeypatch) ->
         output_type=str,
         llm_param=LLMParam(temperature=0.7, top_p=0.8),
     )
+    cancel_token = CancelToken()
     context = ExecutionContext(
         llm_param=LLMParam(temperature=0.2, max_tokens=500, top_p=0.5),
         connection=None,
         llm_messages=(),
+        cancel_token=cancel_token,
     )
 
     spec.invoke("input", context)
 
     assert FakeFacade.instances[0].llm_param == LLMParam(temperature=0.7, max_tokens=500, top_p=0.8)
+    assert FakeFacade.instances[0].cancel_token is cancel_token
 
 
 def test_llm_invocation_keeps_none_when_both_parameter_sources_are_none(monkeypatch) -> None:
     _install_fake_facade(monkeypatch)
     spec = LLMInvocationSpec.from_any(lambda _input: "request", output_type=str)
-    context = ExecutionContext(llm_param=None, connection=None, llm_messages=())
+    cancel_token = CancelToken()
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=(),
+        cancel_token=cancel_token,
+    )
 
     spec.invoke("input", context)
 
     assert FakeFacade.instances[0].llm_param is None
+    assert FakeFacade.instances[0].cancel_token is cancel_token
 
 
 def test_agent_invocation_merges_usage_limits_and_llm_parameters(monkeypatch) -> None:
@@ -103,17 +122,20 @@ def test_agent_invocation_merges_usage_limits_and_llm_parameters(monkeypatch) ->
         llm_param=LLMParam(temperature=0.7),
         usage_limit=UsageLimit(max_total_tokens=200),
     )
+    cancel_token = CancelToken()
     context = ExecutionContext(
         llm_param=LLMParam(temperature=0.2, max_tokens=500),
         connection=None,
         llm_messages=(),
         usage_limit=UsageLimit(max_total_tokens=500, max_requests=10),
+        cancel_token=cancel_token,
     )
 
     spec.invoke("input", context)
 
     assert FakeFacade.instances[0].llm_param == LLMParam(temperature=0.7, max_tokens=500)
     assert FakeFacade.instances[0].usage_limit == UsageLimit(max_total_tokens=200, max_requests=10)
+    assert FakeFacade.instances[0].cancel_token is cancel_token
 
 
 def test_task_spec_run_places_base_configuration_in_execution_context() -> None:

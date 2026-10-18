@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Self
 
-from pytoy_llm.models import LLMEventEmitters, LLMParam, UsageLimit
+from pytoy_llm.models import LLMCancelException, LLMEventEmitters, LLMParam, UsageLimit
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import CancelToken, ExecutionContext, TaskContextState
 from pytoy_llm.task.models.exceptions import InvocationException, TaskCanceledException
@@ -76,6 +76,8 @@ class TaskSpec[T]:
                     ),
                     exception_trace=exc.exception_trace,
                 ) from exc
+            except LLMCancelException as exc:
+                raise TaskCanceledException(completed_invocation_traces=traces) from exc
             except Exception as exc:
                 return Error(
                     exception=InvocationException(

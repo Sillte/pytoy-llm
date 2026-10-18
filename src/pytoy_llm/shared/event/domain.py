@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import Lock
 from typing import Any, Callable, Protocol, TypeGuard, overload
 
 from typing_extensions import TypeIs
@@ -92,24 +93,32 @@ class Event[T]:
 
 
 class EventEmitter[T]:
+    """Thread-safe event source; listeners run outside the emitter lock."""
+
     def __init__(self) -> None:
         self._listeners: list[Listener[T]] = []
+        self._lock = Lock()
         self.event = Event[T](self._subscribe)
 
     def _subscribe(self, listener: Listener[T]) -> Disposable:
-        self._listeners.append(listener)
+        with self._lock:
+            self._listeners.append(listener)
 
         def dispose() -> None:
-            try:
-                self._listeners.remove(listener)
-            except (ValueError, RuntimeError):
-                pass
+            with self._lock:
+                try:
+                    self._listeners.remove(listener)
+                except ValueError:
+                    pass
 
         return Disposable(dispose)
 
     def fire(self, value: T) -> None:
-        for listener in list(self._listeners):
+        with self._lock:
+            listeners = tuple(self._listeners)
+        for listener in listeners:
             listener(value)
 
     def dispose(self) -> None:
-        self._listeners.clear()
+        with self._lock:
+            self._listeners.clear()

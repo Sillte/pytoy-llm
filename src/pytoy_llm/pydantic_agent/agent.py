@@ -1,3 +1,5 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Self, Sequence, cast
 
@@ -10,9 +12,15 @@ from pydantic_ai import (
     ModelRequestPart,
     UserPromptPart,
 )
+from pydantic_ai import (
+    CancellationToken as PydanticAICancellationToken,
+)
+from pydantic_ai.exceptions import RunCancelled
 
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import (
+    CancelToken,
+    LLMCancelException,
     LLMRequestLike,
 )
 from pytoy_llm.models.agent_metas import UsageLimit
@@ -24,6 +32,25 @@ from pytoy_llm.models.llm_tools import LLMToolsLike, from_llm_tools_like
 from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter, UsageLimitConverter
 from pytoy_llm.pydantic_agent.event_handler import EventHandler
 from pytoy_llm.pydantic_agent.factory import PydanticAIModelFactory
+
+
+@contextmanager
+def _bridge_cancel_token(
+    cancel_token: CancelToken | None,
+) -> Generator[PydanticAICancellationToken | None, None, None]:
+    """Relay a CancelToken to PydanticAI's per-run cancellation handle."""
+    if cancel_token is None:
+        yield None
+        return
+
+    pydantic_cancel_token = PydanticAICancellationToken()
+    subscription = cancel_token.on_cancel.subscribe(lambda _: pydantic_cancel_token.cancel())
+    try:
+        if cancel_token.is_set():
+            pydantic_cancel_token.cancel()
+        yield pydantic_cancel_token
+    finally:
+        subscription.dispose()
 
 
 @dataclass(frozen=True)
@@ -53,6 +80,7 @@ class PytoyPydanticAIAgent:
         connection: str | Connection,
         llm_param: LLMParam | None = None,
         event_emitters: LLMEventEmitters | None = None,
+        cancel_token: CancelToken | None = None,
     ) -> None:
         if isinstance(connection, str):
             connection = ConnectionConfiguration().get_connection(connection)
@@ -60,6 +88,7 @@ class PytoyPydanticAIAgent:
         self._connection = connection
         self._llm_param = llm_param
         self._event_emitters = event_emitters or LLMEventEmitters()
+        self._cancel_token = cancel_token
 
     def _make_agent(self, system_prompt: str | None | tuple, tools: LLMToolsLike) -> Agent:
         system_prompt = system_prompt or tuple()
@@ -116,14 +145,26 @@ class PytoyPydanticAIAgent:
         agent = self._make_agent(system_prompt=system_prompt, tools=tools)
         event_handler = EventHandler(self._event_emitters)
         event_handler.emit_request(request)
-        result = agent.run_sync(
-            user_prompt=user_prompt,
-            instructions=instructions,
-            output_type=output_type,
-            message_history=message_history,
-            usage_limits=usage_limits,
-            event_stream_handler=event_handler.event_stream_handler,
-        )
+        with _bridge_cancel_token(self._cancel_token) as pydantic_cancel_token:
+            try:
+                result = agent.run_sync(
+                    user_prompt=user_prompt,
+                    instructions=instructions,
+                    output_type=output_type,
+                    message_history=message_history,
+                    usage_limits=usage_limits,
+                    cancellation_token=pydantic_cancel_token,
+                    event_stream_handler=event_handler.event_stream_handler,
+                )
+            except RunCancelled as exc:
+                if pydantic_cancel_token is None or not pydantic_cancel_token.cancelled:
+                    raise
+                messages = tuple(adapter.from_native(message) for message in exc.all_messages())
+                raise LLMCancelException(messages=messages or request.messages) from exc
+
+        if self._cancel_token is not None and self._cancel_token.is_set():
+            messages = tuple(adapter.from_native(message) for message in result.all_messages())
+            raise LLMCancelException(messages=messages)
         return result
 
     def run_with_result[T: BaseModel | str](

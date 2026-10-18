@@ -1,8 +1,9 @@
 from typing import Any, cast
+from unittest.mock import Mock
 
 import pytest
 
-from pytoy_llm.models import LLMRequest
+from pytoy_llm.models import LLMCancelException, LLMMessage, LLMRequest
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
     CancelToken,
@@ -37,6 +38,33 @@ def test_agent_invocation_spec_from_any_accepts_context_creator() -> None:
     assert spec.meta.name == "create_request"
     context = ExecutionContext(llm_param=None, connection=None, llm_messages=())
     assert isinstance(spec.create_request("input", context), LLMRequest)
+
+
+@pytest.mark.parametrize(
+    ("spec_type", "facade_method"),
+    [
+        (LLMInvocationSpec, "completion_with_result"),
+        (AgentInvocationSpec, "run_with_result"),
+    ],
+)
+def test_llm_invocation_specs_forward_cancel_token(spec_type, facade_method, monkeypatch) -> None:
+    cancel_token = CancelToken()
+    facade = Mock()
+    getattr(facade, facade_method).side_effect = RuntimeError("stop after forwarding")
+    facade_factory = Mock(return_value=facade)
+    monkeypatch.setattr("pytoy_llm.task.models.invocation_specs.LLMFacade", facade_factory)
+    spec = spec_type.from_any(lambda value: str(value), output_type=str)
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=(),
+        cancel_token=cancel_token,
+    )
+
+    with pytest.raises(RuntimeError, match="stop after forwarding"):
+        spec.invoke("input", context)
+
+    assert getattr(facade, facade_method).call_args.kwargs["cancel_token"] is cancel_token
 
 
 def test_invocation_spec_from_any_requires_output_type() -> None:
@@ -97,6 +125,24 @@ def test_task_spec_cancellation_retains_prior_invocation_traces() -> None:
     with pytest.raises(AttributeError):
         setattr(exc_info.value, "exception_trace", "changed")
     assert exc_info.value.exception_trace == exception_trace
+
+
+def test_task_spec_maps_llm_cancel_exception_to_task_cancellation() -> None:
+    cancel_token = CancelToken()
+    messages = (LLMMessage.chat("request"),)
+    llm_cancel_exception = LLMCancelException(messages=messages)
+
+    def cancel(_value: Any, _context: ExecutionContext) -> str:
+        raise llm_cancel_exception
+
+    task = TaskSpec.from_single_spec(FunctionInvocationSpec.from_any(cancel), output_type=str)
+
+    with pytest.raises(TaskCanceledException) as exc_info:
+        task.run("input", TaskContextState(), cancel_token=cancel_token)
+
+    assert exc_info.value.__cause__ is llm_cancel_exception
+    assert llm_cancel_exception.messages == messages
+    assert exc_info.value.completed_invocation_traces == ()
 
 
 def test_task_spec_does_not_start_invocations_when_already_canceled() -> None:

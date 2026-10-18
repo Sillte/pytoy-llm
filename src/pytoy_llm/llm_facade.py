@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
-from pytoy_llm.models import LLMRequestLike, LLMResult
+from pytoy_llm.models import CancelToken, LLMRequestLike, LLMResult
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_activities import LLMActivitySink
@@ -33,11 +33,13 @@ class LLMFacade:
         self,
         request: LLMRequestLike,
         output_type: type[T],
+        cancel_token: CancelToken | None = None,
     ) -> T:
         client = PytoyLiteLLMClient(
             self._resolve_connection(),
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
+            cancel_token=cancel_token,
         )
         return client.completion(request, output_type=output_type)
 
@@ -45,11 +47,13 @@ class LLMFacade:
         self,
         request: LLMRequestLike,
         output_type: type[T],
+        cancel_token: CancelToken | None = None,
     ) -> LLMResult[T]:
         client = PytoyLiteLLMClient(
             self._resolve_connection(),
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
+            cancel_token=cancel_token,
         )
         return client.completion_with_result(request, output_type=output_type)
 
@@ -59,12 +63,14 @@ class LLMFacade:
         output_type: type[T],
         tools: LLMToolsLike = (),
         usage_limit: UsageLimit | None = None,
+        cancel_token: CancelToken | None = None,
     ) -> T:
         """Alias of `run_agent` for better readability."""
         agent = PytoyPydanticAIAgent(
             self._resolve_connection(),
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
+            cancel_token=cancel_token,
         )
         return agent.run(request, output_type=output_type, tools=tools, usage_limit=usage_limit)
 
@@ -74,11 +80,13 @@ class LLMFacade:
         output_type: type[T],
         tools: LLMToolsLike = (),
         usage_limit: UsageLimit | None = None,
+        cancel_token: CancelToken | None = None,
     ) -> LLMResult[T]:
         agent = PytoyPydanticAIAgent(
             self._resolve_connection(),
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
+            cancel_token=cancel_token,
         )
         return agent.run_with_result(
             request, output_type=output_type, tools=tools, usage_limit=usage_limit

@@ -38,12 +38,16 @@ Cancellation can be requested before or during an execution. `on_cancel` reports
 that the request was accepted. Canceling a created execution transitions it
 directly to `canceled`; it has not started, so it does not emit `on_exit`. A
 running execution transitions to `canceling`; its `CancelToken` is shared with
-the task and observed at invocation boundaries, so an invocation already in
-progress is not interrupted. Once a started execution terminates, it emits
-`on_exit` exactly once, including after cancellation; a canceled exit carries a
-`TaskCanceledException` outcome and transitions to `canceled`. The execution
-manager deregisters an unstarted execution on cancellation and a started
-execution on exit.
+the task. A blocking LiteLLM completion is not interrupted; if cancellation is
+requested during it, the LLM call finishes before cancellation is raised and
+converted to `TaskCanceledException`. PydanticAI agent runs receive a native
+cancellation token through `CancelToken.on_cancel`, without a polling thread.
+This cancels the run task, allowing in-flight asynchronous operations to unwind;
+synchronous blocking code cannot be interrupted until it returns. Once a
+started execution terminates, it emits `on_exit` exactly once,
+including after cancellation; a canceled exit carries a `TaskCanceledException`
+outcome and transitions to `canceled`. The execution manager deregisters an unstarted
+execution on cancellation and a started execution on exit.
 
 ## Constraints
 

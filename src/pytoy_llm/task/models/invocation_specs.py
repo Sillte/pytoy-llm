@@ -256,7 +256,9 @@ class LLMInvocationSpec[T: BaseModel | str]:
                 event_emitters=execution_context.emitters,
             )
             completion_result = llm_facade.completion_with_result(
-                input_messages, output_type=self.output_type
+                input_messages,
+                output_type=self.output_type,
+                cancel_token=execution_context.cancel_token,
             )
             output = completion_result.output
             invocation_result = to_invocation_result(
@@ -336,6 +338,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
                 output_type=self.output_type,
                 tools=self.tools,
                 usage_limit=usage_limit,
+                cancel_token=execution_context.cancel_token,
             )
             output = agent_result.output
             invocation_result = to_invocation_result(

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
 from pytoy_llm.llm_facade import LLMFacade
-from pytoy_llm.models import LLMRequestLike
+from pytoy_llm.models import CancelToken, LLMRequestLike
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_activities import LLMActivitySink
@@ -31,10 +31,11 @@ def completion[T: BaseModel | str](
     llm_param: LLMParam | None = None,
     connection: str | Connection = DEFAULT_NAME,
     activity_sink: LLMActivitySink | None = None,
+    cancel_token: CancelToken | None = None,
 ) -> T:
     """Execute the `litellm.completion`."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
-    return facade.completion(request=request, output_type=output_type)
+    return facade.completion(request=request, output_type=output_type, cancel_token=cancel_token)
 
 
 def run[T: BaseModel | str](
@@ -45,10 +46,17 @@ def run[T: BaseModel | str](
     connection: str | Connection = DEFAULT_NAME,
     activity_sink: LLMActivitySink | None = None,
     usage_limit: UsageLimit | None = None,
+    cancel_token: CancelToken | None = None,
 ) -> T:
     """Execute the `pydantic_ai.Agent.run_sync`."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
-    result = facade.run(request, output_type=output_type, tools=tools, usage_limit=usage_limit)
+    result = facade.run(
+        request,
+        output_type=output_type,
+        tools=tools,
+        usage_limit=usage_limit,
+        cancel_token=cancel_token,
+    )
     return result
 
 
