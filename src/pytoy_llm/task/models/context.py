@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, MutableMapping, Self
 
@@ -33,40 +33,51 @@ class ExecutionContext:
 class RuntimeContextPatch:
     """Represents changes to an `ExecutionContext` automatically produced by the runtime.
 
-    This patch is applied before `ContextPatch`.
+    This patch is applied before `ContextPatch`. `None` leaves the history unchanged;
+    an empty sequence clears it.
     """
 
-    llm_messages: Sequence[LLMMessage]
+    llm_messages: Sequence[LLMMessage] | None = None
     """The latest LLM message history for this context."""
 
     def apply(self, context: ExecutionContext) -> ExecutionContext:
-        return replace(context, llm_messages=self.llm_messages)
+        if self.llm_messages is not None:
+            return replace(context, llm_messages=self.llm_messages)
+        return context
 
 
-class ContextPatch(BaseModel, frozen=True):
-    """Represents changes to an `ExecutionContext` produced by an invocation.
+class ContextPatch(BaseModel):
+    """Represents mutable changes to an `ExecutionContext` produced by an invocation.
 
-    The patch describes changes to be applied when constructing the context
-    for subsequent invocations. This is applied after `RuntimeContextPatch`.
+    The patch is applied after `RuntimeContextPatch`. State is cleared first,
+    then removed, then updated; updates win when a key appears in both sets.
     """
 
-    state: Annotated[
-        Mapping[str, Any] | None,
-        Field(description="New states requested by the invocation."),
-    ] = None
+    state_updates: Annotated[
+        TaskRunState,
+        Field(description="State entries to update in the existing context state."),
+    ] = Field(default_factory=dict)
+    state_removals: Annotated[
+        set[str], Field(description="State keys to remove from the existing context state.")
+    ] = Field(default_factory=set)
+    clear_state: bool = False
 
     llm_messages: Annotated[
         Sequence[LLMMessage] | None,
         Field(
             description=(
-                "Overrides the LLM message history for this context. Applied after `RuntimeContextPatch`."
+                "Overrides the LLM message history when not None. Applied after `RuntimeContextPatch`."
             ),
         ),
     ] = None
 
     def apply(self, context: ExecutionContext) -> ExecutionContext:
-        if self.state is not None:
-            context = replace(context, state=self.state)
+        if self.clear_state or self.state_removals or self.state_updates:
+            state = {} if self.clear_state else dict(context.state)
+            for key in self.state_removals:
+                state.pop(key, None)
+            state.update(self.state_updates)
+            context = replace(context, state=state)
         if self.llm_messages is not None:
             context = replace(context, llm_messages=self.llm_messages)
         return context

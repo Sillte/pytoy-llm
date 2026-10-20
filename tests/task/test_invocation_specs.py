@@ -7,6 +7,7 @@ from pytoy_llm.models import LLMCancelException, LLMMessage, LLMRequest
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
     CancelToken,
+    ContextPatch,
     FunctionInvocationSpec,
     InvocationException,
     InvocationHookException,
@@ -17,7 +18,7 @@ from pytoy_llm.task.models import (
     TaskContextState,
     TaskSpec,
 )
-from pytoy_llm.task.models.context import ExecutionContext
+from pytoy_llm.task.models.context import ExecutionContext, RuntimeContextPatch
 
 
 def test_llm_invocation_spec_from_any_wraps_single_argument_creator() -> None:
@@ -189,6 +190,87 @@ def test_on_start_hook_failure_raises_invocation_hook_exception() -> None:
     assert exc_info.value.__cause__ is hook_error
 
 
+def test_invocation_result_defaults_to_independent_empty_patches() -> None:
+    first = InvocationResult[str](output="first")
+    second = InvocationResult[str](output="second")
+
+    first.context_patch.state_updates["changed"] = True
+    first.context_patch.state_removals.add("obsolete")
+    first.context_patch.clear_state = True
+
+    assert first.runtime_patch.llm_messages is None
+    assert first.context_patch.llm_messages is None
+    assert second.context_patch.state_updates == {}
+    assert second.context_patch.state_removals == set()
+    assert second.context_patch.clear_state is False
+
+
+def test_empty_patches_leave_execution_context_unchanged() -> None:
+    message = LLMMessage.from_prompt(user="existing")
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=(message,),
+        state={"existing": "value"},
+    )
+
+    assert RuntimeContextPatch().apply(context) == context
+    assert ContextPatch().apply(context) == context
+
+
+def test_empty_message_patches_clear_message_history() -> None:
+    message = LLMMessage.from_prompt(user="existing")
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=(message,),
+    )
+
+    assert RuntimeContextPatch(llm_messages=()).apply(context).llm_messages == ()
+    assert ContextPatch(llm_messages=()).apply(context).llm_messages == ()
+
+
+def test_context_patch_removes_then_updates_state_without_discarding_entries() -> None:
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=(),
+        state={"existing": "preserved", "updated": "old", "removed": "value"},
+    )
+
+    updated_context = ContextPatch(
+        state_updates={"updated": "new", "added": "value"},
+        state_removals={"removed", "updated", "missing"},
+    ).apply(context)
+
+    assert updated_context.state == {
+        "existing": "preserved",
+        "updated": "new",
+        "added": "value",
+    }
+    assert context.state == {
+        "existing": "preserved",
+        "updated": "old",
+        "removed": "value",
+    }
+
+
+def test_context_patch_can_clear_state_then_apply_updates() -> None:
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=(),
+        state={"existing": "value"},
+    )
+
+    updated_context = ContextPatch(
+        state_updates={"new": "value"},
+        clear_state=True,
+    ).apply(context)
+
+    assert updated_context.state == {"new": "value"}
+
+
 def test_invocation_trace_owns_invocation_result() -> None:
     invocation_result = InvocationResult[str](output="output")
     spec = FunctionInvocationSpec(
@@ -198,6 +280,25 @@ def test_invocation_trace_owns_invocation_result() -> None:
     trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
 
     assert trace.result == invocation_result
+
+
+def test_on_result_hook_can_mutate_context_patch_state() -> None:
+    invocation_result = InvocationResult[str](
+        output="output",
+        context_patch=ContextPatch(state_updates={"status": "initial"}),
+    )
+
+    def update_result(result: InvocationResult[str]) -> None:
+        result.context_patch.state_updates = {"status": "updated"}
+
+    spec = FunctionInvocationSpec(
+        invocator=lambda _value, _context: invocation_result,
+        hooks=InvocationHooks(on_result=update_result),
+    )
+
+    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+
+    assert trace.result.context_patch.state_updates == {"status": "updated"}
 
 
 def test_on_result_hook_failure_retains_result() -> None:

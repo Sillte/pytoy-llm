@@ -98,10 +98,8 @@ class TaskSpec[T]:
             raise_if_cancelled()
 
             invocation_result = invocation_trace.result
-            if invocation_result.runtime_patch:
-                execution_context = invocation_result.runtime_patch.apply(execution_context)
-            if invocation_result.context_patch:
-                execution_context = invocation_result.context_patch.apply(execution_context)
+            execution_context = invocation_result.runtime_patch.apply(execution_context)
+            execution_context = invocation_result.context_patch.apply(execution_context)
             traces.append(invocation_trace)
             invocation_input = invocation_result.output
 

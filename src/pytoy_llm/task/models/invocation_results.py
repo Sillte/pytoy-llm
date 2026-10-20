@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, JsonValue
@@ -32,8 +32,8 @@ class InvocationInfo(BaseModel, frozen=True):
 @dataclass(frozen=True)
 class InvocationResult[T]:
     output: T
-    runtime_patch: RuntimeContextPatch | None = None
-    context_patch: ContextPatch | None = None
+    runtime_patch: RuntimeContextPatch = field(default_factory=RuntimeContextPatch)
+    context_patch: ContextPatch = field(default_factory=ContextPatch)
 
 
 class InvocationTrace[T](BaseModel, frozen=True):

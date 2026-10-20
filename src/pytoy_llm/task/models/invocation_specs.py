@@ -71,7 +71,10 @@ def to_invocation_result[T](
         if runtime_patch is None:
             return output
         return replace(output, runtime_patch=runtime_patch)
-    return InvocationResult(output=output, runtime_patch=runtime_patch)
+    return InvocationResult(
+        output=output,
+        runtime_patch=runtime_patch if runtime_patch is not None else RuntimeContextPatch(),
+    )
 
 
 def _merge_llm_param(base: LLMParam | None, override: LLMParam | None) -> LLMParam | None:

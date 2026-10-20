@@ -50,7 +50,7 @@ def test_session_propagates_context_between_task_executions() -> None:
 
     def remember(value: str, _context) -> InvocationResult[str]:
         return InvocationResult(
-            output=value, context_patch=ContextPatch(state={"remembered": value})
+            output=value, context_patch=ContextPatch(state_updates={"remembered": value})
         )
 
     first = session.create_task(
