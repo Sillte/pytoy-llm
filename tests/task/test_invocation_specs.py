@@ -8,6 +8,8 @@ from pytoy_llm.task.models import (
     AgentInvocationSpec,
     CancelToken,
     FunctionInvocationSpec,
+    InvocationException,
+    InvocationHookException,
     InvocationHooks,
     InvocationResult,
     LLMInvocationSpec,
@@ -165,21 +167,26 @@ def test_task_spec_does_not_start_invocations_when_already_canceled() -> None:
     assert exc_info.value.completed_invocation_traces == ()
 
 
-def test_hook_exceptions_do_not_change_successful_invocation() -> None:
-    def fail_hook(*_args: Any) -> None:
-        raise RuntimeError("hook failed")
+def test_on_start_hook_failure_raises_invocation_hook_exception() -> None:
+    hook_error = RuntimeError("start hook failed")
+
+    def fail_start(_context: ExecutionContext) -> None:
+        raise hook_error
 
     spec = FunctionInvocationSpec(
         invocator=lambda value, _context: value,
-        hooks=InvocationHooks(
-            on_start=fail_hook,
-            on_result=fail_hook,
-        ),
+        hooks=InvocationHooks(on_start=fail_start),
     )
 
-    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+    with pytest.raises(InvocationHookException) as exc_info:
+        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
 
-    assert trace.result.output == "input"
+    assert exc_info.value.hook_name == "on_start"
+    assert exc_info.value.hook_exception is hook_error
+    assert exc_info.value.result is None
+    assert exc_info.value.exception is None
+    assert "start hook failed" in exc_info.value.stack_trace
+    assert exc_info.value.__cause__ is hook_error
 
 
 def test_invocation_trace_owns_invocation_result() -> None:
@@ -193,17 +200,67 @@ def test_invocation_trace_owns_invocation_result() -> None:
     assert trace.result == invocation_result
 
 
-def test_hook_exception_does_not_replace_invocation_exception() -> None:
-    def fail_hook(*_args: Any) -> None:
-        raise RuntimeError("hook failed")
+def test_on_result_hook_failure_retains_result() -> None:
+    hook_error = RuntimeError("result hook failed")
+
+    def fail_result(_result: InvocationResult[Any]) -> None:
+        raise hook_error
+
+    spec = FunctionInvocationSpec(
+        invocator=lambda value, _context: value,
+        hooks=InvocationHooks(on_result=fail_result),
+    )
+
+    with pytest.raises(InvocationHookException) as exc_info:
+        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+
+    assert exc_info.value.hook_name == "on_result"
+    assert exc_info.value.hook_exception is hook_error
+    assert exc_info.value.result is not None
+    assert exc_info.value.result.output == "input"
+    assert exc_info.value.exception is None
+
+
+def test_on_exception_hook_failure_retains_invocation_exception() -> None:
+    hook_error = RuntimeError("exception hook failed")
+    invocation_error = ValueError("invocation failed")
+
+    def fail_exception(_exception: Exception) -> None:
+        raise hook_error
 
     def fail_invocation(_value: Any, _context: ExecutionContext) -> str:
-        raise ValueError("invocation failed")
+        raise invocation_error
 
     spec = FunctionInvocationSpec(
         invocator=fail_invocation,
-        hooks=InvocationHooks(on_exception=fail_hook),
+        hooks=InvocationHooks(on_exception=fail_exception),
     )
 
-    with pytest.raises(ValueError, match="invocation failed"):
+    with pytest.raises(InvocationHookException) as exc_info:
         spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+
+    assert exc_info.value.hook_name == "on_exception"
+    assert exc_info.value.hook_exception is hook_error
+    assert exc_info.value.result is None
+    assert exc_info.value.exception is invocation_error
+    assert exc_info.value.__cause__ is hook_error
+
+
+def test_task_run_returns_invocation_hook_exception_directly() -> None:
+    hook_error = RuntimeError("start hook failed")
+
+    def fail_start(_context: ExecutionContext) -> None:
+        raise hook_error
+
+    spec = FunctionInvocationSpec(
+        invocator=lambda value, _context: value,
+        hooks=InvocationHooks(on_start=fail_start),
+    )
+    task = TaskSpec.from_single_spec(spec, output_type=str)
+
+    outcome = task.run("input", TaskContextState())
+
+    assert outcome.kind == "Error"
+    assert isinstance(outcome.exception, InvocationException)
+    assert isinstance(outcome.exception.invocation_exception, InvocationHookException)
+    assert outcome.exception.invocation_exception.hook_exception is hook_error

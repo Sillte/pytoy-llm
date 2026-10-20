@@ -1,9 +1,9 @@
 import traceback
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from pytoy_llm.task.models.context import ExecutionContext
-from pytoy_llm.task.models.invocation_results import InvocationTrace
+from pytoy_llm.task.models.invocation_results import InvocationResult, InvocationTrace
 
 
 class TaskCanceledException(Exception):
@@ -36,6 +36,23 @@ class InvocationException(Exception):
 
     def __str__(self):
         return f"{self.context=}\n{self.invocation_exception=}\n{self.stack_trace}"
+
+
+class InvocationHookException(Exception):
+    def __init__(
+        self,
+        hook_name: Literal["on_start", "on_result", "on_exception"],
+        hook_exception: Exception,
+        *,
+        result: InvocationResult[Any] | None = None,
+        exception: Exception | None = None,
+    ) -> None:
+        self.hook_name = hook_name
+        self.hook_exception = hook_exception
+        self.result = result
+        self.exception = exception
+        self.stack_trace = "".join(traceback.format_exception(hook_exception))
+        super().__init__(f"{hook_name} hook failed: {hook_exception}")
 
 
 class TaskUnknownException(Exception):

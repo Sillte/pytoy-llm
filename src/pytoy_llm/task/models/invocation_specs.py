@@ -20,6 +20,7 @@ from pytoy_llm.task.models.context import (
     ExecutionContext,
     RuntimeContextPatch,
 )
+from pytoy_llm.task.models.exceptions import InvocationHookException
 from pytoy_llm.task.models.expenditures import LLMExpenditure
 from pytoy_llm.task.models.invocation_hooks import InvocationHooks
 from pytoy_llm.task.models.invocation_results import (
@@ -97,8 +98,11 @@ def invoke_with_hooks[T](
     if hooks.on_start:
         try:
             hooks.on_start(context)
-        except Exception:
-            pass
+        except Exception as hook_exception:
+            raise InvocationHookException(
+                hook_name="on_start",
+                hook_exception=hook_exception,
+            ) from hook_exception
 
     try:
         trace = operation()
@@ -106,15 +110,23 @@ def invoke_with_hooks[T](
         if hooks.on_exception:
             try:
                 hooks.on_exception(exc)
-            except Exception:
-                pass
+            except Exception as hook_exception:
+                raise InvocationHookException(
+                    hook_name="on_exception",
+                    hook_exception=hook_exception,
+                    exception=exc,
+                ) from hook_exception
         raise
     else:
         if hooks.on_result:
             try:
                 hooks.on_result(trace.result)
-            except Exception:
-                pass
+            except Exception as hook_exception:
+                raise InvocationHookException(
+                    hook_name="on_result",
+                    hook_exception=hook_exception,
+                    result=trace.result,
+                ) from hook_exception
         return trace
 
 
@@ -124,7 +136,7 @@ class FunctionInvocationSpec[T]:
     meta: InvocationSpecMeta = field(
         default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A")
     )
-    hooks: InvocationHooks[T] = field(default_factory=InvocationHooks)
+    hooks: InvocationHooks = field(default_factory=InvocationHooks)
     kind: Literal["function"] = "function"
 
     def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationTrace[T]:
@@ -183,7 +195,7 @@ class SelectedInvocationSpec[T]:
     meta: InvocationSpecMeta = field(
         default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A")
     )
-    hooks: InvocationHooks[T] = field(default_factory=InvocationHooks)
+    hooks: InvocationHooks = field(default_factory=InvocationHooks)
     kind: Literal["selector"] = "selector"
 
     def invoke(self, input: Any, execution_context: ExecutionContext, /) -> InvocationTrace[T]:
@@ -218,7 +230,7 @@ class LLMInvocationSpec[T: BaseModel | str]:
     meta: InvocationSpecMeta = field(
         default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A")
     )
-    hooks: InvocationHooks[T] = field(default_factory=InvocationHooks)
+    hooks: InvocationHooks = field(default_factory=InvocationHooks)
     kind: Literal["llm"] = "llm"
 
     @classmethod
@@ -291,7 +303,7 @@ class AgentInvocationSpec[T: BaseModel | str]:
     meta: InvocationSpecMeta = field(
         default_factory=lambda: InvocationSpecMeta(name="NoName", intent="N/A")
     )
-    hooks: InvocationHooks[T] = field(default_factory=InvocationHooks)
+    hooks: InvocationHooks = field(default_factory=InvocationHooks)
     kind: Literal["agent"] = "agent"
 
     @classmethod

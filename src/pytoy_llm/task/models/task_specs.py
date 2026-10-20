@@ -5,7 +5,11 @@ from typing import Any, Self
 from pytoy_llm.models import LLMCancelException, LLMEventEmitters, LLMParam, UsageLimit
 from pytoy_llm.task.models import AgentInvocationSpec, LLMInvocationSpec
 from pytoy_llm.task.models.context import CancelToken, ExecutionContext, TaskContextState
-from pytoy_llm.task.models.exceptions import InvocationException, TaskCanceledException
+from pytoy_llm.task.models.exceptions import (
+    InvocationException,
+    InvocationHookException,
+    TaskCanceledException,
+)
 from pytoy_llm.task.models.invocation_results import InvocationTrace
 from pytoy_llm.task.models.invocation_specs import InvocationSpec
 from pytoy_llm.task.models.metas import TaskSpecMeta
@@ -78,6 +82,13 @@ class TaskSpec[T]:
                 ) from exc
             except LLMCancelException as exc:
                 raise TaskCanceledException(completed_invocation_traces=traces) from exc
+            except InvocationHookException as exc:
+                return Error(
+                    exception=InvocationException(
+                        context=execution_context,
+                        invocation_exception=exc,
+                    )
+                )
             except Exception as exc:
                 return Error(
                     exception=InvocationException(
