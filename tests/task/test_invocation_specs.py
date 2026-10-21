@@ -14,6 +14,7 @@ from pytoy_llm.task.models import (
     InvocationHooks,
     InvocationResult,
     LLMInvocationSpec,
+    SnapshotInvocationResult,
     TaskCanceledException,
     TaskContextState,
     TaskSpec,
@@ -306,6 +307,7 @@ def test_trace_snapshot_captures_post_hook_values_and_is_detached() -> None:
     snapshot = trace.snapshot_result
 
     assert snapshot is not None
+    assert isinstance(snapshot, SnapshotInvocationResult)
     assert snapshot.output == ["initial", "hook"]
     assert snapshot.state == {"nested": {"items": ["hook"]}}
     assert snapshot.llm_messages == [message]

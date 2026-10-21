@@ -64,7 +64,7 @@ from pytoy_llm import completion
 
 output = completion(
     "Hello, there.",
-    output_type="str",
+    output_type=str,
     connection="first_connect",
 )
 ```

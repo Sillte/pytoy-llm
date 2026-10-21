@@ -61,5 +61,4 @@ def run[T: BaseModel | str](
 
 
 if __name__ == "__main__":
-    ...
-    result = completion("hogehoge", output_type=str)
+    pass

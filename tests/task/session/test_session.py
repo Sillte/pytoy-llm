@@ -132,6 +132,34 @@ def test_session_prunes_old_terminal_records_to_max_records() -> None:
     assert [record.id for record in session.records] == [tasks[1].id, tasks[2].id]
 
 
+def test_session_requires_at_least_one_record() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+
+    with pytest.raises(ValueError, match="max_records must be at least 1"):
+        TaskSessionHandler.create(
+            request=TaskSessionRequest.from_any(max_records=0),
+            manager=session_manager,
+            execution_manager=execution_manager,
+        )
+
+
+def test_session_can_retain_one_record() -> None:
+    session_manager = TaskSessionManager()
+    execution_manager = TaskExecutionManager()
+    session = create_session(session_manager, execution_manager, max_records=1)
+
+    task = session.create_task(
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(lambda value: value), "only record"
+        )
+    )
+    task.start()
+    wait_for_exit(session, task.id)
+
+    assert [record.id for record in session.records] == [task.id]
+
+
 def test_task_execution_manager_removes_exit_and_canceled_tasks() -> None:
     session_manager = TaskSessionManager()
     execution_manager = TaskExecutionManager()

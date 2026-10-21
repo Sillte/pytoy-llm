@@ -42,8 +42,8 @@ class TaskSession:
         kind: str = DEFAULT_KIND,
         max_records: int = 100,
     ) -> Self:
-        if max_records < 0:
-            raise ValueError("max_records must be non-negative")
+        if max_records < 1:
+            raise ValueError("max_records must be at least 1")
         return cls(
             context_state=context_state or TaskContextState(),
             kind=kind,

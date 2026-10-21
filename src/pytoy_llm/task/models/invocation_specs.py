@@ -197,7 +197,7 @@ class FunctionInvocationSpec[T]:
                 return single_arg(input_data)
 
             return cls(invocator=wrapped_invocator, meta=meta, hooks=hooks or InvocationHooks())
-        elif len(params) >= 2:
+        elif len(params) == 2:
             invocator = cast(Callable[[Any, ExecutionContext], T], invocator)
             return cls(invocator=invocator, meta=meta, hooks=hooks or InvocationHooks())
         else:
@@ -218,7 +218,9 @@ class SelectedInvocationSpec[T]:
             starttime = time.time()
             selector_trace = self.spec_selector.invoke(input, execution_context)
             execution_context.emitters.activity_emitter.fire(
-                ToolCallActivity(tool_name="SelectedInvocationSpec", args=selector_trace.result)
+                ToolCallActivity(
+                    tool_name="SelectedInvocationSpec", args=selector_trace.result.output
+                )
             )
             spec_output = selector_trace.result.output
             selected_trace = spec_output.invoke(input, execution_context)
