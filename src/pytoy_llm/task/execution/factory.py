@@ -37,6 +37,7 @@ class TaskExecutionFactory:
                     context_state=context_state,
                     emitters=event_emitters,
                     cancel_token=cancel_token,
+                    task_id=request.id,
                 )
             except TaskCanceledException as e:
                 outcome = Error(e)

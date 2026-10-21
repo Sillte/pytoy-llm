@@ -39,25 +39,28 @@ class TaskSpec[T]:
         llm_param: LLMParam | None = None,
         usage_limit: UsageLimit | None = None,
         cancel_token: CancelToken | None = None,
+        task_id: str | None = None,
     ) -> Outcome[TaskResult[T], InvocationException]:
         """Run with base configuration and observe cancellation between invocations.
 
-        Cancellation does not interrupt an invocation already in progress.
+        Cancellation does not interrupt an invocation already in progress. The optional
+        ``task_id`` is shared with the resulting ``TaskResult``; if omitted, the execution
+        context generates it.
 
         Raises:
             TaskCanceledException: If cancellation is observed at an invocation boundary. The
                 exception contains traces completed before that boundary; the invocation that
                 observed cancellation may not be included.
         """
-        connection = None
-        execution_context = ExecutionContext(
+        execution_context = ExecutionContext.from_any(
             llm_param=llm_param,
-            connection=connection,
+            connection=None,
             llm_messages=context_state.llm_messages,
             usage_limit=usage_limit,
             state=context_state.state,
-            emitters=emitters or LLMEventEmitters(),
-            cancel_token=cancel_token if cancel_token is not None else CancelToken(),
+            emitters=emitters,
+            cancel_token=cancel_token,
+            task_id=task_id,
         )
 
         traces: list[InvocationTrace[Any]] = []
@@ -107,6 +110,7 @@ class TaskSpec[T]:
             output=invocation_result.output,
             traces=traces,
             context_state=TaskContextState.from_execution_context(execution_context),
+            id=execution_context.task_id,
         )
         return Success(result)
 

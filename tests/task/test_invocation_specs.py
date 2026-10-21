@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, cast
 from unittest.mock import Mock
 
@@ -17,10 +18,13 @@ from pytoy_llm.task.models import (
     SnapshotInvocationResult,
     TaskCanceledException,
     TaskContextState,
+    TaskRequest,
     TaskSpec,
 )
 from pytoy_llm.task.models.context import ExecutionContext, RuntimeContextPatch
 from pytoy_llm.task.models.invocation_specs import to_invocation_result
+from pytoy_llm.task.shared.outcome import Success
+from pytoy_llm.task.sync_executor import TaskSyncExecutor
 
 
 def test_llm_invocation_spec_from_any_wraps_single_argument_creator() -> None:
@@ -397,6 +401,44 @@ def test_on_exception_hook_failure_retains_invocation_exception() -> None:
     assert exc_info.value.result is None
     assert exc_info.value.exception is invocation_error
     assert exc_info.value.__cause__ is hook_error
+
+
+def test_sync_executor_passes_request_id_to_task_result() -> None:
+    request = TaskRequest(
+        spec=TaskSpec.from_single_spec(
+            FunctionInvocationSpec.from_any(lambda value: value),
+            output_type=str,
+        ),
+        input="input",
+    )
+
+    task_exit = TaskSyncExecutor().execute(request)
+
+    assert task_exit.request_id == request.id
+    assert isinstance(task_exit.outcome, Success)
+    result = task_exit.outcome.value
+    assert result.id == request.id
+    assert result.traces[0].result.context.task_id == request.id
+
+
+@pytest.mark.parametrize("task_id", [None, "request-id"])
+def test_task_result_id_matches_execution_context_id(task_id: str | None) -> None:
+    observed_task_ids: list[str] = []
+    spec = FunctionInvocationSpec.from_any(
+        lambda value, context: observed_task_ids.append(context.task_id) or value
+    )
+    task = TaskSpec.from_single_spec(spec, output_type=str)
+
+    outcome = task.run("input", TaskContextState(), task_id=task_id)
+
+    assert isinstance(outcome, Success)
+    result = outcome.value
+    assert result.id == result.traces[0].result.context.task_id
+    assert observed_task_ids == [result.id]
+    if task_id is not None:
+        assert result.id == task_id
+    else:
+        assert uuid.UUID(result.id).version == 4
 
 
 def test_task_run_returns_invocation_hook_exception_directly() -> None:

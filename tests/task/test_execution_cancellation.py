@@ -8,7 +8,30 @@ from pytoy_llm.task.models import (
     TaskRequest,
     TaskSpec,
 )
-from pytoy_llm.task.shared.outcome import is_error
+from pytoy_llm.task.shared.outcome import is_error, is_success
+
+
+def test_async_execution_uses_request_id_for_task_result() -> None:
+    request = TaskRequest(
+        spec=TaskSpec.from_single_spec(
+            FunctionInvocationSpec.from_any(lambda value: value),
+            output_type=str,
+        ),
+        input="input",
+    )
+    task = TaskExecutionHandler.create(request, manager=TaskExecutionManager())
+    exited = Event()
+    task.on_exit.once().subscribe(lambda _: exited.set())
+
+    task.start(TaskExecutionHooks.from_any())
+
+    assert exited.wait(timeout=1)
+    exit_entity = task.execution_exit
+    assert exit_entity is not None
+    assert is_success(exit_entity.outcome)
+    result = exit_entity.outcome.value
+    assert result.id == request.id
+    assert result.traces[0].result.context.task_id == request.id
 
 
 def test_cancel_running_execution_at_invocation_boundary() -> None:

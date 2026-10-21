@@ -21,6 +21,7 @@ class TaskSyncExecutor:
                 task_input=task_input,
                 context_state=context_state,
                 emitters=emitters,
+                task_id=request.id,
             )
 
             return TaskExit(

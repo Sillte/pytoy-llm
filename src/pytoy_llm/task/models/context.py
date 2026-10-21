@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Annotated, Any, MutableMapping, Self
 
@@ -17,6 +18,10 @@ type TaskRunState = MutableMapping[str, Any]
 ExecutionEvents = LLMEventEmitters
 
 
+def _resolve_task_id(task_id: str | None = None) -> str:
+    return task_id if task_id is not None else str(uuid.uuid4())
+
+
 @dataclass(frozen=True)
 class ExecutionContext:
     llm_param: LLMParam | None
@@ -26,6 +31,32 @@ class ExecutionContext:
     emitters: LLMEventEmitters = field(default_factory=LLMEventEmitters)
     usage_limit: UsageLimit | None = None
     cancel_token: CancelToken = field(default_factory=CancelToken)
+    task_id: str = field(default_factory=_resolve_task_id)
+
+    @classmethod
+    def from_any(
+        cls,
+        llm_param: LLMParam | None,
+        connection: Connection | str | None,
+        llm_messages: list[LLMMessage],
+        *,
+        state: TaskRunState | None = None,
+        emitters: LLMEventEmitters | None = None,
+        usage_limit: UsageLimit | None = None,
+        cancel_token: CancelToken | None = None,
+        task_id: str | None = None,
+    ) -> Self:
+        """Create a context, generating a UUID4 task ID when one is not provided."""
+        return cls(
+            llm_param=llm_param,
+            connection=connection,
+            llm_messages=llm_messages,
+            state=state if state is not None else {},
+            emitters=emitters if emitters is not None else LLMEventEmitters(),
+            usage_limit=usage_limit,
+            cancel_token=cancel_token if cancel_token is not None else CancelToken(),
+            task_id=_resolve_task_id(task_id),
+        )
 
 
 @dataclass(frozen=True)
