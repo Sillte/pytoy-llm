@@ -87,7 +87,7 @@ def test_llm_invocation_merges_context_and_invocation_parameters(monkeypatch) ->
     context = ExecutionContext(
         llm_param=LLMParam(temperature=0.2, max_tokens=500, top_p=0.5),
         connection=None,
-        llm_messages=(),
+        llm_messages=[],
         cancel_token=cancel_token,
     )
 
@@ -104,7 +104,7 @@ def test_llm_invocation_keeps_none_when_both_parameter_sources_are_none(monkeypa
     context = ExecutionContext(
         llm_param=None,
         connection=None,
-        llm_messages=(),
+        llm_messages=[],
         cancel_token=cancel_token,
     )
 
@@ -126,7 +126,7 @@ def test_agent_invocation_merges_usage_limits_and_llm_parameters(monkeypatch) ->
     context = ExecutionContext(
         llm_param=LLMParam(temperature=0.2, max_tokens=500),
         connection=None,
-        llm_messages=(),
+        llm_messages=[],
         usage_limit=UsageLimit(max_total_tokens=500, max_requests=10),
         cancel_token=cancel_token,
     )

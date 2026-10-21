@@ -7,7 +7,7 @@ from pytoy_llm.models import LLMCancelException, LLMMessage, LLMRequest
 from pytoy_llm.task.models import (
     AgentInvocationSpec,
     CancelToken,
-    ContextPatch,
+    FailedSnapshot,
     FunctionInvocationSpec,
     InvocationException,
     InvocationHookException,
@@ -19,6 +19,7 @@ from pytoy_llm.task.models import (
     TaskSpec,
 )
 from pytoy_llm.task.models.context import ExecutionContext, RuntimeContextPatch
+from pytoy_llm.task.models.invocation_specs import to_invocation_result
 
 
 def test_llm_invocation_spec_from_any_wraps_single_argument_creator() -> None:
@@ -28,7 +29,7 @@ def test_llm_invocation_spec_from_any_wraps_single_argument_creator() -> None:
     spec = LLMInvocationSpec.from_any(create_request, output_type=str)
 
     assert spec.meta.name == "create_request"
-    context = ExecutionContext(llm_param=None, connection=None, llm_messages=())
+    context = ExecutionContext(llm_param=None, connection=None, llm_messages=[])
     assert isinstance(spec.create_request("input", context), LLMRequest)
 
 
@@ -39,7 +40,7 @@ def test_agent_invocation_spec_from_any_accepts_context_creator() -> None:
     spec = AgentInvocationSpec.from_any(create_request, output_type=str)
 
     assert spec.meta.name == "create_request"
-    context = ExecutionContext(llm_param=None, connection=None, llm_messages=())
+    context = ExecutionContext(llm_param=None, connection=None, llm_messages=[])
     assert isinstance(spec.create_request("input", context), LLMRequest)
 
 
@@ -60,7 +61,7 @@ def test_llm_invocation_specs_forward_cancel_token(spec_type, facade_method, mon
     context = ExecutionContext(
         llm_param=None,
         connection=None,
-        llm_messages=(),
+        llm_messages=[],
         cancel_token=cancel_token,
     )
 
@@ -180,7 +181,7 @@ def test_on_start_hook_failure_raises_invocation_hook_exception() -> None:
     )
 
     with pytest.raises(InvocationHookException) as exc_info:
-        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=[]))
 
     assert exc_info.value.hook_name == "on_start"
     assert exc_info.value.hook_exception is hook_error
@@ -190,121 +191,168 @@ def test_on_start_hook_failure_raises_invocation_hook_exception() -> None:
     assert exc_info.value.__cause__ is hook_error
 
 
-def test_invocation_result_defaults_to_independent_empty_patches() -> None:
-    first = InvocationResult[str](output="first")
-    second = InvocationResult[str](output="second")
+def test_invocation_results_hold_their_execution_context() -> None:
+    first_context = ExecutionContext(llm_param=None, connection=None, llm_messages=[])
+    second_context = ExecutionContext(llm_param=None, connection=None, llm_messages=[])
+    first = InvocationResult[str](output="first", context=first_context)
+    second = InvocationResult[str](output="second", context=second_context)
 
-    first.context_patch.state_updates["changed"] = True
-    first.context_patch.state_removals.add("obsolete")
-    first.context_patch.clear_state = True
+    first.context.state["changed"] = True
+    first.context.llm_messages.append(LLMMessage.from_prompt(user="first"))
 
-    assert first.runtime_patch.llm_messages is None
-    assert first.context_patch.llm_messages is None
-    assert second.context_patch.state_updates == {}
-    assert second.context_patch.state_removals == set()
-    assert second.context_patch.clear_state is False
+    assert first.context is first_context
+    assert second.context.state == {}
+    assert second.context.llm_messages == []
 
 
-def test_empty_patches_leave_execution_context_unchanged() -> None:
-    message = LLMMessage.from_prompt(user="existing")
+def test_empty_runtime_patch_leaves_execution_context_unchanged() -> None:
     context = ExecutionContext(
         llm_param=None,
         connection=None,
-        llm_messages=(message,),
+        llm_messages=[LLMMessage.from_prompt(user="existing")],
         state={"existing": "value"},
     )
+    messages = context.llm_messages
 
-    assert RuntimeContextPatch().apply(context) == context
-    assert ContextPatch().apply(context) == context
+    assert RuntimeContextPatch().apply(context) is context
+    assert context.llm_messages is messages
+    assert context.llm_messages == [LLMMessage.from_prompt(user="existing")]
 
 
-def test_empty_message_patches_clear_message_history() -> None:
+def test_runtime_patch_replaces_messages_in_place_and_can_clear_history() -> None:
     message = LLMMessage.from_prompt(user="existing")
+    context = ExecutionContext(llm_param=None, connection=None, llm_messages=[message])
+    messages = context.llm_messages
+
+    assert RuntimeContextPatch(llm_messages=[]).apply(context) is context
+    assert context.llm_messages is messages
+    assert context.llm_messages == []
+
+
+def test_on_result_hook_edits_shared_context_state_and_messages() -> None:
+    message = LLMMessage.from_prompt(user="hook update")
     context = ExecutionContext(
         llm_param=None,
         connection=None,
-        llm_messages=(message,),
-    )
-
-    assert RuntimeContextPatch(llm_messages=()).apply(context).llm_messages == ()
-    assert ContextPatch(llm_messages=()).apply(context).llm_messages == ()
-
-
-def test_context_patch_removes_then_updates_state_without_discarding_entries() -> None:
-    context = ExecutionContext(
-        llm_param=None,
-        connection=None,
-        llm_messages=(),
-        state={"existing": "preserved", "updated": "old", "removed": "value"},
-    )
-
-    updated_context = ContextPatch(
-        state_updates={"updated": "new", "added": "value"},
-        state_removals={"removed", "updated", "missing"},
-    ).apply(context)
-
-    assert updated_context.state == {
-        "existing": "preserved",
-        "updated": "new",
-        "added": "value",
-    }
-    assert context.state == {
-        "existing": "preserved",
-        "updated": "old",
-        "removed": "value",
-    }
-
-
-def test_context_patch_can_clear_state_then_apply_updates() -> None:
-    context = ExecutionContext(
-        llm_param=None,
-        connection=None,
-        llm_messages=(),
-        state={"existing": "value"},
-    )
-
-    updated_context = ContextPatch(
-        state_updates={"new": "value"},
-        clear_state=True,
-    ).apply(context)
-
-    assert updated_context.state == {"new": "value"}
-
-
-def test_invocation_trace_owns_invocation_result() -> None:
-    invocation_result = InvocationResult[str](output="output")
-    spec = FunctionInvocationSpec(
-        invocator=lambda _value, _context: invocation_result,
-    )
-
-    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
-
-    assert trace.result == invocation_result
-
-
-def test_on_result_hook_can_mutate_context_patch_state() -> None:
-    invocation_result = InvocationResult[str](
-        output="output",
-        context_patch=ContextPatch(state_updates={"status": "initial"}),
+        llm_messages=[LLMMessage.from_prompt(user="existing")],
+        state={"keep": "value", "remove": "value"},
     )
 
     def update_result(result: InvocationResult[str]) -> None:
-        result.context_patch.state_updates = {"status": "updated"}
+        assert result.context is context
+        result.context.state["added"] = result.output
+        del result.context.state["remove"]
+        result.context.llm_messages.append(message)
+
+    spec = FunctionInvocationSpec(
+        invocator=lambda _value, _context: "output",
+        hooks=InvocationHooks(on_result=update_result),
+    )
+
+    trace = spec.invoke("input", context)
+
+    assert trace.result.context is context
+    assert context.state == {"keep": "value", "added": "output"}
+    assert context.llm_messages[-1] is message
+
+
+def test_runtime_messages_are_shared_with_result_hook() -> None:
+    context = ExecutionContext(llm_param=None, connection=None, llm_messages=[])
+    generated_message = LLMMessage.from_prompt(user="generated")
+    hook_message = LLMMessage.from_prompt(user="hook")
+    invocation_result = to_invocation_result(
+        "output",
+        context,
+        runtime_patch=RuntimeContextPatch(llm_messages=[generated_message]),
+    )
+
+    def update_result(result: InvocationResult[str]) -> None:
+        assert result.context is context
+        assert result.context.llm_messages == [generated_message]
+        result.context.llm_messages.append(hook_message)
 
     spec = FunctionInvocationSpec(
         invocator=lambda _value, _context: invocation_result,
         hooks=InvocationHooks(on_result=update_result),
     )
 
-    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+    trace = spec.invoke("input", context)
 
-    assert trace.result.context_patch.state_updates == {"status": "updated"}
+    assert trace.result.context is context
+    assert context.llm_messages == [generated_message, hook_message]
 
 
-def test_on_result_hook_failure_retains_result() -> None:
+def test_trace_snapshot_captures_post_hook_values_and_is_detached() -> None:
+    output: list[str] = ["initial"]
+    message = LLMMessage.from_prompt(user="hook")
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=[],
+        state={"nested": {"items": []}},
+    )
+
+    def update_result(result: InvocationResult[list[str]]) -> None:
+        result.output.append("hook")
+        result.context.state["nested"]["items"].append("hook")
+        result.context.llm_messages.append(message)
+
+    spec = FunctionInvocationSpec(
+        invocator=lambda _value, _context: output,
+        hooks=InvocationHooks(on_result=update_result),
+    )
+
+    trace = spec.invoke("input", context)
+    snapshot = trace.snapshot_result
+
+    assert snapshot is not None
+    assert snapshot.output == ["initial", "hook"]
+    assert snapshot.state == {"nested": {"items": ["hook"]}}
+    assert snapshot.llm_messages == [message]
+
+    output.append("later")
+    context.state["nested"]["items"].append("later")
+    context.llm_messages.append(LLMMessage.from_prompt(user="later"))
+
+    assert snapshot.output == ["initial", "hook"]
+    assert snapshot.state == {"nested": {"items": ["hook"]}}
+    assert snapshot.llm_messages == [message]
+
+
+def test_snapshot_deepcopy_failure_is_recorded_without_failing_invocation() -> None:
+    class Uncopyable:
+        def __deepcopy__(self, memo):
+            raise RuntimeError("snapshot copy failed")
+
+    exception_hook_calls: list[Exception] = []
+    spec = FunctionInvocationSpec(
+        invocator=lambda _value, _context: Uncopyable(),
+        hooks=InvocationHooks(on_exception=exception_hook_calls.append),
+    )
+
+    trace = spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=[]))
+
+    assert isinstance(trace.result.output, Uncopyable)
+    assert isinstance(trace.snapshot_result, FailedSnapshot)
+    assert trace.snapshot_result.error_type == "RuntimeError"
+    assert trace.snapshot_result.message == "snapshot copy failed"
+    assert exception_hook_calls == []
+
+
+def test_on_result_hook_failure_keeps_mutations_without_rollback() -> None:
     hook_error = RuntimeError("result hook failed")
+    message = LLMMessage.from_prompt(user="mutated before failure")
+    context = ExecutionContext(
+        llm_param=None,
+        connection=None,
+        llm_messages=[],
+        state={"remove": True},
+    )
 
-    def fail_result(_result: InvocationResult[Any]) -> None:
+    def fail_result(result: InvocationResult[Any]) -> None:
+        result.context.state["added"] = True
+        del result.context.state["remove"]
+        result.context.llm_messages.append(message)
         raise hook_error
 
     spec = FunctionInvocationSpec(
@@ -313,13 +361,15 @@ def test_on_result_hook_failure_retains_result() -> None:
     )
 
     with pytest.raises(InvocationHookException) as exc_info:
-        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+        spec.invoke("input", context)
 
     assert exc_info.value.hook_name == "on_result"
     assert exc_info.value.hook_exception is hook_error
     assert exc_info.value.result is not None
     assert exc_info.value.result.output == "input"
     assert exc_info.value.exception is None
+    assert context.state == {"added": True}
+    assert context.llm_messages == [message]
 
 
 def test_on_exception_hook_failure_retains_invocation_exception() -> None:
@@ -338,7 +388,7 @@ def test_on_exception_hook_failure_retains_invocation_exception() -> None:
     )
 
     with pytest.raises(InvocationHookException) as exc_info:
-        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=()))
+        spec.invoke("input", ExecutionContext(llm_param=None, connection=None, llm_messages=[]))
 
     assert exc_info.value.hook_name == "on_exception"
     assert exc_info.value.hook_exception is hook_error

@@ -5,8 +5,8 @@ import pytest
 from pytoy_llm.task.execution import TaskExecutionHandler
 from pytoy_llm.task.execution.manager import TaskExecutionManager
 from pytoy_llm.task.models import (
-    ContextPatch,
     FunctionInvocationSpec,
+    InvocationHooks,
     InvocationResult,
     TaskRequest,
 )
@@ -48,13 +48,17 @@ def test_session_propagates_context_between_task_executions() -> None:
     execution_manager = TaskExecutionManager()
     session = create_session(session_manager, execution_manager)
 
-    def remember(value: str, _context) -> InvocationResult[str]:
-        return InvocationResult(
-            output=value, context_patch=ContextPatch(state_updates={"remembered": value})
-        )
+    def remember(value: str, context) -> InvocationResult[str]:
+        return InvocationResult(output=value, context=context)
+
+    def save_state(result: InvocationResult[str]) -> None:
+        result.context.state["remembered"] = result.output
 
     first = session.create_task(
-        TaskRequest.from_invocation_spec(FunctionInvocationSpec.from_any(remember), "first")
+        TaskRequest.from_invocation_spec(
+            FunctionInvocationSpec.from_any(remember, hooks=InvocationHooks(on_result=save_state)),
+            "first",
+        )
     )
     first.start()
     wait_for_exit(session, first.id)

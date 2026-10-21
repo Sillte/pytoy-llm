@@ -24,9 +24,11 @@ from pytoy_llm.task.models.exceptions import InvocationHookException
 from pytoy_llm.task.models.expenditures import LLMExpenditure
 from pytoy_llm.task.models.invocation_hooks import InvocationHooks
 from pytoy_llm.task.models.invocation_results import (
+    FailedSnapshot,
     InvocationInfo,
     InvocationResult,
     InvocationTrace,
+    SnapshotInvocationResult,
 )
 from pytoy_llm.task.models.metas import InvocationSpecMeta
 
@@ -65,16 +67,17 @@ def _normalize_request_creator(
 
 def to_invocation_result[T](
     output: T | InvocationResult[T],
+    execution_context: ExecutionContext,
     runtime_patch: RuntimeContextPatch | None = None,
 ) -> InvocationResult[T]:
-    if isinstance(output, InvocationResult):
-        if runtime_patch is None:
-            return output
-        return replace(output, runtime_patch=runtime_patch)
-    return InvocationResult(
-        output=output,
-        runtime_patch=runtime_patch if runtime_patch is not None else RuntimeContextPatch(),
+    result = (
+        replace(output, context=execution_context)
+        if isinstance(output, InvocationResult)
+        else InvocationResult(output=output, context=execution_context)
     )
+    if runtime_patch is not None:
+        runtime_patch.apply(execution_context)
+    return result
 
 
 def _merge_llm_param(base: LLMParam | None, override: LLMParam | None) -> LLMParam | None:
@@ -130,7 +133,16 @@ def invoke_with_hooks[T](
                     hook_exception=hook_exception,
                     result=trace.result,
                 ) from hook_exception
-        return trace
+
+        try:
+            snapshot_result = SnapshotInvocationResult.from_invocation_result(trace.result)
+        except Exception as exc:
+            snapshot_result = FailedSnapshot(
+                error_type=type(exc).__name__,
+                message=str(exc),
+            )
+
+        return trace.model_copy(update={"snapshot_result": snapshot_result})
 
 
 @dataclass(frozen=True)
@@ -149,7 +161,7 @@ class FunctionInvocationSpec[T]:
                 ToolCallActivity(tool_name="FunctionInvocationSpec", args=input)
             )
             output = self.invocator(input, execution_context)
-            result = to_invocation_result(output)
+            result = to_invocation_result(output, execution_context)
             execution_context.emitters.activity_emitter.fire(
                 ToolResultActivity(tool_name="FunctionInvocationSpec", result=result.output)
             )
@@ -277,7 +289,9 @@ class LLMInvocationSpec[T: BaseModel | str]:
             )
             output = completion_result.output
             invocation_result = to_invocation_result(
-                output, runtime_patch=RuntimeContextPatch(llm_messages=completion_result.messages)
+                output,
+                execution_context,
+                runtime_patch=RuntimeContextPatch(llm_messages=list(completion_result.messages)),
             )
             info = InvocationInfo(
                 started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta
@@ -357,7 +371,9 @@ class AgentInvocationSpec[T: BaseModel | str]:
             )
             output = agent_result.output
             invocation_result = to_invocation_result(
-                output, runtime_patch=RuntimeContextPatch(llm_messages=agent_result.messages)
+                output,
+                execution_context,
+                runtime_patch=RuntimeContextPatch(llm_messages=list(agent_result.messages)),
             )
             info = InvocationInfo(
                 started_at=starttime, ended_at=time.time(), kind=self.kind, meta=self.meta
