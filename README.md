@@ -8,7 +8,7 @@ For now, it focuses on exploring software architecture, with a particular focus 
 - Stateless LLM usage
     - Structured system prompt construction
     - Typed contracts
-    - Thin wrappers around LiteLLM and PydanticAI
+    - OpenAI SDK for completion by default, with optional LiteLLM; PydanticAI for agents
 
 - Task mechanism with state management
     - Session management
@@ -47,10 +47,12 @@ For example:
 ```json
 {
     "model": "gemini/gemini-2.5-flash",
-    "base_url": "https://generativelanguage.googleapis.com/v1beta",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "api_key": "YOUR_SECRET_KEY"
 }
 ```
+
+`completion` uses the OpenAI Chat Completions protocol by default, so `base_url` must expose an OpenAI-compatible endpoint. For example, Ollama uses `http://localhost:11434/v1`. To opt into LiteLLM's provider support, install `pytoy-llm[litellm]` and set `"completion_backend": "litellm"` in the connection file. Existing connection files default to the OpenAI backend. The `responses` protocol is not supported by `completion` yet; `run` continues to use PydanticAI's provider integrations.
 
 ### `completion` — Stateless usage
 

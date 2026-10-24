@@ -27,6 +27,11 @@ class Connection(BaseModel, frozen=True):
         Field(description="Credential Information for using LLM.", examples=["SECRET-KEY"]),
     ]
 
+    completion_backend: Annotated[
+        Literal["openai", "litellm"],
+        Field(description="Client backend used for stateless completion."),
+    ] = "openai"
+
     api_protocol: Annotated[
         Literal["completions", "responses"] | None,
         Field(

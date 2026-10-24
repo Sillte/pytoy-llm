@@ -1,1 +1,3 @@
-from .client import PytoyLiteLLMClient  # noqa
+from .client import PytoyLiteLLMClient
+
+__all__ = ["PytoyLiteLLMClient"]

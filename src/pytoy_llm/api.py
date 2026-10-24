@@ -33,7 +33,7 @@ def completion[T: BaseModel | str](
     activity_sink: LLMActivitySink | None = None,
     cancel_token: CancelToken | None = None,
 ) -> T:
-    """Execute the `litellm.completion`."""
+    """Execute a stateless LLM completion."""
     facade = LLMFacade(connection=connection, llm_param=llm_param, activity_sink=activity_sink)
     return facade.completion(request=request, output_type=output_type, cancel_token=cancel_token)
 

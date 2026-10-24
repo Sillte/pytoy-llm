@@ -1,31 +1,7 @@
 import pytest
-from litellm import ModelResponse
-from pydantic import BaseModel
 
 from pytoy_llm.models.llm_messages import LLMMessage, LLMRequest
 from pytoy_llm.models.parts import ContentPart, TextPart
-
-
-# --- Mock Data ---
-@pytest.fixture
-def mock_response():
-    # LiteLLMのModelResponseを模したデータ
-    response_data = {
-        "choices": [
-            {
-                "message": {"role": "assistant", "content": '{"answer": "fine"}'},
-                "finish_reason": "stop",
-            }
-        ],
-        "model": "gemini/gemini-2.0-flash",
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-    }
-    return ModelResponse(**response_data)
-
-
-class DummyStructuredModel(BaseModel):
-    answer: str
-
 
 # --- InputConverter Tests ---
 

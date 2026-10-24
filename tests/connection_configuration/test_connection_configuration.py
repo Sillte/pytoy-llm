@@ -27,6 +27,7 @@ def test_initialize_connection_file(client: ConnectionConfiguration, test_name: 
     content = json.loads(path.read_text())
     assert "api_key" in content
     assert content["api_key"] == "SECRET"  # 初期状態は空文字（モデルの初期化とは別）
+    assert content["base_url"] == "http://localhost:11434/v1"
 
 
 def test_get_connection_success(client, test_name):
@@ -37,6 +38,7 @@ def test_get_connection_success(client, test_name):
 
     conn = client.get_connection(test_name)
     assert isinstance(conn, Connection)
+    assert conn.completion_backend == "openai"
 
 
 def test_llm_connection_validation_error():

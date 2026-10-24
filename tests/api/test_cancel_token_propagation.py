@@ -1,13 +1,13 @@
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
-from litellm import ModelResponse
+from openai.types.chat import ChatCompletion
 
 from pytoy_llm import api
-from pytoy_llm.litellm_client.client import PytoyLiteLLMClient
 from pytoy_llm.models import CancelToken, LLMCancelException
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.parts import TextPart
+from pytoy_llm.openai_client import PytoyOpenAIClient
 
 
 def test_completion_forwards_cancel_token_to_llm_client(monkeypatch) -> None:
@@ -15,39 +15,59 @@ def test_completion_forwards_cancel_token_to_llm_client(monkeypatch) -> None:
     client = Mock()
     client.return_value = client
     client.completion.return_value = "result"
-    monkeypatch.setattr("pytoy_llm.llm_facade.PytoyLiteLLMClient", client)
+    monkeypatch.setattr("pytoy_llm.llm_facade.PytoyOpenAIClient", client)
 
-    result = api.completion("hello", cancel_token=cancel_token)
-
-    assert result == "result"
-    assert client.call_args.kwargs["cancel_token"] is cancel_token
-
-
-def test_litellm_client_raises_cancellation_after_completion(monkeypatch) -> None:
-    cancel_token = CancelToken()
-    client = PytoyLiteLLMClient(
-        Connection(
+    result = api.completion(
+        "hello",
+        connection=Connection(
             model="openai/test-model",
-            base_url="https://example.com",
+            base_url="https://example.com/v1",
             api_key="test-key",
         ),
         cancel_token=cancel_token,
     )
 
-    def complete(**_kwargs):
-        cancel_token.set()
-        return ModelResponse(
-            choices=[
+    assert result == "result"
+    assert client.call_args.kwargs["cancel_token"] is cancel_token
+
+
+def test_openai_client_raises_cancellation_after_completion(monkeypatch) -> None:
+    cancel_token = CancelToken()
+    client = PytoyOpenAIClient(
+        Connection(
+            model="openai/test-model",
+            base_url="https://example.com/v1",
+            api_key="test-key",
+        ),
+        cancel_token=cancel_token,
+    )
+    response = ChatCompletion.model_validate(
+        {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "created": 1,
+            "model": "test-model",
+            "choices": [
                 {
+                    "index": 0,
                     "message": {"role": "assistant", "content": "completed response"},
                     "finish_reason": "stop",
                 }
             ],
-            model="openai/test-model",
-            usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
-        )
+            "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+        }
+    )
+    fake_client = MagicMock()
+    fake_client.__enter__.return_value = fake_client
+    fake_client.chat.completions.create.return_value = response
+    monkeypatch.setattr("pytoy_llm.openai_client.client.OpenAI", Mock(return_value=fake_client))
+    fake_client.chat.completions.parse.side_effect = AssertionError("unexpected structured parse")
 
-    monkeypatch.setattr("litellm.completion", complete)
+    def complete(**_kwargs):
+        cancel_token.set()
+        return response
+
+    fake_client.chat.completions.create.side_effect = complete
 
     with pytest.raises(LLMCancelException) as exc_info:
         client.completion_with_result("hello", output_type=str)
