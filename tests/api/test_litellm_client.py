@@ -5,9 +5,16 @@ import pytest
 from pytoy_llm.models.connections import Connection
 
 
-def test_litellm_client_completes_with_its_optional_dependency(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+        None,
+    ],
+)
+def test_litellm_client_completes_with_its_optional_dependency(monkeypatch, usage) -> None:
     litellm = pytest.importorskip("litellm")
-    client_module = importlib.import_module("pytoy_llm.litellm_client")
+    client_module = importlib.import_module("pytoy_llm.completion_clients.litellm_client")
     response = litellm.ModelResponse(
         choices=[
             {
@@ -16,7 +23,7 @@ def test_litellm_client_completes_with_its_optional_dependency(monkeypatch) -> N
             }
         ],
         model="openai/test-model",
-        usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+        usage=usage,
     )
     monkeypatch.setattr(litellm, "completion", lambda **_kwargs: response)
     client = client_module.PytoyLiteLLMClient(
@@ -27,6 +34,11 @@ def test_litellm_client_completes_with_its_optional_dependency(monkeypatch) -> N
             completion_backend="litellm",
         )
     )
+
+    if usage is None:
+        with pytest.raises(ValueError, match="Response is strange"):
+            client.completion_with_result("hello", output_type=str)
+        return
 
     result = client.completion_with_result("hello", output_type=str)
 

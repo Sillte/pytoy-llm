@@ -1,36 +1,45 @@
+from typing import Any
 from unittest.mock import MagicMock, Mock
 
 from openai.types.chat import ChatCompletion, ParsedChatCompletion
 from pydantic import BaseModel
 
+from pytoy_llm.completion_clients.openai_client import PytoyOpenAIClient
+from pytoy_llm.models import LLMTokens
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMRequest
 from pytoy_llm.models.llm_metas import LLMParam
-from pytoy_llm.openai_client import PytoyOpenAIClient
 
 
 class StructuredOutput(BaseModel):
     answer: str
 
 
-def make_response(content: str) -> ChatCompletion:
-    return ChatCompletion.model_validate(
-        {
-            "id": "chatcmpl-test",
-            "object": "chat.completion",
-            "created": 1,
-            "model": "test-model",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": content},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
-        }
-    )
+def make_response(
+    content: str,
+    cached_tokens: int | None = None,
+    include_usage: bool = True,
+) -> ChatCompletion:
+    usage: dict[str, Any] = {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3}
+    if cached_tokens is not None:
+        usage["prompt_tokens_details"] = {"cached_tokens": cached_tokens}
+    response: dict[str, Any] = {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "test-model",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }
+        ],
+    }
+    if include_usage:
+        response["usage"] = usage
+    return ChatCompletion.model_validate(response)
 
 
 def test_openai_client_sends_openai_compatible_chat_completion(monkeypatch) -> None:
@@ -41,7 +50,9 @@ def test_openai_client_sends_openai_compatible_chat_completion(monkeypatch) -> N
     fake_client.__enter__.return_value = fake_client
     fake_client.chat.completions = completion_endpoint
     openai_constructor = Mock(return_value=fake_client)
-    monkeypatch.setattr("pytoy_llm.openai_client.client.OpenAI", openai_constructor)
+    monkeypatch.setattr(
+        "pytoy_llm.completion_clients.openai_client.client.OpenAI", openai_constructor
+    )
     client = PytoyOpenAIClient(
         Connection(
             model="openai/test-model",
@@ -105,7 +116,9 @@ def test_openai_client_uses_sdk_parsing_for_structured_output(monkeypatch) -> No
     fake_client = MagicMock()
     fake_client.__enter__.return_value = fake_client
     fake_client.chat.completions.parse.return_value = response
-    monkeypatch.setattr("pytoy_llm.openai_client.client.OpenAI", Mock(return_value=fake_client))
+    monkeypatch.setattr(
+        "pytoy_llm.completion_clients.openai_client.client.OpenAI", Mock(return_value=fake_client)
+    )
     client = PytoyOpenAIClient(
         Connection(model="test-model", base_url="https://example.com/v1", api_key="test-key")
     )
@@ -116,14 +129,14 @@ def test_openai_client_uses_sdk_parsing_for_structured_output(monkeypatch) -> No
     fake_client.chat.completions.parse.assert_called_once()
 
 
-def test_openai_client_emits_request_and_response_activities(monkeypatch) -> None:
-    response = make_response("hello")
-    completion_endpoint = Mock()
-    completion_endpoint.create.return_value = response
+def test_openai_client_accepts_missing_usage(monkeypatch) -> None:
+    response = make_response("hello", include_usage=False)
     fake_client = MagicMock()
     fake_client.__enter__.return_value = fake_client
-    fake_client.chat.completions = completion_endpoint
-    monkeypatch.setattr("pytoy_llm.openai_client.client.OpenAI", Mock(return_value=fake_client))
+    fake_client.chat.completions.create.return_value = response
+    monkeypatch.setattr(
+        "pytoy_llm.completion_clients.openai_client.client.OpenAI", Mock(return_value=fake_client)
+    )
     emitters = LLMEventEmitters()
     activities = []
     emitters.on_activity.subscribe(activities.append)
@@ -132,10 +145,36 @@ def test_openai_client_emits_request_and_response_activities(monkeypatch) -> Non
         event_emitters=emitters,
     )
 
-    client.completion("hello", output_type=str)
+    result = client.completion_with_result("hello", output_type=str)
 
+    assert result.meta.tokens == LLMTokens(prompt=0, completion=0, total=0)
+    assert activities[-1].tokens == result.meta.tokens
+
+
+def test_openai_client_emits_request_and_response_activities(monkeypatch) -> None:
+    response = make_response("hello", cached_tokens=3)
+    completion_endpoint = Mock()
+    completion_endpoint.create.return_value = response
+    fake_client = MagicMock()
+    fake_client.__enter__.return_value = fake_client
+    fake_client.chat.completions = completion_endpoint
+    monkeypatch.setattr(
+        "pytoy_llm.completion_clients.openai_client.client.OpenAI", Mock(return_value=fake_client)
+    )
+    emitters = LLMEventEmitters()
+    activities = []
+    emitters.on_activity.subscribe(activities.append)
+    client = PytoyOpenAIClient(
+        Connection(model="test-model", base_url="https://example.com/v1", api_key="test-key"),
+        event_emitters=emitters,
+    )
+
+    result = client.completion_with_result("hello", output_type=str)
+
+    assert result.meta.tokens.cache_read == 3
     assert [activity.activity_type for activity in activities] == [
         "pre_api_call",
         "post_api_call",
         "response_activity",
     ]
+    assert activities[-1].tokens.cache_read == 3

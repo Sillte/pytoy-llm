@@ -1,8 +1,11 @@
-from typing import Any, Protocol
-
 from pydantic import BaseModel
 
-from pytoy_llm.connection_configuration import DEFAULT_NAME, ConnectionConfiguration
+from pytoy_llm.completion_clients import (
+    CompletionClient,
+    CompletionClientFactory,
+    DefaultCompletionClientFactory,
+)
+from pytoy_llm.connection_configuration import DEFAULT_NAME
 from pytoy_llm.models import CancelToken, LLMRequestLike, LLMResult
 from pytoy_llm.models.agent_metas import UsageLimit
 from pytoy_llm.models.connections import Connection
@@ -10,22 +13,7 @@ from pytoy_llm.models.llm_activities import LLMActivitySink
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_metas import LLMParam
 from pytoy_llm.models.llm_tools import LLMToolsLike
-from pytoy_llm.openai_client import PytoyOpenAIClient
 from pytoy_llm.pydantic_agent.agent import PytoyPydanticAIAgent
-
-
-class _CompletionClient(Protocol):
-    def completion[T: BaseModel | str](
-        self,
-        request: LLMRequestLike,
-        output_type: type[T],
-    ) -> T: ...
-
-    def completion_with_result[T: BaseModel | str](
-        self,
-        request: LLMRequestLike,
-        output_type: type[T],
-    ) -> LLMResult[T]: ...
 
 
 class LLMFacade:
@@ -35,36 +23,27 @@ class LLMFacade:
         llm_param: LLMParam | None = None,
         activity_sink: LLMActivitySink | None = None,
         event_emitters: LLMEventEmitters | None = None,
+        *,
+        completion_client_factory: CompletionClientFactory | None = None,
     ) -> None:
         self.connection: str | Connection | None = connection
         self.llm_param: LLMParam | None = llm_param
         self.event_emitters = event_emitters or LLMEventEmitters()
+        self._completion_client_factory = (
+            completion_client_factory
+            if completion_client_factory is not None
+            else DefaultCompletionClientFactory()
+        )
+
         if activity_sink is not None:
             self.event_emitters.on_activity.subscribe(activity_sink.emit)
 
     def _resolve_connection(self) -> str | Connection:
         return self.connection or DEFAULT_NAME
 
-    def _create_completion_client(self, cancel_token: CancelToken | None) -> _CompletionClient:
-        connection = self._resolve_connection()
-        if isinstance(connection, str):
-            connection = ConnectionConfiguration().get_connection(connection)
-
-        client_type: Any = PytoyOpenAIClient
-        if connection.completion_backend == "litellm":
-            try:
-                from pytoy_llm.litellm_client import PytoyLiteLLMClient
-            except ModuleNotFoundError as error:
-                if error.name != "litellm":
-                    raise
-                raise ImportError(
-                    "The LiteLLM backend requires the optional dependency. "
-                    "Install it with `pip install pytoy-llm[litellm]`."
-                ) from error
-            client_type = PytoyLiteLLMClient
-
-        return client_type(
-            connection,
+    def _create_completion_client(self, cancel_token: CancelToken | None) -> CompletionClient:
+        return self._completion_client_factory.create(
+            connection=self._resolve_connection(),
             llm_param=self.llm_param,
             event_emitters=self.event_emitters,
             cancel_token=cancel_token,

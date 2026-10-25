@@ -4,31 +4,22 @@ import pytest
 from openai.types.chat import ChatCompletion
 
 from pytoy_llm import api
+from pytoy_llm.completion_clients.openai_client import PytoyOpenAIClient
 from pytoy_llm.models import CancelToken, LLMCancelException
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.parts import TextPart
-from pytoy_llm.openai_client import PytoyOpenAIClient
 
 
-def test_completion_forwards_cancel_token_to_llm_client(monkeypatch) -> None:
+def test_completion_forwards_cancel_token_to_facade(monkeypatch) -> None:
     cancel_token = CancelToken()
-    client = Mock()
-    client.return_value = client
-    client.completion.return_value = "result"
-    monkeypatch.setattr("pytoy_llm.llm_facade.PytoyOpenAIClient", client)
+    facade = Mock()
+    facade.completion.return_value = "result"
+    monkeypatch.setattr(api, "LLMFacade", Mock(return_value=facade))
 
-    result = api.completion(
-        "hello",
-        connection=Connection(
-            model="openai/test-model",
-            base_url="https://example.com/v1",
-            api_key="test-key",
-        ),
-        cancel_token=cancel_token,
-    )
+    result = api.completion("hello", cancel_token=cancel_token)
 
     assert result == "result"
-    assert client.call_args.kwargs["cancel_token"] is cancel_token
+    assert facade.completion.call_args.kwargs["cancel_token"] is cancel_token
 
 
 def test_openai_client_raises_cancellation_after_completion(monkeypatch) -> None:
@@ -60,7 +51,9 @@ def test_openai_client_raises_cancellation_after_completion(monkeypatch) -> None
     fake_client = MagicMock()
     fake_client.__enter__.return_value = fake_client
     fake_client.chat.completions.create.return_value = response
-    monkeypatch.setattr("pytoy_llm.openai_client.client.OpenAI", Mock(return_value=fake_client))
+    monkeypatch.setattr(
+        "pytoy_llm.completion_clients.openai_client.client.OpenAI", Mock(return_value=fake_client)
+    )
     fake_client.chat.completions.parse.side_effect = AssertionError("unexpected structured parse")
 
     def complete(**_kwargs):

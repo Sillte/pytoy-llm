@@ -52,7 +52,7 @@ For example:
 }
 ```
 
-`completion` uses the OpenAI Chat Completions protocol by default, so `base_url` must expose an OpenAI-compatible endpoint. For example, Ollama uses `http://localhost:11434/v1`. To opt into LiteLLM's provider support, install `pytoy-llm[litellm]` and set `"completion_backend": "litellm"` in the connection file. Existing connection files default to the OpenAI backend. The `responses` protocol is not supported by `completion` yet; `run` continues to use PydanticAI's provider integrations.
+`completion` uses the OpenAI Chat Completions protocol by default, so `base_url` must expose an OpenAI-compatible endpoint. For example, Ollama uses `http://localhost:11434/v1`. To opt into LiteLLM's provider support, install `pytoy-llm[litellm]` and set `"completion_backend": "litellm"` in the connection file. Existing connection files default to the OpenAI backend. `LLMFacade` accepts a `CompletionClientFactory` through `completion_client_factory` for dependency injection. The `responses` protocol is not supported by `completion` yet; `run` continues to use PydanticAI's provider integrations.
 
 ### `completion` — Stateless usage
 

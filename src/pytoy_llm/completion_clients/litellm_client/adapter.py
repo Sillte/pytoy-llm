@@ -39,7 +39,7 @@ class LiteLLMTransactionAdapter:
     ) -> LLMResult[T]:
 
         response = cast(litellm.TextCompletionResponse, llm_response)
-        usage = response.usage
+        usage = getattr(response, "usage", None)
         if usage is None:
             raise ValueError("Response is strange.")
         tokens = LLMTokens(

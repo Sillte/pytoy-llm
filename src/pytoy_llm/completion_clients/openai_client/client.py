@@ -6,6 +6,13 @@ from uuid import uuid4
 from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 
+from pytoy_llm.completion_clients.openai_client.adapter import (
+    LLMParamConverter,
+    OpenAICompletion,
+    OpenAITransactionAdapter,
+    usage_to_llm_tokens,
+)
+from pytoy_llm.completion_clients.protocol import CompletionClient
 from pytoy_llm.connection_configuration import ConnectionConfiguration
 from pytoy_llm.models import CancelToken, LLMCancelException
 from pytoy_llm.models.connections import Connection
@@ -16,15 +23,10 @@ from pytoy_llm.models.llm_activities import (
 )
 from pytoy_llm.models.llm_events import LLMEventEmitters
 from pytoy_llm.models.llm_messages import LLMRequest, LLMRequestLike, LLMResult
-from pytoy_llm.models.llm_metas import LLMParam, LLMTokens
-from pytoy_llm.openai_client.adapter import (
-    LLMParamConverter,
-    OpenAICompletion,
-    OpenAITransactionAdapter,
-)
+from pytoy_llm.models.llm_metas import LLMParam
 
 
-class PytoyOpenAIClient:
+class PytoyOpenAIClient(CompletionClient):
     """OpenAI-compatible Chat Completions client for pytoy-llm."""
 
     def __init__(
@@ -144,22 +146,7 @@ class PytoyOpenAIClient:
         self._event_emitters.emit_activity(activity)
 
     def _emit_response(self, response: OpenAICompletion, trace_id: str) -> None:
-        usage = response.usage
-        prompt_details = getattr(usage, "prompt_tokens_details", None)
-        if usage is None:
-            tokens = None
-        else:
-            cache_read = getattr(prompt_details, "cached_tokens", None)
-            if cache_read is None:
-                cache_read = getattr(usage, "cache_read_input_tokens", None)
-            tokens = LLMTokens(
-                prompt=usage.prompt_tokens,
-                completion=usage.completion_tokens,
-                total=usage.total_tokens,
-                cache_read=cache_read,
-                cache_write=getattr(prompt_details, "cache_write_tokens", None)
-                or getattr(usage, "cache_creation_input_tokens", None),
-            )
+        tokens = usage_to_llm_tokens(response.usage)
         try:
             content = response.choices[0].message.content
             if not isinstance(content, str):

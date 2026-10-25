@@ -143,7 +143,7 @@ class LiteLLMEventHandler(CustomLogger):
 
     def _to_response_activity(self, response_obj) -> LLMResponseActivity | LLMMinimumActivity:
         try:
-            usage = response_obj.usage
+            usage = getattr(response_obj, "usage", None)
             if usage:
                 tokens = LLMTokens(
                     prompt=usage.prompt_tokens,

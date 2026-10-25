@@ -3,9 +3,13 @@ from typing import cast
 from litellm import ModelResponse
 from pydantic import BaseModel
 
+from pytoy_llm.completion_clients.litellm_client.adapter import (
+    LiteLLMTransactionAdapter,
+    LLMParamConverter,
+)
+from pytoy_llm.completion_clients.litellm_client.event_handler import LiteLLMEventHandler
+from pytoy_llm.completion_clients.protocol import CompletionClient
 from pytoy_llm.connection_configuration import ConnectionConfiguration
-from pytoy_llm.litellm_client.adapter import LiteLLMTransactionAdapter, LLMParamConverter
-from pytoy_llm.litellm_client.event_handler import LiteLLMEventHandler
 from pytoy_llm.models import CancelToken, LLMCancelException
 from pytoy_llm.models.connections import Connection
 from pytoy_llm.models.llm_events import LLMEventEmitters
@@ -13,7 +17,7 @@ from pytoy_llm.models.llm_messages import LLMRequest, LLMRequestLike, LLMResult
 from pytoy_llm.models.llm_metas import LLMParam
 
 
-class PytoyLiteLLMClient:
+class PytoyLiteLLMClient(CompletionClient):
     """
     LLM Client for `vim-pytoy`.
 

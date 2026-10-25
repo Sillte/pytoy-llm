@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from openai.types.chat import ChatCompletion, ParsedChatCompletion
+from openai.types.completion_usage import CompletionUsage
 from pydantic import BaseModel
 
 from pytoy_llm.json_codecs import CompletionMessagesCodec
@@ -11,6 +12,25 @@ from pytoy_llm.models.llm_metas import LLMOutputMeta, LLMParam, LLMTokens
 from pytoy_llm.models.parts import SystemPromptHistoryPart
 
 OpenAICompletion = ChatCompletion | ParsedChatCompletion[Any]
+
+
+def usage_to_llm_tokens(usage: CompletionUsage | None) -> LLMTokens:
+    if usage is None:
+        return LLMTokens(prompt=0, completion=0, total=0)
+
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
+    cache_read = getattr(prompt_details, "cached_tokens", None)
+    if cache_read is None:
+        cache_read = getattr(usage, "cache_read_input_tokens", None)
+
+    return LLMTokens(
+        prompt=usage.prompt_tokens,
+        completion=usage.completion_tokens,
+        total=usage.total_tokens,
+        cache_read=cache_read,
+        cache_write=getattr(prompt_details, "cache_write_tokens", None)
+        or getattr(usage, "cache_creation_input_tokens", None),
+    )
 
 
 class OpenAITransactionAdapter:
@@ -44,21 +64,7 @@ class OpenAITransactionAdapter:
             else:
                 raise ValueError("Response did not contain structured output.")
 
-        usage = llm_response.usage
-        if usage is None:
-            raise ValueError("Response is strange: token usage is missing.")
-        prompt_details = getattr(usage, "prompt_tokens_details", None)
-        cache_read = getattr(prompt_details, "cached_tokens", None)
-        if cache_read is None:
-            cache_read = getattr(usage, "cache_read_input_tokens", None)
-        tokens = LLMTokens(
-            prompt=usage.prompt_tokens,
-            completion=usage.completion_tokens,
-            total=usage.total_tokens,
-            cache_read=cache_read,
-            cache_write=getattr(prompt_details, "cache_write_tokens", None)
-            or getattr(usage, "cache_creation_input_tokens", None),
-        )
+        tokens = usage_to_llm_tokens(llm_response.usage)
         meta = LLMOutputMeta(
             tokens=tokens,
             finish_reason=choice.finish_reason,
