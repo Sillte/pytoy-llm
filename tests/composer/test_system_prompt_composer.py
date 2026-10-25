@@ -7,10 +7,7 @@ from pytoy_llm.composers.materials.models import (
     MaterialUsage,
     build_material_sections,
 )
-from pytoy_llm.materials.models import (
-    ModelMaterialData,
-    TextMaterialData,
-)
+from pytoy_llm.materials.models import JsonMaterialData, TextMaterialData
 from pytoy_llm.models.llm_messages import LLMMessage
 
 
@@ -61,7 +58,7 @@ def test_system_prompt_composer_with_material_sections():
         content="This is a long example sentence that could be improved.",
     )
 
-    model_material = ModelMaterialData[SampleModel](
+    model_material = JsonMaterialData.from_basemodel(
         description="Sample model instances.",
         instances=[
             SampleModel(name="a", value=1),

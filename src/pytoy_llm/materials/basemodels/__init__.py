@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel
 
-from pytoy_llm.materials.models import ModelMaterialData, TextMaterialData
+from pytoy_llm.materials.models import JsonMaterialData, TextMaterialData
 
 
 class BaseModelMaterial[T: BaseModel](BaseModel, frozen=True):
@@ -17,18 +17,18 @@ class BaseModelMaterial[T: BaseModel](BaseModel, frozen=True):
         return TextMaterialData(content=structured_text, description=description)
 
     @property
-    def model_material_data(self) -> ModelMaterialData:
+    def json_material_data(self) -> JsonMaterialData:
         # Note: This requires a memory space of
         # text data.
         # If we would like to use the big data,
         # `chunk` or `iter` iteration is necessary regarding `data`.
-        return ModelMaterialData(description=self.description, instances=self.data)
+        return JsonMaterialData.from_basemodel(description=self.description, instances=self.data)
 
     @property
     def description(self) -> str:
         description = (
             "This section contains multiple instances of `pydantic.BaseModel`\n"
-            "Both of Json Schemas and Json Data are given as below."
+            "A JSON Schema and the JSON data are provided below."
         )
         return description
 

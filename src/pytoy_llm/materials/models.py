@@ -1,9 +1,13 @@
+import builtins
 import json
 import warnings
 from collections.abc import Sequence
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self, Union, cast
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue, TypeAdapter
+from typing_extensions import TypeForm
+
+_JSON_VALUE_ADAPTER = TypeAdapter(JsonValue)
 
 type StructuredText = Annotated[
     str,
@@ -48,70 +52,12 @@ class TextMaterialData(BaseModel, frozen=True):
         return _join_blocks([header_description, self.description, header_content, self.content])
 
 
-class ModelMaterialData[T: BaseModel](BaseModel, frozen=True):
-    """
-    Material data represented as JSON instances with their JSON Schema.
-
-    The instances provide concrete examples of the material,
-    while the JSON Schema describes their structure and fields.
-    """
-
-    description: Annotated[
-        str, Field(description="Human-readable explanation of the section's purpose and contents.")
-    ]
-    instances: Sequence[T] = Field(
-        ...,
-        description="Concrete JSON instances representing the material.",
-    )
-    schema_model: Annotated[
-        type[T] | None,
-        Field(
-            description=(
-                "Optional model used to generate the JSON Schema describing "
-                "the structure of the material. If omitted, the schema is "
-                "inferred from the provided instances."
-            )
-        ),
-    ] = None
-
-    type: Literal["model"] = "model"
-
-    def compose_explanation(self, parent_header_depth: int) -> str:
-
-        sub_header_depth = parent_header_depth + 1
-        sub_header_prefix = "#" * sub_header_depth
-        warn_forbidden_headers(self.description, sub_header_depth)
-        blocks = [f"{sub_header_prefix} Description", self.description]
-
-        if self.schema_model is None and (not self.instances):
-            return _join_blocks([*blocks, "No data exists"])
-
-        json_schemas = (
-            [self.schema_model.model_json_schema()]
-            if self.schema_model
-            else [cls.model_json_schema() for cls in set(type(item) for item in self.instances)]
-        )
-        schema_fragments = "\n\n".join(
-            "\n```json\n" + json.dumps(schema, indent=2, ensure_ascii=False) + "\n```"
-            for schema in json_schemas
-        )
-        blocks = [*blocks, f"{sub_header_prefix} JSON Schemas", schema_fragments]
-
-        data_parts = [f"```json\n{item.model_dump_json()}```" for item in self.instances]
-        if data_parts:
-            json_instance_str = "\n".join(data_parts)
-        else:
-            json_instance_str = "**NO DATA**"
-        blocks = [*blocks, f"{sub_header_prefix} JSON Instances", json_instance_str]
-        return _join_blocks(blocks)
-
-
 class JsonMaterialData(BaseModel, frozen=True):
     """
-    Material data represented by a JSON instance accompanied by its JSON Schema.
+    Material data represented by JSON data accompanied by its JSON Schema.
 
     The JSON Schema describes the structure of the data, while the JSON
-    instance provides the concrete data to be presented to the LLM.
+    value provides the concrete data to be presented to the LLM.
     """
 
     description: Annotated[
@@ -134,6 +80,35 @@ class JsonMaterialData(BaseModel, frozen=True):
     ]
 
     type: Literal["json"] = "json"
+
+    @classmethod
+    def from_basemodel[T: BaseModel](
+        cls,
+        description: str,
+        instances: Sequence[T],
+        schema_model: builtins.type[T] | None = None,
+    ) -> Self:
+        model_types = tuple(dict.fromkeys(type(instance) for instance in instances))
+        if schema_model is not None:
+            model_types = (schema_model,)
+
+        if model_types:
+            instance_type = cast(
+                TypeForm[BaseModel],
+                model_types[0] if len(model_types) == 1 else Union[model_types],
+            )
+            item_schema = TypeAdapter(instance_type).json_schema()
+            definitions = item_schema.pop("$defs", None)
+            json_schema = {"type": "array", "items": item_schema}
+            if definitions is not None:
+                json_schema["$defs"] = definitions
+        else:
+            json_schema = {"type": "array", "items": {}}
+
+        data = _JSON_VALUE_ADAPTER.validate_python(
+            [instance.model_dump(mode="json") for instance in instances]
+        )
+        return cls(description=description, json_schema=json_schema, data=data)
 
     def compose_explanation(self, parent_header_depth: int) -> str:
         """Compose the material body under a parent Markdown section."""
@@ -161,7 +136,7 @@ class JsonMaterialData(BaseModel, frozen=True):
         )
 
 
-type MaterialData = TextMaterialData | ModelMaterialData | JsonMaterialData
+type MaterialData = TextMaterialData | JsonMaterialData
 
 
 def _compose_json_block(value: JsonValue) -> str:

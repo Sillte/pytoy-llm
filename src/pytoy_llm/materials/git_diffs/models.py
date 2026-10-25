@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, BeforeValidator, Field
 
-from pytoy_llm.materials.models import ModelMaterialData, StructuredText, TextMaterialData
+from pytoy_llm.materials.models import JsonMaterialData, StructuredText, TextMaterialData
 
 
 def check_relative_path(v: Any) -> Path:
@@ -166,7 +166,7 @@ class DiffMaterial(BaseModel, frozen=True):
         return TextMaterialData(content=structured_text, description=description)
 
     @property
-    def model_material_data(self) -> ModelMaterialData:
+    def json_material_data(self) -> JsonMaterialData:
         """Raw BaseModel representation of the diff bundle."""
         timestamp = time.time()
         description = (
@@ -174,7 +174,10 @@ class DiffMaterial(BaseModel, frozen=True):
             f"Current Timestamp: {timestamp} / {datetime.fromtimestamp(timestamp).isoformat()}\n"
             f"Root location of the instances: {self.root_location}\n"
         )
-        return ModelMaterialData(description=description, instances=self.file_diffs)
+        return JsonMaterialData.from_basemodel(
+            description=description,
+            instances=self.file_diffs,
+        )
 
 
 class GitDiffMaterialQuery(BaseModel, frozen=True):

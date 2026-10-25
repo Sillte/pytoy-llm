@@ -81,7 +81,7 @@ class LiteLLMTransactionAdapter:
             ]
         else:
             messages = [*request.messages, output_message]
-        return cast(LLMResult[T], LLMResult(output=content, meta=meta, messages=messages))
+        return LLMResult(output=content, meta=meta, messages=messages)
 
 
 class LLMParamConverter:

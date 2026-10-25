@@ -7,7 +7,7 @@ from typing import Annotated, Any, Self
 from pydantic import BaseModel, BeforeValidator, Field
 
 from pytoy_llm.foundation.paths import PathTree
-from pytoy_llm.materials.models import ModelMaterialData, TextMaterialData
+from pytoy_llm.materials.models import JsonMaterialData, TextMaterialData
 
 
 def check_relative_path(v: Any) -> Path:
@@ -99,8 +99,11 @@ class TextFilesMaterial(BaseModel, frozen=True):
         return TextMaterialData(content=structured_text, description=description)
 
     @property
-    def model_material_data(self) -> ModelMaterialData:
-        return ModelMaterialData(description="Collection of text files", instances=self.files)
+    def json_material_data(self) -> JsonMaterialData:
+        return JsonMaterialData.from_basemodel(
+            description="Collection of text files",
+            instances=self.files,
+        )
 
     def _make_structured_text(self, with_tree: bool = False) -> str:
         lines = []

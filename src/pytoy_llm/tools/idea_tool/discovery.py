@@ -1,4 +1,4 @@
-from typing import Callable, Sequence
+from typing import Any, Callable, Sequence
 
 from pytoy_llm.idea import IdeaSpace, ShouldBeSpacePathError
 from pytoy_llm.tools.errors import ToolError, ToolErrorKind
@@ -23,7 +23,7 @@ class IdeaDiscovery:
         self._get_idea_space = get_idea_space
 
     @property
-    def tools(self) -> Sequence[Callable]:
+    def tools(self) -> Sequence[Any]:
         return [
             self.get_idea_space_paths_with_conventions,
             self.get_sub_idea_spaces,

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 from urllib.parse import unquote
 
 from pydantic import AwareDatetime
@@ -133,7 +133,7 @@ class IdeaInspection:
         self._local_path_resolver = local_path_resolver
 
     @property
-    def tools(self) -> Sequence[Callable]:
+    def tools(self) -> Sequence[Any]:
         return [
             self.get_idea_space_convention,
             self.get_effective_conventions,

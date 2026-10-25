@@ -1,15 +1,42 @@
 from pathlib import Path
+from typing import Any, Iterable, Iterator
+
+from pydantic import JsonValue
 
 from pytoy_llm.idea import IdeaNote, MetadataSerializationError, TextPosition
 from pytoy_llm.idea.domain.metadata import MetaDataProtocol
 
 
 class FailingMetadata(MetaDataProtocol):
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {"key": "value"}
+
+    def __getitem__(self, key: str) -> Any:
+        return self._data[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._data[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self._data[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
+
     def __len__(self) -> int:
-        return 1
+        return len(self._data)
+
+    def keys(self) -> Iterable[str]:
+        return self._data.keys()
 
     def as_text(self) -> str:
         raise MetadataSerializationError("cannot serialize")
+
+    def as_dict(self) -> dict[str, JsonValue]:
+        return self._data
+
+    def clear(self) -> None:
+        self._data.clear()
 
 
 def test_note_parses_front_matter_and_preserves_body_offset() -> None:

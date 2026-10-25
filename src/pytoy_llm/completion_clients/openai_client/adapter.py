@@ -88,7 +88,7 @@ class OpenAITransactionAdapter:
         else:
             messages = [*request.messages, output_message]
 
-        return cast(LLMResult[T], LLMResult(output=output, meta=meta, messages=messages))
+        return LLMResult(output=output, meta=meta, messages=messages)
 
 
 class LLMParamConverter:
