@@ -20,7 +20,9 @@ class LiteLLMTransactionAdapter:
         self,
         request: LLMRequest,
     ) -> list[dict[str, Any]]:
-        dict_arrays = sum((self._codec.to_native(elem) for elem in request.messages), [])
+        dict_arrays = [
+            native for message in request.messages for native in self._codec.to_native(message)
+        ]
         if request.system_prompt:
             row = {"role": "system", "content": request.system_prompt.content}
             dict_arrays.insert(0, row)
@@ -41,28 +43,30 @@ class LiteLLMTransactionAdapter:
         response = cast(litellm.TextCompletionResponse, llm_response)
         usage = getattr(response, "usage", None)
         if usage is None:
-            raise ValueError("Response is strange.")
-        tokens = LLMTokens(
-            prompt=usage.prompt_tokens,
-            completion=usage.completion_tokens,
-            total=usage.total_tokens,
-            cache_read=getattr(usage, "cache_read_input_tokens", None),
-            cache_write=getattr(usage, "cache_creation_input_tokens", None)
-            or getattr(getattr(usage, "prompt_tokens_details", None), "cache_write_tokens", None),
-        )
+            tokens = LLMTokens(prompt=0, completion=0, total=0, usage_missing=True)
+        else:
+            tokens = LLMTokens(
+                prompt=usage.prompt_tokens,
+                completion=usage.completion_tokens,
+                total=usage.total_tokens,
+                cache_read=getattr(usage, "cache_read_input_tokens", None),
+                cache_write=getattr(usage, "cache_creation_input_tokens", None)
+                or getattr(
+                    getattr(usage, "prompt_tokens_details", None), "cache_write_tokens", None
+                ),
+            )
         finish_reason = response.choices[0].finish_reason
         meta = LLMOutputMeta(tokens=tokens, finish_reason=finish_reason, llm_calls=1)
 
         choices = cast(litellm.Choices, response.choices)
         choice = choices[0]
-        content = choice.message.content
-        content = cast(str, content)
+        raw_content = choice.message.content
 
         if output_type is str:
-            content = str(content)
+            content = str(raw_content)
         else:
             t_output_type = cast(T, output_type)
-            content = cast(T, t_output_type.model_validate_json(content))  # type:ignore
+            content = cast(T, t_output_type.model_validate_json(raw_content))  # type:ignore
         output_message = self.from_native(choice.message, kind="response")
         if request.system_prompt and request.system_prompt.as_history and request.messages:
             last_message = list(request.messages)[-1]

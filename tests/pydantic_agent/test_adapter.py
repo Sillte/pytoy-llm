@@ -1,9 +1,13 @@
 import pytest
-from pydantic_ai import ModelRequest, ToolReturnPart
+from pydantic_ai import ModelRequest, ModelResponse, ToolReturnPart
+from pydantic_ai.usage import RequestUsage, RunUsage
 
-from pytoy_llm.models import LLMMessage
+from pytoy_llm.models import LLMMessage, LLMTokens
 from pytoy_llm.models.parts import ContentPart, ToolResultPart
-from pytoy_llm.pydantic_agent.adapter import PydanticAIMessageAdapter
+from pytoy_llm.pydantic_agent.adapter import (
+    PydanticAIMessageAdapter,
+    _run_usage_to_llm_tokens,
+)
 
 
 def test_request_content_part_is_not_converted() -> None:
@@ -57,3 +61,22 @@ def test_tool_return_converts_to_tool_result_part() -> None:
     assert part.call_id == "call-1"
     assert part.tool_name == "weather"
     assert part.result == '{"temperature": 20}'
+
+
+def test_run_usage_marks_missing_if_any_response_has_no_token_counts() -> None:
+    usage = RunUsage(requests=2, input_tokens=10, output_tokens=4)
+    messages = [
+        ModelResponse(parts=[], usage=RequestUsage(input_tokens=10, output_tokens=4)),
+        ModelResponse(parts=[]),
+    ]
+
+    result = _run_usage_to_llm_tokens(usage, messages)
+
+    assert result == LLMTokens(
+        prompt=10,
+        completion=4,
+        total=14,
+        cache_read=0,
+        cache_write=0,
+        usage_missing=False,
+    )

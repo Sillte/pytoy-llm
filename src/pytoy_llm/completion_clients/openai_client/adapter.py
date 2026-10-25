@@ -16,7 +16,7 @@ OpenAICompletion = ChatCompletion | ParsedChatCompletion[Any]
 
 def usage_to_llm_tokens(usage: CompletionUsage | None) -> LLMTokens:
     if usage is None:
-        return LLMTokens(prompt=0, completion=0, total=0)
+        return LLMTokens(prompt=0, completion=0, total=0, usage_missing=True)
 
     prompt_details = getattr(usage, "prompt_tokens_details", None)
     cache_read = getattr(prompt_details, "cached_tokens", None)

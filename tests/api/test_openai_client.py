@@ -147,7 +147,7 @@ def test_openai_client_accepts_missing_usage(monkeypatch) -> None:
 
     result = client.completion_with_result("hello", output_type=str)
 
-    assert result.meta.tokens == LLMTokens(prompt=0, completion=0, total=0)
+    assert result.meta.tokens == LLMTokens(prompt=0, completion=0, total=0, usage_missing=True)
     assert activities[-1].tokens == result.meta.tokens
 
 

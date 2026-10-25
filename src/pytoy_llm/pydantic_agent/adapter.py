@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Mapping, assert_never
 
 from pydantic import BaseModel
@@ -18,7 +19,7 @@ from pydantic_ai import (
 )
 from pydantic_ai import TextPart as PydanticTextPart
 from pydantic_ai.settings import ThinkingLevel
-from pydantic_ai.usage import UsageLimits
+from pydantic_ai.usage import RunUsage, UsageLimits
 
 from pytoy_llm.models import Part as LLMPart
 from pytoy_llm.models.agent_metas import UsageLimit as PytoyUsageLimit
@@ -32,6 +33,16 @@ from pytoy_llm.models.parts import (
 )
 from pytoy_llm.models.parts import TextPart as LLMTextPart
 from pytoy_llm.models.parts import ToolCallPart as LLMToolCallPart
+
+
+def _run_usage_to_llm_tokens(usage: RunUsage, messages: Sequence[ModelMessage]) -> LLMTokens:
+    return LLMTokens(
+        prompt=usage.input_tokens,
+        completion=usage.output_tokens,
+        total=usage.input_tokens + usage.output_tokens,
+        cache_read=usage.cache_read_tokens,
+        cache_write=usage.cache_write_tokens,
+    )
 
 
 class RequestPartConverter:
@@ -161,15 +172,7 @@ class PydanticAIMessageAdapter:
         messages = [self.from_native(elem) for elem in run_result.all_messages()]
 
         usage = run_result.usage
-        prompt = usage.input_tokens
-        completion = usage.output_tokens
-        tokens = LLMTokens(
-            prompt=prompt,
-            completion=completion,
-            total=prompt + completion,
-            cache_read=usage.cache_read_tokens,
-            cache_write=usage.cache_write_tokens,
-        )
+        tokens = _run_usage_to_llm_tokens(usage, run_result.new_messages())
         meta = LLMOutputMeta(tokens=tokens, finish_reason=None, llm_calls=usage.requests)
         return LLMResult(output=run_result.output, meta=meta, messages=messages)
 

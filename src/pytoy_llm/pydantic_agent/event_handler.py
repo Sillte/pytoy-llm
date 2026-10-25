@@ -29,7 +29,7 @@ from pydantic_ai import (
     ThinkingPart,
 )
 
-from pytoy_llm.models import LLMEventEmitters, LLMRequest, LLMTokens
+from pytoy_llm.models import LLMEventEmitters, LLMRequest
 from pytoy_llm.models.llm_activities.llm_activities import (
     LLMActivity,
     LLMMinimumActivity,
@@ -39,6 +39,7 @@ from pytoy_llm.models.llm_activities.llm_activities import (
     ToolCallActivity,
     ToolResultActivity,
 )
+from pytoy_llm.pydantic_agent.adapter import _run_usage_to_llm_tokens
 
 
 class EventHandler:
@@ -59,15 +60,7 @@ class EventHandler:
 
     def emit_response(self, run_result: AgentRunResult) -> None:
         usage = run_result.usage
-        prompt = usage.input_tokens
-        completion = usage.output_tokens
-        tokens = LLMTokens(
-            prompt=prompt,
-            completion=completion,
-            total=prompt + completion,
-            cache_read=usage.cache_read_tokens,
-            cache_write=usage.cache_write_tokens,
-        )
+        tokens = _run_usage_to_llm_tokens(usage, run_result.new_messages())
         activity = LLMResponseActivity(response=str(run_result.output), tokens=tokens)
         self._event_emitters.emit_activity(activity)
 

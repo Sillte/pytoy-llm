@@ -15,6 +15,7 @@ class LLMTokens(BaseModel, frozen=True):
     total: int
     cache_read: int | None = None
     cache_write: int | None = None
+    usage_missing: bool = False
 
     @classmethod
     def aggregate(cls, llm_tokens: Iterable[Self]) -> Self:
@@ -34,6 +35,7 @@ class LLMTokens(BaseModel, frozen=True):
                 if all(x.cache_write is not None for x in tokens)
                 else None
             ),
+            usage_missing=any(x.usage_missing for x in tokens),
         )
 
 

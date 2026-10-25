@@ -2,6 +2,7 @@ import importlib
 
 import pytest
 
+from pytoy_llm.models import LLMTokens
 from pytoy_llm.models.connections import Connection
 
 
@@ -35,12 +36,10 @@ def test_litellm_client_completes_with_its_optional_dependency(monkeypatch, usag
         )
     )
 
-    if usage is None:
-        with pytest.raises(ValueError, match="Response is strange"):
-            client.completion_with_result("hello", output_type=str)
-        return
-
     result = client.completion_with_result("hello", output_type=str)
 
     assert result.output == "hello from LiteLLM"
-    assert result.meta.tokens.prompt == 1
+    if usage is None:
+        assert result.meta.tokens == LLMTokens(prompt=0, completion=0, total=0, usage_missing=True)
+    else:
+        assert result.meta.tokens == LLMTokens(prompt=1, completion=2, total=3)

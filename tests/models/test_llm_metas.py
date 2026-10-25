@@ -16,3 +16,16 @@ def test_llm_tokens_aggregate_returns_zero_for_empty_iterable() -> None:
     assert LLMTokens.aggregate(iter(())) == LLMTokens(
         prompt=0, completion=0, total=0, cache_read=0, cache_write=0
     )
+
+
+def test_llm_tokens_aggregate_marks_usage_missing_if_any_input_is_missing() -> None:
+    result = LLMTokens.aggregate(
+        [
+            LLMTokens(prompt=10, completion=3, total=13),
+            LLMTokens(prompt=0, completion=0, total=0, usage_missing=True),
+        ]
+    )
+
+    assert result == LLMTokens(
+        prompt=10, completion=3, total=13, cache_read=None, cache_write=None, usage_missing=True
+    )

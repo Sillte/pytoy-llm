@@ -144,7 +144,9 @@ class LiteLLMEventHandler(CustomLogger):
     def _to_response_activity(self, response_obj) -> LLMResponseActivity | LLMMinimumActivity:
         try:
             usage = getattr(response_obj, "usage", None)
-            if usage:
+            if usage is None:
+                tokens = LLMTokens(prompt=0, completion=0, total=0, usage_missing=True)
+            else:
                 tokens = LLMTokens(
                     prompt=usage.prompt_tokens,
                     completion=usage.completion_tokens,
@@ -155,8 +157,6 @@ class LiteLLMEventHandler(CustomLogger):
                         getattr(usage, "prompt_tokens_details", None), "cache_write_tokens", None
                     ),
                 )
-            else:
-                tokens = None
             choice = response_obj.choices[0]
             content = choice.message.content
             activity = LLMResponseActivity(
