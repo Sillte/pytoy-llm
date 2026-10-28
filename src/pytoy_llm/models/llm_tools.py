@@ -4,16 +4,16 @@ from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
-class LLMToolSet(Protocol):
+class LLMToolset(Protocol):
     @property
     def tools(self) -> Sequence[Callable]: ...
 
 
-type LLMToolsLike = Callable | LLMToolSet | Sequence["LLMToolsLike"]
+type LLMToolsLike = Callable | LLMToolset | Sequence["LLMToolsLike"]
 
 
 def from_llm_tools_like(tools: LLMToolsLike) -> Sequence[Callable]:
-    if isinstance(tools, LLMToolSet):
+    if isinstance(tools, LLMToolset):
         return tools.tools
     if callable(tools):
         return [tools]
