@@ -8,7 +8,7 @@ from pytoy_llm.idea import (
     SchemeDirectory,
     UriLocalPathResolver,
 )
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 
 from .discovery import IdeaDiscovery
 from .inspection import IdeaInspection

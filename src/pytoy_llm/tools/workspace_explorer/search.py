@@ -5,7 +5,7 @@ from typing import Annotated, Self, Sequence
 
 from pydantic import Field
 
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import GrepMatch, GrepMatchContext, WorkspaceAccess
 from pytoy_llm.tools.workspace_explorer.semantic_types import (
     GlobPattern,

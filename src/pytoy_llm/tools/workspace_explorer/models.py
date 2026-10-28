@@ -6,7 +6,7 @@ from typing import Literal, Self, Sequence
 from pydantic import AwareDatetime, BaseModel, Field
 
 from pytoy_llm.foundation.paths import PathGatherer
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.semantic_types import (
     FileGlob,
     LineNumber,

@@ -9,7 +9,7 @@ from pytoy_llm.idea import (
     MetadataValueError,
     OutsidePathError,
 )
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 
 from .semantic_types import IdeaNoteBody, IdeaNoteMetadata, IdeaNotePath, IdeaSpacePath, Namespace
 

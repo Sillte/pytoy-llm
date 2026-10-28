@@ -1,7 +1,7 @@
 from typing import Any, Callable, Sequence
 
 from pytoy_llm.idea import IdeaSpace, ShouldBeSpacePathError
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 
 from .boundaries import tool_discovery_boundary
 from .semantic_types import (

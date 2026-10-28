@@ -5,7 +5,7 @@ from pydantic import TypeAdapter
 
 from pytoy_llm.idea import IdeaSpace, SchemeDirectory, UriLocalPathResolver
 from pytoy_llm.idea.domain.uri import Uri
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 from pytoy_llm.tools.idea_tool import IdeaTool
 from pytoy_llm.tools.idea_tool.models import ExternalLinkModel, IdeaNoteModel
 from pytoy_llm.tools.idea_tool.semantic_types import IdeaNoteReference, Namespace

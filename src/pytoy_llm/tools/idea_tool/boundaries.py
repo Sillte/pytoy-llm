@@ -2,7 +2,7 @@ from functools import wraps
 from typing import Callable
 
 from pytoy_llm.idea import MetadataDeserializationError, OutsidePathError
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 
 
 def tool_discovery_boundary[R](

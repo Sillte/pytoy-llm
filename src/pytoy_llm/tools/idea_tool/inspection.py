@@ -13,7 +13,7 @@ from pytoy_llm.idea import (
     OutsidePathError,
     UriLocalPathResolver,
 )
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 
 from .boundaries import tool_inspection_boundary
 from .models import (

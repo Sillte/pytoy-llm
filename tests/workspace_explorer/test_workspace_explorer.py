@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
+from pytoy_llm.tool import ToolError, ToolErrorKind
 from pytoy_llm.tools import WorkspaceExplorer
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import (
     DirectoryInfo,
     FileContent,

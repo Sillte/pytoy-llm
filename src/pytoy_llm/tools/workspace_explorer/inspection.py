@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Self, Sequence
 
-from pytoy_llm.tools.errors import ToolError, ToolErrorKind
+from pytoy_llm.tool import ToolError, ToolErrorKind
 from pytoy_llm.tools.workspace_explorer.models import (
     FileContent,
     FilePartContent,
